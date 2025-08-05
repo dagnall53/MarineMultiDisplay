@@ -12,8 +12,9 @@ FOR WAVESHARE 4inch LCD
 #define EX102 1 //BL_EN
 #define EX103 2//LCD_RST
 #define EX104 3 //SD_CS
+#define EX105 4 //TF VLED FB?
 
-#define GFX_BL EX102 // is port ex102
+#define GFX_BL EX102 // is port ex102  NB this is used in  uses expander.digitalwrite
 
 Arduino_DataBus *bus = new Arduino_SWSPI(
   GFX_NOT_DEFINED /* DC */,
@@ -73,7 +74,7 @@ using //(deleted), 00 60 Good results == type9 default
 */
 //** OTHER PINS
 
-#define TFT_BL GFX_BL
+#define TFT_BL GFX_BL  // or EX105 ?  not used??
 #define I2C_SDA_PIN 15
 #define I2C_SCL_PIN 7
 

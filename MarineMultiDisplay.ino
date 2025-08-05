@@ -92,7 +92,7 @@ bool hasSD;
 #include <SD_MMC.h>  // was SD.h  // pins set in 4inch.h
 #include "SPI.h"
 #include "FS.h"
-//Changes for SD_MMC use ..
+//Changes for SD_MMC use .. for the waveshare board. This may avoid having to use the expander as SD_MMC.begin it does not use SDCS?
 bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() function
   File file = SD_MMC.open(path);
   if (file) {
