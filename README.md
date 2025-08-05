@@ -3,6 +3,10 @@
 This project is a version of the NMEADISPLAY Wireless Instrument Repeater Display for Boats coded for the WaveShare Module
 <img width="432" height="426" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
 
+WIKI: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+
+NEEDS ESP32 Compiler Version 3 ??
+
 
 <i>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
@@ -60,7 +64,7 @@ colortest.txt ( a json with settings that will eventually allow global day/night
 logo4.jpg (the new generic start screen image), 
 v3small.jpg (used in the webbrowser start screen).
 and loading.jpg, (a picture that appears during OTA updates). 
-Add startsound.mp3 to play on start if you have modified the board to enable the audio.
+
 
 Re insert the SD card into the module and restart. 
 
@@ -232,15 +236,6 @@ There is a Simulate option, selectable in colortest, this initiates a crude simu
 This works most logically with my default Vconfig.txt file. 
 I have seen some issues with Simulate crashing the display very badly:(needed reinstall of code). But I think this has been fixed in V4.30 
 
-## AUDIO 
-
-An audio player has been added for experimental use, that plays MP3 from files stored on the SD card /music directory.
-It requires that three resistors are moved on the PCB to activate the audio circuit, and is not recommended unless you are comfortable with soldering and desoldering SMD resistors!
-The audio works, but is mainly used to explore how much - if any - free computation the ESP32 has. When playing and also logging data, the audio is noticably disrupted.
-I have semi hidden the audio player in V2 of the software. 
-The audio will drop out when extensive computation is occuring. Such as when the graphics are updated. - or when the BLE is scanning. 
-Giving a good audible indication useful for development debugging. 
-If you ty to listen to an audio file while the BLE is in operation, all sound stops for a second at about 3 second intervals.
 
 
 =======

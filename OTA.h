@@ -44,7 +44,7 @@
 #include "Structures.h"
 
 #include <SPI.h>
-#include <SD.h>
+#include <SD_MMC.h> // was SD.h
 
 extern bool hasSD;
 static bool INSTlogFileStarted = false;
@@ -88,7 +88,7 @@ char SavedFile[30];
 char InstLogFileName[25];
 char NMEALogFileName[25];
 
-
+extern bool SDfileExists(const char* path);
 
 // Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
 String html_Question() {
@@ -161,7 +161,7 @@ String html_startws() {
   st += String(Display_Config.PanelName);
   st += ".local/edit/index.htm'>SD Files Editor</a></h1><br>"
         "<div class='version'>Saved Log files on SD </div>";
-  File dir = SD.open("/logs");
+  File dir = SD_MMC.open("/logs");
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
     Serial.println(entry.path());
@@ -199,7 +199,7 @@ String style =
 // using local copy of the javascript ?..
 String serverIndex() {
   String st;
-  if (SD.exists("/edit/jquery.min.js")) {
+  if (SDfileExists("/edit/jquery.min.js")) {
     Serial.println("using local js");
     st = "<script src='/edit/jquery.min.js'></script>";
   } else {
@@ -309,11 +309,11 @@ bool loadFromSdCard(String path) {
     dataType = "audio/mpeg";
   }
 
-  File dataFile = SD.open(path.c_str());
+  File dataFile = SD_MMC.open(path.c_str());
   if (dataFile.isDirectory()) {
     path += "/index.htm";
     dataType = "text/html";
-    dataFile = SD.open(path.c_str());
+    dataFile = SD_MMC.open(path.c_str());
   }
 
   if (!dataFile) {
@@ -338,10 +338,10 @@ void handleFileUpload() {
   }
   HTTPUpload &upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
-    if (SD.exists((char *)upload.filename.c_str())) {
-      SD.remove((char *)upload.filename.c_str());
+    if (SDfileExists((char *)upload.filename.c_str())) {
+      SD_MMC.remove((char *)upload.filename.c_str());
     }
-    uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
+    uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
     Serial.print("Upload: START, filename: ");
     Serial.println(upload.filename);
     strcpy(SavedFile, upload.filename.c_str());
@@ -397,10 +397,10 @@ void handleFileUpload() {
 }
 
 void deleteRecursive(String path) {
-  File file = SD.open((char *)path.c_str());
+  File file = SD_MMC.open((char *)path.c_str());
   if (!file.isDirectory()) {
     file.close();
-    SD.remove((char *)path.c_str());
+    SD_MMC.remove((char *)path.c_str());
     return;
   }
 
@@ -416,12 +416,12 @@ void deleteRecursive(String path) {
       deleteRecursive(entryPath);
     } else {
       entry.close();
-      SD.remove((char *)entryPath.c_str());
+      SD_MMC.remove((char *)entryPath.c_str());
     }
     yield();
   }
 
-  SD.rmdir((char *)path.c_str());
+  SD_MMC.rmdir((char *)path.c_str());
   file.close();
 }
 
@@ -430,7 +430,7 @@ void handleDelete() {
     return returnFail("BAD ARGS");
   }
   String path = server.arg(0);
-  if (path == "/" || !SD.exists((char *)path.c_str())) {
+  if (path == "/" || !SDfileExists((char *)path.c_str())) {
     returnFail("BAD PATH");
     return;
   }
@@ -443,19 +443,19 @@ void handleCreate() {
     return returnFail("BAD ARGS");
   }
   String path = server.arg(0);
-  if (path == "/" || SD.exists((char *)path.c_str())) {
+  if (path == "/" || SDfileExists((char *)path.c_str())) {
     returnFail("BAD PATH");
     return;
   }
 
   if (path.indexOf('.') > 0) {
-    File file = SD.open((char *)path.c_str(), FILE_WRITE);
+    File file = SD_MMC.open((char *)path.c_str(), FILE_WRITE);
     if (file) {
       file.write(0);
       file.close();
     }
   } else {
-    SD.mkdir((char *)path.c_str());
+    SD_MMC.mkdir((char *)path.c_str());
   }
   returnOK();
 }
@@ -465,10 +465,10 @@ void printDirectory() {
     return returnFail("BAD ARGS");
   }
   String path = server.arg("dir");
-  if (path != "/" && !SD.exists((char *)path.c_str())) {
+  if (path != "/" && !SDfileExists((char *)path.c_str())) {
     return returnFail("BAD PATH");
   }
-  File dir = SD.open((char *)path.c_str());
+  File dir = SD_MMC.open((char *)path.c_str());
   path = String();
   if (!dir.isDirectory()) {
     dir.close();
@@ -724,7 +724,7 @@ void StartInstlogfile() {
   // Serial.printf("  ***** LOG FILE DEBUG ***  use: <%6i>  to make name..  ",int(BoatData.GPSDate));
   snprintf(InstLogFileName, 25, "/logs/%6i.log", int(BoatData.GPSDate));
   //  Serial.printf("  <%s> \n",InstLogFileName);
-  File file = SD.open(InstLogFileName);
+  File file = SD_MMC.open(InstLogFileName);
   if (!file) {
     //Serial.println("File doesn't exist");
     INSTlogFileStarted = true;
@@ -733,7 +733,7 @@ void StartInstlogfile() {
     /*    int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60,
         BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
         */
-    writeFile(SD, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
+    writeFile(SD_MMC, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
     file.close();
     return;
   } else {
@@ -750,12 +750,12 @@ void StartNMEAlogfile() {
   }
   // If the data.txt file doesn't exist
   // Create a (FIXED NAME!) file on the SD card and write the data labels
-  File file = SD.open("/logs/NMEA.log");
+  File file = SD_MMC.open("/logs/NMEA.log");
   if (!file) {
     //Serial.println("File doens't exist");
     NMEAINSTlogFileStarted = true;
     Serial.printf("Creating NMEA LOG file. and header..\n");
-    writeFile(SD, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
+    writeFile(SD_MMC, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
     file.close();
     return;
   } else {
@@ -779,7 +779,7 @@ void NMEALOG(const char *fmt, ...) {
   // Serial.printf("  Logging to:<%s>", NMEALogFileName);
   // Serial.print("  Log  data: ");
   // Serial.println(msg);
-  appendFile(SD, "/logs/NMEA.log", msg);
+  appendFile(SD_MMC, "/logs/NMEA.log", msg);
 }
 
 void INSTLOG(const char *fmt, ...) {
@@ -796,7 +796,7 @@ void INSTLOG(const char *fmt, ...) {
   // Serial.printf("  Logging to:<%s>", InstLogFileName);
   // Serial.print("  Log  data: ");
   // Serial.println(msg);
-  appendFile(SD, InstLogFileName, msg);
+  appendFile(SD_MMC, InstLogFileName, msg);
 }
 
 
