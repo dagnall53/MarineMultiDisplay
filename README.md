@@ -1,6 +1,8 @@
 
-# NMEADisplay
-This project is a Wireless Instrument Repeater Display for Boats.
+# Marine Multi Display
+This project is a version of the NMEADISPLAY Wireless Instrument Repeater Display for Boats coded for the WaveShare Module
+<img width="432" height="426" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
+
 
 <i>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
@@ -9,10 +11,6 @@ No liability for any loss, damage, or injury resulting from the use of this inst
 
 This project requires the boat to have a wireless NMEA Gateway that sends NMEA 0183 instrument readings on UDP. 
 <p align="center"> Version 3 display <img width = 400 src="https://github.com/user-attachments/assets/a6a14548-3c6a-4396-b0af-098bd9176c43" width="200" /></p>
-
-Images of previous versions of the display
-<p> <img  height =200 src="https://github.com/user-attachments/assets/7f585734-d98d-4989-88b9-e27b94a2dbbe" />
-<img height = 200 src="https://github.com/user-attachments/assets/f7ee5526-b172-4278-a29b-25652bf69c3d" /></p>
 
 
 ## HOW TO INSTALL FIRST TIME
