@@ -1,8 +1,8 @@
 /*
-N2kDataToNMEA0183.cpp
+N2KdataRX.cpp
 
 Copyright (c) 2015-2018 Timo Lappalainen, Kave Oy, www.kave.fi
-
+Adding AIS (c) 2019 Ronnie Zeiller, www.zeiller.eu
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -22,10 +22,10 @@ CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFT
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-my work here is based on example in Examples  N2kDataToNMEA0183.cpp
+my work here is based on example in Examples  N2KdataRX.cpp
 */
 
-#include "N2kDataToNMEA0183.h"
+#include "N2KdataRX.h"
 #include <N2kMessages.h>
 #include <N2kTypes.h>
 #include <NMEA0183Messages.h>
@@ -44,7 +44,7 @@ extern _sBoatData BoatData;  // BoatData values for the display , int double , w
 
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleMsg(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleMsg(const tN2kMsg &N2kMsg) {
 
   switch (N2kMsg.PGN) {
     // these update my structures on receipt:
@@ -76,7 +76,7 @@ void tN2kDataToNMEA0183::HandleMsg(const tN2kMsg &N2kMsg) {
 //*****************************************************************************
 
 //****************************************************
-void tN2kDataToNMEA0183::Update() {  // note other messages will be initiated immediately by their tN2kDataToNMEA0183 HandleMsg
+void tN2KdataRX::Update() {  // note other messages will be initiated immediately by their tN2KdataRX HandleMsg
   static bool ResetDone = false;
   // On the First Run, RESET the variables that are used as "indicators"  so that we do not get spurious Data sent on startup.
   if (!ResetDone) {
@@ -91,7 +91,7 @@ void tN2kDataToNMEA0183::Update() {  // note other messages will be initiated im
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleHeading(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleHeading(const tN2kMsg &N2kMsg) {
   /*
   1 Sequence ID
   2 Heading Sensor Reading
@@ -182,7 +182,7 @@ void tN2kDataToNMEA0183::HandleHeading(const tN2kMsg &N2kMsg) {
 
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleVariation(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleVariation(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   tN2kMagneticVariation Source;
   uint16_t LOCALDaysSince1970;
@@ -193,7 +193,7 @@ void tN2kDataToNMEA0183::HandleVariation(const tN2kMsg &N2kMsg) {
 
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleBoatSpeed(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleBoatSpeed(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   double WaterReferenced;
   double GroundReferenced;
@@ -206,7 +206,7 @@ void tN2kDataToNMEA0183::HandleBoatSpeed(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleDepth(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleDepth(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   double DepthBelowTransducer;
   double Offset;
@@ -217,7 +217,7 @@ void tN2kDataToNMEA0183::HandleDepth(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandlePosition(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandlePosition(const tN2kMsg &N2kMsg) {
 
   if (ParseN2kPGN129025(N2kMsg, Latitude, Longitude)) {
 // needs toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);
@@ -226,7 +226,7 @@ void tN2kDataToNMEA0183::HandlePosition(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleCOGSOG(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleCOGSOG(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   tN2kHeadingReference HeadingReference;
 
@@ -245,7 +245,7 @@ void tN2kDataToNMEA0183::HandleCOGSOG(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleGNSS(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleGNSS(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   tN2kGNSStype GNSStype;
   tN2kGNSSmethod GNSSmethod;
@@ -268,7 +268,7 @@ void tN2kDataToNMEA0183::HandleGNSS(const tN2kMsg &N2kMsg) {
   }
 }
 
-void tN2kDataToNMEA0183::HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   uint16_t SystemDate;
   double SystemTime;
@@ -288,7 +288,7 @@ void tN2kDataToNMEA0183::HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
   }
 }
 
-void tN2kDataToNMEA0183::HandleWatertemp12(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleWatertemp12(const tN2kMsg &N2kMsg) {
   // Garmin depth sensor output as advised Erasmo J. D. Chiappetta Filho 02/06/25 
   unsigned char SID, TempInstance;
   tN2kTempSource TempSource;
@@ -300,7 +300,7 @@ void tN2kDataToNMEA0183::HandleWatertemp12(const tN2kMsg &N2kMsg) {
     
   }
 }
-void tN2kDataToNMEA0183::HandleWatertemp16(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleWatertemp16(const tN2kMsg &N2kMsg) {
   // Garmin depth sensor output  advised  Erasmo J. D. Chiappetta Filho 02/06/25 
   unsigned char SID, TempInstance;
   tN2kTempSource TempSource;
@@ -314,8 +314,8 @@ void tN2kDataToNMEA0183::HandleWatertemp16(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleWind(const tN2kMsg &N2kMsg) {
-  /* see C:\Users\admin\Documents\Arduino\libraries\NMEA2000\Examples\NMEA2000ToNMEA0183\N2kDataToNMEA0183.cpp
+void tN2KdataRX::HandleWind(const tN2kMsg &N2kMsg) {
+  /* see C:\Users\admin\Documents\Arduino\libraries\NMEA2000\Examples\NMEA2000ToNMEA0183\N2KdataRX.cpp
 */
 
 
@@ -345,7 +345,7 @@ void tN2kDataToNMEA0183::HandleWind(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2kDataToNMEA0183::HandleRudder(const tN2kMsg &N2kMsg) {
+void tN2KdataRX::HandleRudder(const tN2kMsg &N2kMsg) {
 
   unsigned char Instance;
   tN2kRudderDirectionOrder RudderDirectionOrder;

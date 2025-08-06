@@ -27,7 +27,7 @@ const char soft_version[] = "VERSION 4.32";
 #define UsingV3Compiler             // this "UsingV3Compiler" #def DOES NOT WORK by itsself! it only affects .h not .cpp files  !! (v3 ESPnow is very different) directive to replace std::string with String for Version 3 compiler and also (?) other V3 incompatibilites
 #endif
 
-#include "N2kDataToNMEA0183.h"  // NOTE FOR the MULTI DISPLAY. We do not convert N2K to 0183, but just get values and place in boatData! 
+#include "N2KDataRX.h"  // NOTE FOR the MULTI DISPLAY. We do not convert N2K to 0183, but just get values and place in boatData! 
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 #include <NMEA2000_esp32xx.h>  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 tNMEA2000 &NMEA2000=*(new tNMEA2000_esp32xx());
@@ -124,7 +124,7 @@ bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() funct
   #define ESP32_CAN_TX_PIN 6  // for the waveshare module boards!
   #define ESP32_CAN_RX_PIN 0  // for the waveshare module boards!
 
-tN2kDataToNMEA0183 tN2kDataToNMEA0183(&NMEA2000, 0);
+tN2KdataRX tN2KdataRX(&NMEA2000, 0);
 const unsigned long ReceiveMessages[] PROGMEM = { 
                                                   127250L,      // Heading
                                                   127258L,      // Magnetic variation
@@ -173,14 +173,14 @@ void InitNMEA2000() {
 
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 32);
   NMEA2000.ExtendReceiveMessages(ReceiveMessages);
-  NMEA2000.AttachMsgHandler(&tN2kDataToNMEA0183);  // NMEA 2000 inputs
+  NMEA2000.AttachMsgHandler(&tN2KdataRX);  // NMEA 2000 inputs
   NMEA2000.SetMsgHandler(HandleNMEA2000Msg);  // see main ino)
-  // this would be where a NMEA0183 would gets converted to N2K and sent //N2K gets tN2kDataToNMEA0183.SetSendNMEA0183MessageCallback(N2K_to_0183_Handler);  //  FUNCTION called once we have a 0183 conversion from the n2k
+  // this would be where a NMEA0183 would gets converted to N2K and sent //N2K gets tN2KdataRX.SetSendNMEA0183MessageCallback(N2K_to_0183_Handler);  //  FUNCTION called once we have a 0183 conversion from the n2k
   
   NMEA2000.Open();
   // loop contains         NMEA2000.ParseMessages();                                        
 }
-extern _sButton Terminal ; // saves moving all the N2000 stuff after the button definitions 
+extern _sButton Terminal ; // saves moving all the N2000 stuff to after the button definitions 
 void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) { 
 // FIRST- if on debug page (-21) send summary to terminal - else keep quiet!
 /* based on..  
