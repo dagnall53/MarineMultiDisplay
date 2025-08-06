@@ -39,7 +39,7 @@ const double radToDeg = 180.0 / M_PI;
 #include "Structures.h"
 
 extern _sBoatData BoatData;  // BoatData values for the display , int double , when read, when displayed etc 
-//extern void toNewStruct(char *field, _sInstData &data); 
+
 
 
 
@@ -91,15 +91,6 @@ void tN2kDataToNMEA0183::Update() {  // note other messages will be initiated im
 }
 
 //*****************************************************************************
-extern bool DebugMode;
-extern void WebserverSendContent(String st);
-
-
-
-
-
-
-//*****************************************************************************
 void tN2kDataToNMEA0183::HandleHeading(const tN2kMsg &N2kMsg) {
   /*
   1 Sequence ID
@@ -129,11 +120,8 @@ void tN2kDataToNMEA0183::HandleHeading(const tN2kMsg &N2kMsg) {
   double _Deviation = 0;
   double _Variation;
 
-  //Select which message to send! depending on type of data received: If N2khr_magnetic  -- send HDG or HDM depending on if DEV/Var were seen.
-  //if N2khr_true  send HDT!
   bool SendHDM = true;
   if (ParseN2kHeading(N2kMsg, SID, Heading, _Deviation, _Variation, ref)) {
-    LastHeadingTime = millis();
     if (ref == N2khr_magnetic) {
       if (!N2kIsNA(_Deviation)) {
         Deviation = _Deviation;
@@ -193,31 +181,15 @@ tWAYPOINT Waypoint[5];
 tROUTE MyRoute;
 
 
-
-
-
-
-
-
-
-
 //*****************************************************************************
 void tN2kDataToNMEA0183::HandleVariation(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   tN2kMagneticVariation Source;
   uint16_t LOCALDaysSince1970;
   // Just saves the Variation for use in other functions.
-  //ParseN2kMagneticVariation(N2kMsg, SID, Source, LOCALDaysSince1970, Variation);
-}
-
-
-
-
-
-
-
-
-
+  ParseN2kMagneticVariation(N2kMsg, SID, Source, LOCALDaysSince1970, Variation);
+  BoatData.Variation = Variation; // just save value, not sInstData so not need to save time of data etc.. 
+  }
 
 
 //*****************************************************************************
@@ -225,11 +197,10 @@ void tN2kDataToNMEA0183::HandleBoatSpeed(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   double WaterReferenced;
   double GroundReferenced;
-  tN2kSpeedWaterReferenceType SWRT;
-
+  tN2kSpeedWaterReferenceType SWRT; // water speed reference type 
+  // ignore ground referenced! 
   if (ParseN2kBoatSpeed(N2kMsg, SID, WaterReferenced, GroundReferenced, SWRT)) {
-     double MagneticHeading = (!N2kIsNA(Heading) && !N2kIsNA(Variation) ? Heading + Variation : NMEA0183DoubleNA);
-    toNewStruct(MagneticHeading, BoatData.MagHeading);
+     toNewStruct(WaterReferenced, BoatData.STW);
     
   }
 }
@@ -249,9 +220,9 @@ void tN2kDataToNMEA0183::HandleDepth(const tN2kMsg &N2kMsg) {
 void tN2kDataToNMEA0183::HandlePosition(const tN2kMsg &N2kMsg) {
 
   if (ParseN2kPGN129025(N2kMsg, Latitude, Longitude)) {
-    LastPositionTime = millis();
+// needs toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);
   }
-  //NOTE 0183 build uses timed function in SendRMC
+  
 }
 
 //*****************************************************************************
@@ -318,7 +289,7 @@ void tN2kDataToNMEA0183::HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
 }
 
 void tN2kDataToNMEA0183::HandleWatertemp12(const tN2kMsg &N2kMsg) {
-  // for Erasmo J. D. Chiappetta Filho 02/06/25 : erasmocf@gmail.com
+  // Garmin depth sensor output as advised Erasmo J. D. Chiappetta Filho 02/06/25 
   unsigned char SID, TempInstance;
   tN2kTempSource TempSource;
   double SeaTemp, SetTemperature;
@@ -330,7 +301,7 @@ void tN2kDataToNMEA0183::HandleWatertemp12(const tN2kMsg &N2kMsg) {
   }
 }
 void tN2kDataToNMEA0183::HandleWatertemp16(const tN2kMsg &N2kMsg) {
-  // for Erasmo J. D. Chiappetta Filho 02/06/25 : erasmocf@gmail.com
+  // Garmin depth sensor output  advised  Erasmo J. D. Chiappetta Filho 02/06/25 
   unsigned char SID, TempInstance;
   tN2kTempSource TempSource;
   double SeaTemp, SetTemperature;
@@ -381,7 +352,7 @@ void tN2kDataToNMEA0183::HandleRudder(const tN2kMsg &N2kMsg) {
   double AngleOrder;
 
   if (ParseN2kRudder(N2kMsg, RudderPosition, Instance, RudderDirectionOrder, AngleOrder)) {
-  //set rudder structure? 
+  //set  a rudder position structure? 
 
   }
 }

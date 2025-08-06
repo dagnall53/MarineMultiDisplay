@@ -29,18 +29,15 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <N2kMessages.h>
 
 //------------------------------------------------------------------------------
+/*
+ Despite the name,  NOTE FOR the MULTI DISPLAY. We do not convert N2K to 0183, but just get values and place in boatData! 
+*/
+
 class tN2kDataToNMEA0183 : public tNMEA2000::tMsgHandler {
 public:
   using tSendNMEA0183MessageCallback=void (*)(const tNMEA0183Msg &NMEA0183Msg);
 
 protected:
-  static const unsigned long RMCPeriod=1000;
-  static const unsigned long RMBPeriod=1000;
-  static const unsigned long APBPeriod=1000;
-  static const unsigned long VTGPeriod=1000;
-  static const unsigned long MWVPeriod=500;
-  static const unsigned long HDGPeriod=500;
-  unsigned long lastRMCSeconds;
   double Latitude;
   double Longitude;
   double Altitude;
@@ -53,21 +50,9 @@ protected:
   double WindSpeed;
   double WindAngle;
   bool WindSourceApparent;
-  unsigned long LastHeadingTime;
-  unsigned long LastCOGSOGTime;
-  unsigned long LastPositionTime;
-  unsigned long LastRouteTime;
-  unsigned long LastPosSend;
-  unsigned long LastWindTime;
   double RudderPosition;
   uint16_t DaysSince1970;
   double SecondsSinceMidnight;
-  unsigned long NextRMCSend;
-  unsigned long NextRMBSend;
-  unsigned long NextAPBSend;
-  unsigned long NextVTGSend;
-  unsigned long NextMWVSend;
-  unsigned long NextHDGSend;
   tNMEA0183 *pNMEA0183;
   tSendNMEA0183MessageCallback SendNMEA0183MessageCallback;
 
@@ -83,10 +68,6 @@ protected:
   void HandleGNSSSystemTime(const tN2kMsg &N2kMsg);     // 126992 
   void HandleWind(const tN2kMsg &N2kMsg);               // 130306
   void HandleRudder(const tN2kMsg &N2kMsg);             // 127245
-
-
-
-
   void HandleWatertemp12(const tN2kMsg &N2kMsg);        //130312
   void HandleWatertemp16(const tN2kMsg &N2kMsg);        //130316
 
@@ -97,12 +78,7 @@ public:
     Latitude=N2kDoubleNA; Longitude=N2kDoubleNA; Altitude=N2kDoubleNA;
     Variation=N2kDoubleNA; Heading=N2kDoubleNA; COG=N2kDoubleNA; SOG=N2kDoubleNA;
     SecondsSinceMidnight=N2kDoubleNA; DaysSince1970=N2kUInt16NA;
-    LastPosSend=0;
-    NextRMCSend=millis()+RMCPeriod; // old way?
-    LastHeadingTime=0;
-    LastCOGSOGTime=0;
-    LastPositionTime=0;
-    LastWindTime=0;
+
   }
   void HandleMsg(const tN2kMsg &N2kMsg);
   void SetSendNMEA0183MessageCallback(tSendNMEA0183MessageCallback _SendNMEA0183MessageCallback) {

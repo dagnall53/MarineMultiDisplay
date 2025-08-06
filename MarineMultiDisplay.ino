@@ -27,7 +27,7 @@ const char soft_version[] = "VERSION 4.32";
 #define UsingV3Compiler             // this "UsingV3Compiler" #def DOES NOT WORK by itsself! it only affects .h not .cpp files  !! (v3 ESPnow is very different) directive to replace std::string with String for Version 3 compiler and also (?) other V3 incompatibilites
 #endif
 
-#include "N2kDataToNMEA0183.h"
+#include "N2kDataToNMEA0183.h"  // NOTE FOR the MULTI DISPLAY. We do not convert N2K to 0183, but just get values and place in boatData! 
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 #include <NMEA2000_esp32xx.h>  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 tNMEA2000 &NMEA2000=*(new tNMEA2000_esp32xx());
