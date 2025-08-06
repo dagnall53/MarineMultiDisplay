@@ -27,7 +27,16 @@ const char soft_version[] = "VERSION 4.32";
 #define UsingV3Compiler             // this "UsingV3Compiler" #def DOES NOT WORK by itsself! it only affects .h not .cpp files  !! (v3 ESPnow is very different) directive to replace std::string with String for Version 3 compiler and also (?) other V3 incompatibilites
 #endif
 
-
+#include "N2kDataToNMEA0183.h"
+// not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
+#include <NMEA2000_esp32xx.h>  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
+tNMEA2000 &NMEA2000=*(new tNMEA2000_esp32xx());
+//#include <ESP32-TWAI-CAN.hpp>
+//Should only use the relevant code from these libraries!
+#include <N2kTypes.h>
+#include <N2kMsg.h>
+#include <NMEA2000.h>
+#include <N2kMessages.h>
 #include <NMEA0183.h>
 #include <NMEA0183Msg.h>
 #include <NMEA0183Messages.h>
@@ -46,7 +55,7 @@ const char soft_version[] = "VERSION 4.32";
 #include "Structures.h"
 
 #include "aux_functions.h"
-#include <Arduino_GFX_Library.h>  // aka by Moon on our Nation
+#include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation'
 // Original version was for GFX 1.3.1 only. #include "GUITIONESP32-S3-4848S040_GFX_133.h"
 #include "WAV_4inch.h"  // defines GFX settings for Waveshare lcd 4 including touch
 //*********** for keyboard*************
@@ -110,6 +119,158 @@ bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() funct
 #include "VICTRONBLE.h"  //sets #ifndef Victronble_h
 
 
+//************************ CANBUS / NMEA2000
+
+  #define ESP32_CAN_TX_PIN 6  // for the waveshare module boards!
+  #define ESP32_CAN_RX_PIN 0  // for the waveshare module boards!
+
+tN2kDataToNMEA0183 tN2kDataToNMEA0183(&NMEA2000, 0);
+const unsigned long ReceiveMessages[] PROGMEM = { 
+                                                  127250L,      // Heading
+                                                  127258L,      // Magnetic variation
+                                                  128259UL,     // Boat speed
+                                                  128267UL,     // Depth
+                                                  129025UL,     // Position
+                                                  129026L,      // COG and SOG
+                                                  129029L,      // GNSS
+                                                  130306L,      // Wind
+                                                  128275L,      // Log
+                                                  127245L,      // Rudder
+                                                  0 };
+#define DefaultSerialNumber 999999
+//*****************************************************************************
+uint32_t GetSerialNumber() {  // not using the getSerial.number library function!
+  byte b[6];
+  WiFi.macAddress(b);
+  uint32_t sn = b[2] << 24;
+  sn += b[3] << 16;
+  sn += b[4] << 8;
+  sn += b[5];
+  return (sn != 0 ? sn : DefaultSerialNumber);
+}
+
+
+void InitNMEA2000() {
+  NMEA2000.SetN2kCANMsgBufSize(8);
+  NMEA2000.SetN2kCANReceiveFrameBufSize(100);
+  char SnoStr[33];
+  uint32_t SerialNumber = GetSerialNumber();
+  snprintf(SnoStr, 32, "%lu", (long unsigned int)SerialNumber);
+  Serial.println("NMEA2000 Initialization ...");
+  Serial.printf("   Unique ID: <%lu>\r\n", (long unsigned int)SerialNumber);
+  NMEA2000.SetProductInformation(SnoStr,                // Manufacturer's Model Serial. code // set from board!
+                                 135,                   // Manufacturer's product code
+                                 "Multi_Display",  // Manufacturer's Model ID
+                                 soft_version,          // Manufacturer's Software version code  // This should be linked to char soft_version[ ]/ or at least the SW ver number part
+                                 "DIY Display"         // Manufacturer's Model version
+  );
+  // Det device information
+  NMEA2000.SetDeviceInformation(SerialNumber,  // Unique number. Use e.g. Serial number.
+                                135,           // Device function=0183 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20%26%20function%20codes%20v%202.00.pdf
+                                25,            // Device class=Inter/Intranetwork Device. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20%26%20function%20codes%20v%202.00.pdf
+                                2046           // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
+  );
+
+  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 32);
+  NMEA2000.ExtendReceiveMessages(ReceiveMessages);
+  NMEA2000.AttachMsgHandler(&tN2kDataToNMEA0183);  // NMEA 2000 inputs
+  NMEA2000.SetMsgHandler(HandleNMEA2000Msg);  // see main ino)
+  // this would be where a NMEA0183 would gets converted to N2K and sent //N2K gets tN2kDataToNMEA0183.SetSendNMEA0183MessageCallback(N2K_to_0183_Handler);  //  FUNCTION called once we have a 0183 conversion from the n2k
+  
+  NMEA2000.Open();
+  // loop contains         NMEA2000.ParseMessages();                                        
+}
+extern _sButton Terminal ; // saves moving all the N2000 stuff after the button definitions 
+void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) { 
+// FIRST- if on debug page (-21) send summary to terminal - else keep quiet!
+/* based on..  
+  if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
+        if (type == 4) {
+          UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);  
+        }
+        */
+  if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
+    char SrcPgnHEX[8];
+    String st;
+    sprintf( SrcPgnHEX, "%.2X%.5X", N2kMsg.Source, N2kMsg.PGN );    
+    st += " PGN:" +String(N2kMsg.PGN)+" SRC:" + String(N2kMsg.Source) + "=[" + SrcPgnHEX  + "]" + PGNDecode(N2kMsg.PGN) + "\r";
+    UpdateLinef(BLACK, 8, Terminal, "N2K:%s", st); // or '7' ?small enough to avoid line wrap issues?
+ 
+  }
+}
+String PGNDecode(int PGN) {  // decode the PGN to a readable name.. Useful for the decodeMode the bus?
+  //https://endige.com/2050/nmea-2000-pgns-deciphered/
+  // see also https://canboat.github.io/canboat/canboat.xml#pgn-list
+  // Changed Type to String: from Char*// to avoid the warnings!
+  // I have added  to those PGN that store data for timed use: RMB APB RMC etc
+  switch (PGN) {
+    case 65359: return "Seatalk: Pilot Heading"; break;  //https://github.com/canboat/canboat/blob/master/analyzer/pgn.h
+    case 65379: return "Seatalk: Pilot Mode"; break;
+    case 65360: return "Seatalk: Pilot Locked Heading"; break;
+    case 65311: return "Magnetic Variation (Raymarine Proprietary)"; break;
+    case 126720: return "Raymarine Device ID"; break;
+    case 126992: return "System Time"; break;
+    case 126993: return "Heartbeat"; break;
+    case 127237: return "Heading/Track Control"; break;
+    case 127245: return "Rudder"; break;
+    case 127250: return "Vessel Heading, Deviation, Variation"; break;
+    case 127251: return "Rate of Turn"; break;
+    case 127258: return "Magnetic Variation"; break;
+    case 127488: return "Engine Parameters, Rapid Update"; break;
+    case 127508: return "Battery Status"; break;
+    case 127513: return "Battery Configuration Status"; break;
+    case 128259: return "Speed, Water referenced"; break;
+    case 128267: return "Water Depth"; break;
+    case 128275: return "Distance Log"; break;
+    case 129025: return "Position, Rapid Update"; break;
+    case 129026: return "COG & SOG, Rapid Update"; break;
+    case 129029: return "GNSS Position Data"; break;
+    case 129033: return "Local Time Offset"; break;
+    case 129044: return "Datum"; break;
+    case 129283: return "Cross Track Error"; break;
+    case 129284: return "Navigation Data"; break;
+    case 129285: return "Navigation — Route/WP information"; break;
+    case 129291: return "Set & Drift, Rapid Update"; break;
+    case 129539: return "GNSS DOPs"; break;
+    case 129540: return "GNSS Sats in View"; break;
+    case 130066: return "Route and WP Service — Route/WP— List Attributes"; break;
+    case 130067: return "Route and WP Service — Route — WP Name & Position"; break;
+    case 130074: return "Route and WP Service — WP List — WP Name & Position"; break;
+    case 130306: return "Wind Data"; break;
+    case 130310: return "Environmental Parameters-deprecated"; break;
+    case 130311: return "Environmental Parameters-deprecated"; break;
+    case 130312: return "Temperature"; break;
+    case 130313: return "Humidity"; break;
+    case 130314: return "Actual Pressure"; break;
+    case 130316: return "Temperature, Extended Range"; break;
+    case 129038: return "AIS Class A Position Report"; break;
+    case 129039: return "AIS Class B Position Report"; break;
+    case 129040: return "AIS Class B Extended Position Report"; break;
+    case 129041: return "AIS Aids to Navigation (AtoN) Report"; break;
+    case 129793: return "AIS UTC and Date Report"; break;
+    case 129794: return "AIS Class A Static and Voyage Related Data"; break;
+    case 129798: return "AIS SAR Aircraft Position Report"; break;
+    case 129809: return "AIS Class B “CS” Static Data Report, Part A"; break;
+    case 129810: return "AIS Class B “CS” Static Data Report, Part B"; break;
+    case 60928: return "Address Claimed/cannot Claim"; break;
+    case 130916: return "?Seatalk AP Unknown?"; break;
+    case 65240: return "Commanded Address"; break;
+    case 127257:return "Attitude yaw pitch etc"; break;
+
+    case 130848:return "Mfr proprietary fast packet";break;
+    case 130918:return "Mfr proprietary fast packet";break;
+    case 130577:return "Direction Data";break;
+
+    default: return "Unknown ";break;
+  }
+  return "unknown";
+}
+
+
+
+//******************** end N2000 additions *************
+
+
 //************JSON SETUP STUFF to get setup parameters from the SD card to make it easy for user to change
 // READ https://arduinojson.org/?utm_source=meta&utm_medium=library.properties
 // *********************************************************************************************************
@@ -154,20 +315,15 @@ int StationsConnectedtomyAP;
 uint32_t WIFIGFXBoxstartedTime;
 bool WIFIGFXBoxdisplaystarted;
 
+// some helpful defines for easier coding 
+#define On_Off ? "ON " : "OFF"  // if 1 first case else second (0 or off) same number of chars to try and helps some flashing later
+#define True_False ? "true" : "false"
+
 //********** All boat data (instrument readings) are stored as double in a single structure:
 
 _sBoatData BoatData;  // BoatData values, int double etc
 
 bool dataUpdated;  // flag that Nmea Data has been updated
-
-//**   structures and helper functions for my variables
-
-
-
-//for MP3 player based on (but modified!) https://github.com/VolosR/MakePythonLCDMP3/blob/main/MakePythonLCDMP3.ino#L119
-char File_List[20][20];  //array of 20 (20 long) file names for listing..
-String runtimes[20];
-int file_num = 0;
 
 // _sWiFi_settings_Config (see structures.h) are the settings for the Display:
 // If the structure is changed, be sure to change the Key (first figure) so that new defaults and struct can be set.
@@ -182,7 +338,7 @@ _sWiFi_settings_Config Default_Settings = { 17, "GUESTBOAT", "12345678", "2002",
   strlcpy(config.FourWayBL, doc["FourWayBL"] | "DEPTH", sizeof(config.FourWayBL));
   strlcpy(config.FourWayTR, doc["FourWayTR"] | "WIND", sizeof(config.FourWayTR));
   strlcpy(config.FourWayTL, doc["FourWayTL"] | "STW */
-_sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default circa 265 etc.
+_sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default 
 _sDisplay_Config Display_Config;
 int Display_Page = 4;  //set last in setup(), but here for clarity?
 _sWiFi_settings_Config Saved_Settings;
@@ -283,8 +439,10 @@ _sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // intefere
 
 
 
-#define On_Off ? "ON " : "OFF"  // if 1 first case else second (0 or off) same number of chars to try and helps some flashing later
-#define True_False ? "true" : "false"
+
+//**********   Victron stuff ***************************
+
+
 bool LoadVictronConfiguration(const char* filename, _sMyVictronDevices& config) {
   // Open SD file for reading
   bool fault = false;
@@ -930,7 +1088,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         AddTitleBorderBox(0, Switch9, "UDP");
         GFXBorderBoxPrintf(Switch10, Current_Settings.ESP_NOW_ON On_Off);
         AddTitleBorderBox(0, Switch10, "ESP-Now");
-
+  // note NMEA2000 is currently not switched but is continuously on!
         if (!Terminal.debugpause) {
           AddTitleBorderBox(0, Terminal, "TERMINAL");
         } else {
@@ -1903,6 +2061,7 @@ void setup() {
     delay(1);
     ts.read();
     CheckAndUseInputs();
+    NMEA2000.ParseMessages();
     Display(Display_Page);
     /*BLEloop*/
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
@@ -2019,6 +2178,7 @@ void setup() {
           if (type == 2) { NMEALOG(" %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
           if (type == 3) { NMEALOG(" %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
           if (type == 4) { NMEALOG("\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
+          
 
         } else {
 
