@@ -1,20 +1,15 @@
 /*******************************************************************************
 Pins and defines for GFX - various versions!
 FOR WAVESHARE 4inch LCD 
+https://www.waveshare.com/esp32-s3-touch-lcd-4.htm
+https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+
  ******************************************************************************/
  
 #ifndef _ESPGFDEF_H_
 #define _ESPGFDEF_H_
 
-//****  Later  GFX VERSIONS HAVE this Refactored  *BUS config and miss the ips (colour inversion??) setup  
-// P0 is EX101 P1 is ex102 etc. 
-#define EX101 0 //TP_RST
-#define EX102 1 //BL_EN
-#define EX103 2//LCD_RST
-#define EX104 3 //SD_CS
-#define EX105 4 //TF VLED FB?
 
-#define GFX_BL EX102 // is port ex102  NB this is used in  uses expander.digitalwrite
 
 Arduino_DataBus *bus = new Arduino_SWSPI(
   GFX_NOT_DEFINED /* DC */,
@@ -46,6 +41,17 @@ Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
   2 /* rotation */,  true /* auto_flush */,  bus, // as defined in Arduino_DataBus *bus 
   GFX_NOT_DEFINED /* RST */,  st7701_type1_init_operations,  sizeof(st7701_type1_init_operations));  ///DAGNALL NOTE  type 1 selected in GFX clock demo - I think it should be type 9 ?
 
+/* Wavshare type X inits fot correct colours .. 
+
+MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Display.h Line 511     WRITE_COMMAND_8, 0x21,   // 0x20 normal, 0x21 IPS
+1 wrong, inverted but readable
+2 wrong
+3,4,5,6,7,8 unusabl
+8 wrong, different Top part unused? (like 2?)
+9 wrong but usable
+*/
+
+
 /* V3.3 compiler & gfx 1.6.0 incompatibility notes:  type9 seems to flicker: 
 V3 & 1.5.5 type9 & 1  both crash horribly 
 //notes on Arduino_GFX/src/display/Arduino_RGB_Display.h
@@ -74,21 +80,24 @@ using //(deleted), 00 60 Good results == type9 default
 */
 //** OTHER PINS
 
-#define TFT_BL GFX_BL  // or EX105 ?  not used??
-#define I2C_SDA_PIN 15
-#define I2C_SCL_PIN 7
+//#define TFT_BL GFX_BL  // or EX105 ?  not used??
+//#define I2C_SDA_PIN 15
+//#define I2C_SCL_PIN 7
 
+//SD card interface 
 
 #define SD_SCK  2
 #define SD_MISO 4
 #define SD_MOSI 1
-#define SD_CS   EX104 // is port ex104
+#define SD_CS   -1 // is port ex104  ?? Not called up?? 
 
-//touch **************************
+//** 12/08/2025 ... not working!! touch interface **************************
 #include <TAMC_GT911.h>
+//#include "TouchDrvGT911.hpp"
 
 #define TOUCH_INT 16          //-1 = not connected
-#define TOUCH_RST -1          // important both are not -1 ?
+#define TOUCH_RST -1          // EX101 important both are not -1 ?
+
 #define TOUCH_SDA  15
 #define TOUCH_SCL  7
 #define TOUCH_WIDTH  480
@@ -102,6 +111,50 @@ using //(deleted), 00 60 Good results == type9 default
 
 
 
+//***         waveshare has a port expander ******************
+/*****IO EXPANDER uses 9554 ***********************************
+/*
+https://github.com/Tinyu-Zhao/PCA9554
+
+*/
+#include <PCA9554.h>     // Load the PCA9554 Library
+#include <Wire.h>        // Load the Wire Library
+
+//  PCA9554 Addressing
+//  Address     A2  A1  A0
+//  0x20        L   L   L
+//  0x21        L   L   H < this one on waveshare board
+//  0x22        L   H   L
+//  0x23        L   H   H
+//  0x24        H   L   L
+//  0x25        H   L   H
+//  0x26        H   H   L
+//  0x27        H   H   H
+// usage: expander.digitalWrite(n,LOW);expander.digitalWrite(n,HIGH)
+
+// P0 is EX101 P1 is ex102 etc. 
+#define EX101 0 //TP_RST
+#define EX102 1 //BL_EN
+#define EX103 2 //LCD_RST
+#define EX104 3 //SD_CS
+#define EX105 4 //TF VLED FB?
+
+#define ExpanderSDA 8
+#define ExpanderSCL 9
+
+
+PCA9554 expander(0x21);  // Create an object at this address
+
+void SetupExpander(){
+  Wire.begin(ExpanderSDA,ExpanderSCL);
+  expander.portMode(ALLOUTPUT);  //Set the port as all output
+  // usage expander.digitalWrite(0, LOW);
+  #ifdef EX102
+  expander.digitalWrite(EX102, HIGH); 
+  Serial.println("EX102 set");
+  #endif
+
+}
 
 #endif // _ESPGFDEF_H_
 
