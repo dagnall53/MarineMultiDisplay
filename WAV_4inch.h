@@ -89,14 +89,14 @@ using //(deleted), 00 60 Good results == type9 default
 #define SD_SCK  2
 #define SD_MISO 4
 #define SD_MOSI 1
-#define SD_CS   -1 // is port ex104  ?? Not called up?? 
+//#define SD_CS   is port ex104  ?? Not called up?? 
 
 //** 12/08/2025 ... not working!! touch interface **************************
 #include <TAMC_GT911.h>
 //#include "TouchDrvGT911.hpp"
 
-#define TOUCH_INT 16          //-1 = not connected
-#define TOUCH_RST -1          // EX101 important both are not -1 ?
+#define TOUCH_INT 16          //
+#define TOUCH_RST -1          // EX101 will reset it at the start ?
 
 #define TOUCH_SDA  15
 #define TOUCH_SCL  7
@@ -122,8 +122,8 @@ https://github.com/Tinyu-Zhao/PCA9554
 
 //  PCA9554 Addressing
 //  Address     A2  A1  A0
-//  0x20        L   L   L
-//  0x21        L   L   H < this one on waveshare board
+//  0x20        L   L   L < THIS ONE !!
+//  0x21        L   L   H < schematic says this this one on waveshare board
 //  0x22        L   H   L
 //  0x23        L   H   H
 //  0x24        H   L   L
@@ -136,25 +136,16 @@ https://github.com/Tinyu-Zhao/PCA9554
 #define EX101 0 //TP_RST
 #define EX102 1 //BL_EN
 #define EX103 2 //LCD_RST
-#define EX104 3 //SD_CS
+#define EX104 3 //SD_CS  expander.digitalWrite(EX104,LOW);
 #define EX105 4 //TF VLED FB?
+#define EX106 5 //BUZZER enable
+#define ExpanderSDA 15
+#define ExpanderSCL 7
 
-#define ExpanderSDA 8
-#define ExpanderSCL 9
+
+PCA9554 expander(0x20);  // Create an object at this address
 
 
-PCA9554 expander(0x21);  // Create an object at this address
-
-void SetupExpander(){
-  Wire.begin(ExpanderSDA,ExpanderSCL);
-  expander.portMode(ALLOUTPUT);  //Set the port as all output
-  // usage expander.digitalWrite(0, LOW);
-  #ifdef EX102
-  expander.digitalWrite(EX102, HIGH); 
-  Serial.println("EX102 set");
-  #endif
-
-}
 
 #endif // _ESPGFDEF_H_
 

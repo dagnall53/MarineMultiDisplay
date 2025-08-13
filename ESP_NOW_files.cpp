@@ -88,7 +88,7 @@ bool Start_ESP_EXT() {  // start espnow and set interrupt to function Update_ESP
   #endif
   if (esp_now_add_peer(&peerInfo) == ESP_OK) { success = true; }
   esp_wifi_get_channel(espnowchannel,secondch);
-  Serial.println(" ESP-Now setup completed"); 
+  USBSerial.println(" ESP-Now setup completed"); 
   return success;
 }
 

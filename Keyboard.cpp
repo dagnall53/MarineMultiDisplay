@@ -102,7 +102,7 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
     }
     if (!strcmp(KEY, "ENT")) {
       strcpy(DATA, Local_var);
-      Serial.printf("Updated data: was %s is  %s", DATA, Local_var);
+      USBSerial.printf("Updated data: was %s is  %s", DATA, Local_var);
       strncpy(DATA, Local_var, sizeof_data);  // limit_size so we cannot overwrite the original array size
       Command_Key = true;
       VariableChanged = false;
@@ -114,7 +114,7 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
     if (!Command_Key) {  //Serial.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
       strcat(Local_var, KEY);
     }
-    Serial.printf(" end of loop <%s> \n",Local_var);
+    USBSerial.printf(" end of loop <%s> \n",Local_var);
     setFont(4);
     WriteinKey(result_positionX, result_positionY, 1, Local_var);
     }
@@ -142,7 +142,7 @@ void keyboard(int type) {
   if (type == -1){lasttype=6; return;} // silly number to reset things
   if (lasttype == type) {return;} // redraws only if keys change
   caps=type;
-  Serial.printf("\n*** Start keyboard type %i  last type%i \n",type,lasttype);
+  USBSerial.printf("\n*** Start keyboard type %i  last type%i \n",type,lasttype);
   lasttype=type;
   ///gfx->setFont(&FreeMonoBold18pt7b);
   setFont(2);

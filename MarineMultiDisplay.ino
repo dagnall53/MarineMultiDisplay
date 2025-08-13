@@ -21,7 +21,7 @@ Compiled with 2.0.11 - works with BLE
 
 //const char soft_version[] = "Version 4.05";
 //const char compile_date[] = __DATE__ " " __TIME__;
-const char soft_version[] = "VERSION 4.32";
+const char soft_version[] = "VERSION W.32";
 
 #if ESP_ARDUINO_VERSION_MAJOR == 3  // hoping this #if will work in the called .cpp !!
 #define UsingV3Compiler             // this "UsingV3Compiler" #def DOES NOT WORK by itsself! it only affects .h not .cpp files  !! (v3 ESPnow is very different) directive to replace std::string with String for Version 3 compiler and also (?) other V3 incompatibilites
@@ -59,10 +59,12 @@ tNMEA2000 &NMEA2000=*(new tNMEA2000_esp32xx());
 // Original version was for GFX 1.3.1 only. #include "GUITIONESP32-S3-4848S040_GFX_133.h"
 #include "WAV_4inch.h"  // defines GFX settings for Waveshare lcd 4 including touch
 #include "HWCDC.h"
+
+#include "LittleFS.h"
 //HWCDC USBSerial;
 //*********** for keyboard*************
 #include "Keyboard.h"
-
+//touch port
 TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH, TOUCH_HEIGHT);
 
 #include <EEPROM.h>
@@ -81,21 +83,12 @@ TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WID
 //For SD card (see display page -98 for test)
 // allow comments in the JSON FILE
 bool hasSD;
+bool hasFS;
 #define ARDUINOJSON_ENABLE_COMMENTS 1
 #include <ArduinoJson.h>
-#include <SD_MMC.h>  // was SD.h  // pins set in 4inch.h
+#include <SD.h>  // was SD.h  // pins set in 4inch.h
 #include "SPI.h"
 #include "FS.h"
-//Changes for SD_MMC use .. for the waveshare board. This may avoid having to use the expander as SD_MMC.begin it does not use SDCS?
-bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() function
-  File file = SD_MMC.open(path);
-  if (file) {
-    file.close();
-    return true;
-  }
-  return false;
-}
-
 
 //jpeg
 #include "JpegFunc.h"
@@ -103,6 +96,8 @@ bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() funct
 
 #include "VICTRONBLE.h"  //sets #ifndef Victronble_h
 
+// Some extra helpwrs for testing why the Waveshare is so slow
+bool WebServerActive;
 
 //************************ CANBUS / NMEA2000
 
@@ -431,11 +426,12 @@ _sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // intefere
 bool LoadVictronConfiguration(const char* filename, _sMyVictronDevices& config) {
   // Open SD file for reading
   bool fault = false;
-  if (!SDfileExists(filename)) {
+  expander.digitalWrite(EX104,LOW);
+  if (!SD.exists(filename)) {
     USBSerial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);
     fault = true;
   }
-  File file = SD_MMC.open(filename, FILE_READ);
+  File file = SD.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read Victron JSON file"));
     fault = true;
@@ -463,18 +459,21 @@ bool LoadVictronConfiguration(const char* filename, _sMyVictronDevices& config) 
   // Close the file (Curiously, File's destructor doesn't close the file)
 
   file.close();
+  expander.digitalWrite(EX104,HIGH);
 
   return !fault;  // report success
 }
 void SaveVictronConfiguration(const char* filename, _sMyVictronDevices& config) {
   // USED for adding extra devices or for creating a new file if missing
   //Delete existing file, otherwise the configuration is appended to the file
-  SD_MMC.remove(filename);
+  expander.digitalWrite(EX104,LOW);
+  SD.remove(filename);
   char buff[15];
   // Open file for writing
-  File file = SD_MMC.open(filename, FILE_WRITE);
+  File file = SD.open(filename, FILE_WRITE);
   if (!file) {
     USBSerial.println(F("JSON: Victron: Failed to create SD file"));
+    expander.digitalWrite(EX104,HIGH);
     return;
   }
   USBSerial.printf(" We expect %i Victron devices", Num_Victron_Devices);
@@ -511,16 +510,19 @@ void SaveVictronConfiguration(const char* filename, _sMyVictronDevices& config) 
   }
   // Close the file, //but print serial as a check
   file.close();
+  expander.digitalWrite(EX104,HIGH);
   PrintJsonFile("Check after Saving configuration ", filename);
 }
 void SaveDisplayConfiguration(const char* filename, _MyColors& set) {
   // Delete existing file, otherwise the configuration is appended to the file
-  SD_MMC.remove(filename);
+  expander.digitalWrite(EX104,LOW);
+  SD.remove(filename);
   char buff[15];
   // Open file for writing
-  File file = SD_MMC.open(filename, FILE_WRITE);
+  File file = SD.open(filename, FILE_WRITE);
   if (!file) {
     USBSerial.println(F("JSON: Failed to create SD file"));
+    expander.digitalWrite(EX104,HIGH);
     return;
   }
   // Allocate a temporary JsonDocument
@@ -553,11 +555,13 @@ void SaveDisplayConfiguration(const char* filename, _MyColors& set) {
   }
   // Close the file, but print serial as a check
   file.close();
+  expander.digitalWrite(EX104,HIGH);
   PrintJsonFile("Check after Saving configuration ", filename);
 }
 bool LoadDisplayConfiguration(const char* filename, _MyColors& set) {
   // Open SD file for reading
-  File file = SD_MMC.open(filename, FILE_READ);
+  expander.digitalWrite(EX104,LOW);
+  File file = SD.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read JSON file"));
   }
@@ -591,22 +595,26 @@ bool LoadDisplayConfiguration(const char* filename, _MyColors& set) {
   set.ShowRawDecryptedDataFor = doc["ShowRawDecryptedDataFor"] | 1;
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
+  expander.digitalWrite(EX104,HIGH);
   if (!error) { return true; }
   return false;
 }
 
 bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Open SD file for reading
-  if (!SDfileExists(filename)) {
+  expander.digitalWrite(EX104,LOW);
+  if (!SD.exists(filename)) {
     USBSerial.printf("**JSON file %s did not exist\n Using defaults\n", filename);
     SaveConfiguration(filename, Default_JSON, Default_Settings);  //save defaults to sd file
     config = Default_JSON;
     settings = Default_Settings;
+    expander.digitalWrite(EX104,HIGH);
     return false;
   }
-  File file = SD_MMC.open(filename, FILE_READ);
+  File file = SD.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read JSON file"));
+    expander.digitalWrite(EX104,HIGH);
     return false;
   }
   // Allocate a temporary JsonDocument
@@ -649,7 +657,7 @@ bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
             doc["password"] | "12345678",  // <- source and default
             sizeof(settings.password));    // <- destination's capacity
     strlcpy(settings.UDP_PORT,             // <- destination
-            doc["UDP_PORT"] | "2000",      // <- source and default.
+            doc["UDP_PORT"] | "2003",      // <- source and default.
             sizeof(settings.UDP_PORT));    // <- destination's capacity
 
     strlcpy(temp, doc["Serial"] | "false", sizeof(temp));
@@ -672,6 +680,7 @@ bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
 
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
+  expander.digitalWrite(EX104,HIGH);
   if (!error) { return true; }
   return false;
 }
@@ -679,12 +688,14 @@ bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
 
 void SaveConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Delete existing file, otherwise the configuration is appended to the file
-  SD_MMC.remove(filename);
+  expander.digitalWrite(EX104,LOW);
+  SD.remove(filename);
   char buff[15];
   // Open file for writing
-  File file = SD_MMC.open(filename, FILE_WRITE);
+  File file = SD.open(filename, FILE_WRITE);
   if (!file) {
     USBSerial.println(F("JSON: Failed to create SD file"));
+    expander.digitalWrite(EX104,HIGH);
     return;
   }
   // Allocate a temporary JsonDocument
@@ -735,16 +746,19 @@ void SaveConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
   }
   // Close the file, but print serial as a check
   file.close();
+  expander.digitalWrite(EX104,HIGH);
   PrintJsonFile("Check after Saving configuration ", filename);
 }
 
 
 void PrintJsonFile(const char* comment, const char* filename) {
   // Open file for reading
-  File file = SD_MMC.open(filename, FILE_READ);
+  expander.digitalWrite(EX104,LOW);
+  File file = SD.open(filename, FILE_READ);
   USBSerial.printf(" %s JSON FILE %s is.", comment, filename);
   if (!file) {
     USBSerial.println(F("Failed to read file"));
+    expander.digitalWrite(EX104,HIGH);
     return;
   }
   USBSerial.println();
@@ -755,6 +769,7 @@ void PrintJsonFile(const char* comment, const char* filename) {
   USBSerial.println();
   // Close the file
   file.close();
+  expander.digitalWrite(EX104,HIGH);
 }
 
 
@@ -1943,24 +1958,81 @@ void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes increment
   }
 }
 
+void SetupExpander(){
+  Wire.begin(ExpanderSDA,ExpanderSCL);
+  expander.portMode(ALLOUTPUT);  //Set the port as all output
+  // usage expander.digitalWrite(0, LOW);
+ expander.digitalWrite(EX101, HIGH); //TP RST High = off 
+ expander.digitalWrite(EX102, HIGH); // TFT Backlight enabled 
+ expander.digitalWrite(EX103, LOW);
+ expander.digitalWrite(EX104, HIGH); // initial SD_CS state is High - not selected
+ expander.digitalWrite(EX105, HIGH); //tf Vled FB
+ expander.digitalWrite(EX106, LOW);
+
+}
+void SD_CS(bool state){
+  expander.digitalWrite(EX104, state);
+}
+void SetEXLOW(bool state){
+   expander.digitalWrite(EX101, state);
+ expander.digitalWrite(EX102, state);
+ expander.digitalWrite(EX103, state);
+ //expander.digitalWrite(EX104, state);
+  expander.digitalWrite(EX105, state); 
+  if (!state) {USBSerial.println("all set LOW set");}else{USBSerial.println("all set high set");}
+}
+void SetEXLOW(){
+   expander.digitalWrite(EX101, LOW);
+ expander.digitalWrite(EX102, LOW);
+ expander.digitalWrite(EX103, LOW);
+ //expander.digitalWrite(EX104, LOW);
+  expander.digitalWrite(EX105, LOW); 
+  expander.digitalWrite(EX106, LOW); 
+  USBSerial.println("all set LOW set");
+}
+void SetEXHI(){
+   expander.digitalWrite(EX101, HIGH);
+ expander.digitalWrite(EX102, HIGH);
+ expander.digitalWrite(EX103, HIGH);
+ //expander.digitalWrite(EX104, HIGH);
+  expander.digitalWrite(EX105, HIGH); 
+   expander.digitalWrite(EX106, HIGH); 
+
+  USBSerial.println("all set high set");
+
+}
 void setup() {
   //CONFIG_ESP_BROWNOUT_DET_LVL_SEL_5 ??
   //Serial.begin(115200);
+  WebServerActive=false;
   USBSerial.begin(115200);
   USBSerial.println("Starting NMEA Display ");
   USBSerial.println(soft_version);
+  // Initialize LittleFS
+
   // setup Waveshare expander port
   SetupExpander();
-  delay(100);
+  delay(10);
+    // pulse TP RST 
+  expander.digitalWrite(EX101, LOW); //TP RST
+  delay(30);
+  expander.digitalWrite(EX101, HIGH); //TP RST
+  delay(30);
   ts.begin();
-  USBSerial.println("ts has begun");
+  USBSerial.println("touch has begun ?");
   ts.setRotation(ROTATION_INVERTED);
   // guitron sets GFX_BL 38
-  #ifdef GFX_BL
-  pinMode(GFX_BL, OUTPUT);
-  digitalWrite(GFX_BL, HIGH);
-  USBSerial.println("GFX_BL set");
-  #endif
+  // #ifdef GFX_BL
+  // pinMode(GFX_BL, OUTPUT);
+  // digitalWrite(GFX_BL, HIGH);
+  // USBSerial.println("GFX_BL set");
+  // #endif
+  expander.digitalWrite(EX102, HIGH); //tf BL EN 
+  // pulse LCD RST 
+  expander.digitalWrite(EX103, LOW); //LCD RST
+  delay(30);
+  expander.digitalWrite(EX103, HIGH); //LCD RST
+  delay(30);
   // Init Display
   gfx->begin();
   //if GFX> 1.3.1 try and do this as the invert colours write 21h or 20h to 0Dh has been lost from the structure!
@@ -1973,7 +2045,8 @@ void setup() {
   gfx->println(F("***Display Started***"));
   SD_Setup();
 
-
+//SetEXLOW();  // turns off backlight?? 
+delay (1000);
   EEPROM_READ();  // setup and read Saved_Settings (saved variables)
   Current_Settings = Saved_Settings;
   // Should automatically load default config if run for the first time
@@ -2062,25 +2135,34 @@ void setup() {
   }
 
   void loop() {
+    static int number;USBSerial.print(".");number++; if (number>40){number=0;USBSerial.println();}
+    
     static unsigned long LogInterval;
     static unsigned long DebugInterval;
     static unsigned long SSIDSearchInterval;
     timeupdate();
+  //  USBSerial.print("time ");USBSerial.println(millis());
     //USBSerial.printf(" s<%i>",millis()-Interval);Interval=millis();
     yield();
     server.handleClient();  // for OTA;
-
     delay(1);
-    ts.read();
+   // if (!WebServerActive ){
+
+
+    ts.read();  // is taking ages!! 
+
+    delay(100);
     CheckAndUseInputs();
     //NMEA2000.ParseMessages();
     Display(Display_Page);
+
     /*BLEloop*/
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
       BLEloop();
-    }  // Prioritize the sounds if on..
-       //ONLY on  victron Display_Page -86 and -87!! or it interrupts eveything!
+    }  
+
     EXTHeartbeat();
+
 
     if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchInterval)) {  // repeat at intervals to check..
       SSIDSearchInterval = millis() + scansearchinterval;                          //
@@ -2088,7 +2170,6 @@ void setup() {
         ScanAndConnect(true);
       }  // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
     }
-
     // NMEALOG is done in CheckAndUseInputs
     // the instrument log saves everything every LogInterval (set in config)  secs, even if data is not available! (NMEA0183DoubleNA)
     // uses LOCAL Time as this advances if GPS (UTC) is lost (but resets when GPS received again.)
@@ -2099,14 +2180,17 @@ void setup() {
               ValidData(BoatData.STW), ValidData(BoatData.MagHeading), ValidData(BoatData.SOG), ValidData(BoatData.COG),
               ValidData(BoatData.WaterDepth), ValidData(BoatData.WindSpeedK), ValidData(BoatData.WindAngleApp));
     }
+//    USBSerial.print("2148 ");USBSerial.println(millis());
     // switch off WIFIGFXBox after timed interval
     if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
-      WIFIGFXBoxdisplaystarted = false;
+    WIFIGFXBoxdisplaystarted = false;
+    WebServerActive=false;
       Display(true, Display_Page);
       delay(50);  // change page back, having set zero above which alows the graphics to reset up the boxes etc.
     }
-
-    if (((ColorSettings.Debug) || (ColorSettings.BLEDebug)) && (millis() >= DebugInterval)) {
+//    USBSerial.print("2156 ");USBSerial.println(millis());
+//((ColorSettings.Debug) || (ColorSettings.BLEDebug)) &&
+    if (((ColorSettings.Debug) || (ColorSettings.BLEDebug)) &&(millis() >= DebugInterval)) {
       DebugInterval = millis() + 1000;
       size_t current_free_heap = esp_get_free_heap_size();
       USBSerial.printf("Current Free Heap Size: %zu bytes, ", current_free_heap);
@@ -2114,7 +2198,7 @@ void setup() {
       size_t min_free_heap = esp_get_minimum_free_heap_size();
       USBSerial.printf("Minimum Free Heap Size: %zu bytes\n", min_free_heap);
       // Add a small delay to ensure the values are stable
-      delay(1);
+      delay(50);
     }
   }
 
@@ -2163,10 +2247,10 @@ void setup() {
       }
     }
     // USBSerial.printf(" ca<%i>",millis()-Interval);Interval=millis();
-    if (Current_Settings.Serial_on) {
-      if (Test_Serial_1()) { UseNMEA(nmea_1, 1); }
-    }
-    // USBSerial.printf(" cb<%i>",millis()-Interval);Interval=millis();
+    // if (Current_Settings.Serial_on) {
+    //   if (Test_Serial_1()) { UseNMEA(nmea_1, 1); }
+    // }
+    // // USBSerial.printf(" cb<%i>",millis()-Interval);Interval=millis();
     if (Current_Settings.UDP_ON) {
       if (Test_U()) { UseNMEA(nmea_U, 2); }
     }
@@ -2354,21 +2438,24 @@ void setup() {
   void SD_Setup() {
     hasSD = false;
     USBSerial.println("SD Card START");
-    //SPI.begin(SD_SCK, SD_MISO, SD_MOSI);
-    SD_MMC.setPins(SD_SCK, SD_MOSI, SD_MISO);  //#define SD_SCK  2 #define SD_MISO 4 #define SD_MOSI 1
+    SPI.setHwCs(false);
+    SPI.begin(SD_SCK, SD_MISO, SD_MOSI);
+    //SD_MMC.setPins(SD_SCK, SD_MOSI, SD_MISO);  //#define SD_SCK  2 #define SD_MISO 4 #define SD_MOSI 1
     delay(10);
-    if (!SD_MMC.begin("/sdcard", true)) {
+    //if (!SD_MMC.begin("/sdcard", true)) {
+    expander.digitalWrite(EX104,LOW);
+
+    if (!SD.begin()) {  // no cs for wavesghare
       USBSerial.println("Card Mount Failed");
       gfx->println("NO SD Card");
+      expander.digitalWrite(EX104,HIGH);
       return;
     } else {
       hasSD = true;  // picture is run in setup, after load config
     }
-
-    uint8_t cardType = SD_MMC.cardType();
-
+    uint8_t cardType = SD.cardType();
     if (cardType == CARD_NONE) {
-      USBSerial.println("No SD card attached");
+      USBSerial.println("No SD card attached");expander.digitalWrite(EX104,HIGH);
       return;
     }
     USBSerial.print("SD Card Type: ");
@@ -2388,11 +2475,12 @@ void setup() {
       gfx->println("Unknown");
     }
 
-    uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
+    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
     USBSerial.printf("SD Card Size: %lluMB\n", cardSize);
     gfx->printf("SD Card Size: %lluMB\n", cardSize);
     // USBSerial.println("*** SD card contents  (to three levels) ***");
     //listDir(SD_MMC, "/", 3);
+    expander.digitalWrite(EX104,HIGH);
   }
   //  ************  WIFI support functions *****************
 

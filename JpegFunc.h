@@ -23,6 +23,7 @@ static int jpegDrawCallback(JPEGDRAW *pDraw)
 
 static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 {
+    expander.digitalWrite(EX104,LOW);
     // Serial.println("jpegOpenFile");
 #if defined(ARDUINO_ARCH_SAMD) && defined(SEEED_GROVE_UI_WIRELESS)
     _f = SD.open(szFilename, "r");
@@ -34,7 +35,7 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
     // _f = SD.open(szFilename, "r");
-     _f = SD_MMC.open(szFilename, "r");
+     _f = SD.open(szFilename, "r");
 #elif defined(ESP8266)
     _f = LittleFS.open(szFilename, "r");
     // _f = SD.open(szFilename, "r");
@@ -43,6 +44,7 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 #endif
     *pFileSize = _f.size();
     return &_f;
+    expander.digitalWrite(EX104,HIGH);
 }
 
 static void jpegCloseFile(void *pHandle)
