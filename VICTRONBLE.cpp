@@ -538,7 +538,7 @@ _sButton Setup_N_Display(_sButton &box, int i) {  // takes charactersitics of 'b
     strcpy(borderdisplay, victronDevices.DeviceVictronName[i]);
   }
   //if (ColorSettings.Simulate) { strcat(borderdisplay, "-sim-"); }
-  //Serial.printf(" BOX h%i v%i %i high \n",Display4outerbox.h,Display4outerbox.v,Display4outerbox.height);
+  //USBSerial.printf(" BOX h%i v%i %i high \n",Display4outerbox.h,Display4outerbox.v,Display4outerbox.height);
   GFXBorderBoxPrintf(Display4outerbox, "");  //Used to blank the previous stuff!
   //
   AddTitleBorderBox(0, Display4outerbox, borderdisplay);
@@ -557,7 +557,7 @@ _sButton Setup_N_Display(_sButton &box, int i) {  // takes charactersitics of 'b
 //   char borderdisplay[30];
 //   strcpy(borderdisplay, title);
 //   //if (ColorSettings.Simulate) { strcat(borderdisplay, "-sim-"); }
-//   //Serial.printf(" BOX h%i v%i %i high \n",Display4outerbox.h,Display4outerbox.v,Display4outerbox.height);
+//   //USBSerial.printf(" BOX h%i v%i %i high \n",Display4outerbox.h,Display4outerbox.v,Display4outerbox.height);
 //   GFXBorderBoxPrintf(Display4outerbox, "");  //Used to blank the previous stuff!
 //   //
 //   AddTitleBorderBox(0, Display4outerbox, borderdisplay);
@@ -569,7 +569,7 @@ void DebugRawVdata(unsigned char *outputData, int datasize) {
   char debugMsg[200];
   snprintf(debugMsg, 120, "Decrypted Data len %i :", datasize);
   strcat(VictronBuffer, debugMsg);
-  //Serial.print("Raw Data");
+  //USBSerial.print("Raw Data");
   for (int i = 0; i < datasize; i++) {
     //  USBSerial.printf("%i=[%02X],", i, outputData[i]);
     snprintf(debugMsg, 120, "%i=[%02X], ", i, outputData[i]);
@@ -681,7 +681,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     victronDevices.displayed[i] = false;  // OLD DATA  update in GREY!!  just pretend we have new data while we grey it
   };
 
-  if (victronDevices.displayed[i]) {  //Serial.printf(" %i displayed already\n",i);
+  if (victronDevices.displayed[i]) {  //USBSerial.printf(" %i displayed already\n",i);
     return;
   }
   // USBSerial.printf("Deal_With_BLE_<%i>_Data", i);
@@ -707,7 +707,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
 
   snprintf(debugMsg, 120, " Type<%s>,ProductID(%i),", RecordTypeToChar(vicData->VICTRON_BLE_RECORD_TYPE), vicData->product_id);
   strcat(VictronBuffer, debugMsg);
-  //Serial.println(debugMsg);
+  //USBSerial.println(debugMsg);
   int KnownDataType;
   KnownDataType = -1;
   if (vicData->VICTRON_BLE_RECORD_TYPE == 0x01) { KnownDataType = 1; }  //Solar Charger
@@ -718,7 +718,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   hexCharStrToByteArray(victronDevices.charKey[i], localbyteKey);
   if (!ColorSettings.Simulate) {  //disable for simulate
     if (vicData->encryption_key_0 != localbyteKey[0]) {
-      snprintf(debugMsg, 120, "BUT key is MIS-MATCHED %x Localbyte(0)%x\n", localbyteKey[0]);  //Serial.println(debugMsg);
+      snprintf(debugMsg, 120, "BUT key is MIS-MATCHED %x Localbyte(0)%x\n", localbyteKey[0]);  //USBSerial.println(debugMsg);
       strcat(VictronBuffer, debugMsg);
       victronDevices.displayed[i] = true;  // stop trying again until we get better data!
       return;
@@ -753,7 +753,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     size_t nonce_offset = 0;
     status = esp_aes_crypt_ctr(&ctx, encrDataSize, &nonce_offset, nonce_counter, stream_block, inputData, outputData);
     if (status != 0) {
-      //Serial.printf("Error during esp_aes_crypt_ctr operation (%i).", status);
+      //USBSerial.printf("Error during esp_aes_crypt_ctr operation (%i).", status);
       snprintf(debugMsg, 120, " Error esp_aes_crypt_ctr operation (%i).", status);
       strcat(VictronBuffer, debugMsg);
       esp_aes_free(&ctx);
@@ -924,7 +924,7 @@ void BLEloop() {
       victronDevices.displayed[VictronSimulateIndex] = false;
       victronDevices.greyed[VictronSimulateIndex] = false;
       victronDevices.updated[VictronSimulateIndex] = millis();
-      //Serial.printf(" Simulating reception of :<%i>", VictronSimulateIndex);
+      //USBSerial.printf(" Simulating reception of :<%i>", VictronSimulateIndex);
     } else {
 #if ESP_ARDUINO_VERSION_MAJOR == 3
       pBLEScan->start(1, scanCompleteCB);

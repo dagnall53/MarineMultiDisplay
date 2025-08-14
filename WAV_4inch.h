@@ -6,8 +6,8 @@ https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
  ******************************************************************************/
  
-#ifndef _ESPGFDEF_H_
-#define _ESPGFDEF_H_
+#ifndef _WAV_DEF_H
+#define _WAV_DEF_H
 
 
 
@@ -136,7 +136,7 @@ https://github.com/Tinyu-Zhao/PCA9554
 #define EX101 0 //TP_RST
 #define EX102 1 //BL_EN
 #define EX103 2 //LCD_RST
-#define EX104 3 //SD_CS  expander.digitalWrite(EX104,LOW);
+#define EX104 3 //SD_CS  SD_CS(LOW);
 #define EX105 4 //TF VLED FB?
 #define EX106 5 //BUZZER enable
 #define ExpanderSDA 15
@@ -147,5 +147,5 @@ PCA9554 expander(0x20);  // Create an object at this address
 
 
 
-#endif // _ESPGFDEF_H_
+#endif // _WAV_DEF_H
 

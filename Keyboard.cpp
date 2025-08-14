@@ -64,22 +64,22 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
   
   if (!VariableChanged && !Keyboardinuse) {
     strcpy(Local_var, DATA);
-   // Serial.printf(" !variable changed  <%s>\n",Local_var);
+   // USBSerial.printf(" !variable changed  <%s>\n",Local_var);
     WriteinKey(result_positionX, result_positionY, 1, Local_var);
     Keyboardinuse=true;
   }
   int st;
   if ((ts.isTouched)) {
     st = KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps);
-    //Serial.printf(" Pressure test %i  KEYchr<%i> Bool <%i>\n",ts.points[0].size,ts.points[0].x, ts.points[0].y,KEY,st );
+    //USBSerial.printf(" Pressure test %i  KEYchr<%i> Bool <%i>\n",ts.points[0].size,ts.points[0].x, ts.points[0].y,KEY,st );
   }
 
   if (!KeyPressUsed && (ts.isTouched) && (ts.points[0].size > 10) && (KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps))) {
-  //  Serial.printf(" Keyboard check inputsizeof<%i>   sizeof_here *data(%i)   currentlen<%i>\n", sizeof_data, sizeof(*DATA), strlen(Local_var));
+  //  USBSerial.printf(" Keyboard check inputsizeof<%i>   sizeof_here *data(%i)   currentlen<%i>\n", sizeof_data, sizeof(*DATA), strlen(Local_var));
     KeyPressUsed = true;
     lastkeypressed = millis();
     Command_Key = false;
-    //Serial.printf(" Key test %s \n",KEY);
+    //USBSerial.printf(" Key test %s \n",KEY);
     if (!strcmp(KEY, "^")) {
       caps = caps + 1;
       if (caps > 2) { caps = 0; }  
@@ -96,7 +96,7 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
     }
     if (!strcmp(KEY, "MEM")) {
       strcpy(Local_var, DATA);
-      //Serial.printf(" reset  <%s> \n",Local_var);
+      //USBSerial.printf(" reset  <%s> \n",Local_var);
       WriteinKey(result_positionX, result_positionY, 1, Local_var);
       Command_Key = true;
     }
@@ -111,7 +111,7 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
       setFont(0);
       Display_Page=-1; //Always return to settings, page -1
     }
-    if (!Command_Key) {  //Serial.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
+    if (!Command_Key) {  //USBSerial.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
       strcat(Local_var, KEY);
     }
     USBSerial.printf(" end of loop <%s> \n",Local_var);
@@ -138,7 +138,7 @@ void DrawKey(int KBD_size, int x, int rows_down, int width, String text ){
 void keyboard(int type) {
  static int lasttype;
  int oldsize;
- //Serial.printf(" setup keyboard %i  was%i \n",type,lasttype);
+ //USBSerial.printf(" setup keyboard %i  was%i \n",type,lasttype);
   if (type == -1){lasttype=6; return;} // silly number to reset things
   if (lasttype == type) {return;} // redraws only if keys change
   caps=type;
@@ -187,7 +187,7 @@ bool XYinBox(int touchx,int touchy, int h,int v,int width,int height){ //xy posi
 }
 
 bool XYinBox(int x, int y ,int Kx, int Krows_down, int Kwidth){ // use DrawKey type key setting
-//Serial.printf(" Testing accuracy Target is ")
+//USBSerial.printf(" Testing accuracy Target is ")
 
     int h=Keyboard_X+(Kx*KBD_size);
     int width=Kwidth*KBD_size;
@@ -202,7 +202,7 @@ bool KeyOver(int x, int y, char* Key, int type){ //char array version
 
    if ((y > Keyboard_Y) && (y < (Keyboard_Y+25*KBD_size))) { //a, Keyboard_Y, 20, 25,
     //top row  
-   //Serial.printf(" In TOP ROW  KBD_size;(%i) x%i y%i   looking in space x%i y%i\n",KBD_size,x,y );
+   //USBSerial.printf(" In TOP ROW  KBD_size;(%i) x%i y%i   looking in space x%i y%i\n",KBD_size,x,y );
    /*  for (int x = 0; x < 10; x++) {
     int a = KBD_size*((x * 4) + (20 * x) + 2) + Keyboard_X;
     gfx->drawRoundRect(a, Keyboard_Y, 20*KBD_size, 25*KBD_size, 3, WHITE);
@@ -218,7 +218,7 @@ bool KeyOver(int x, int y, char* Key, int type){ //char array version
  
   if ((y > (Keyboard_Y + (30*KBD_size))) && (y < (Keyboard_Y + (30*KBD_size)+(25*KBD_size)))) { //Keyboard_Y + (30*KBD_size), 20, 25, 1, WHITE);
     //middle row
-      // Serial.printf(" In MIDDLE ROW   %i %i",x,y);
+      // USBSerial.printf(" In MIDDLE ROW   %i %i",x,y);
     for (int z = 0; z < 9; z++) {
       int a = KBD_size*((z * 4) + (20 * z) + 13) + Keyboard_X;
       int b = a + (20*KBD_size);

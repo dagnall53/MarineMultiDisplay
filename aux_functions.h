@@ -4,7 +4,6 @@
 #include <Arduino.h>     //necessary for the String, uint16_t etc variable definitions
 #include "Structures.h"  // to tell it about the _sBoatData and button structs.
 #include <Arduino_GFX_Library.h>  // for the graphics functions
-
 extern Arduino_RGB_Display  *gfx ; //  change if alternate displays !
 bool processPacket(const char* buf,  _sBoatData &stringBD );
 

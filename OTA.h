@@ -397,10 +397,12 @@ void handleRoot() {
 }
 
 bool loadFromSdCard(String path) {
+  SD_CS(LOW);
   String dataType = "text/plain";
   //  previous version used just startws.htm  html from SD card.
   if (path.endsWith("/")) {  // send our local version with modified path!
     handleRoot();
+    SD_CS(HIGH);
     return true;
     //will not get here now!
     path += "startws.htm";  // start our html file from  the SD !
@@ -431,7 +433,7 @@ bool loadFromSdCard(String path) {
   } else if (path.endsWith(".mp3")) {
     dataType = "audio/mpeg";
   }
-SD_CS(LOW);
+
   File dataFile = SD.open(path.c_str());
   if (dataFile.isDirectory()) {
     path += "/index.htm";
@@ -461,13 +463,12 @@ void handleFileUpload() {
     return;
   }
   HTTPUpload &upload = server.upload();
+  SD_CS(LOW);
   if (upload.status == UPLOAD_FILE_START) {
-    SD_CS(LOW);
-    if (SD.exists((char *)upload.filename.c_str())) {
+     if (SD.exists((char *)upload.filename.c_str())) {
       SD.remove((char *)upload.filename.c_str());
     }
     uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
-    SD_CS(HIGH);
     USBSerial.println(upload.filename);
     strcpy(SavedFile, upload.filename.c_str());
 
@@ -481,7 +482,6 @@ void handleFileUpload() {
     if (uploadFile) {
       uploadFile.close();
     }
-    SD_CS(HIGH);
     USBSerial.print("Upload: END, Size: ");
     USBSerial.print(upload.totalSize);
     USBSerial.print(" filename: <");
@@ -520,6 +520,7 @@ void handleFileUpload() {
     }
     SavedFile[0] = 0;
   }
+  SD_CS(HIGH);
 }
 
 void deleteRecursive(String path) {
@@ -614,7 +615,7 @@ void printDirectory() {
     dir.close();SD_CS(HIGH);
     return returnFail("NOT DIR");
   }
-  SD_CS(HIGH);
+  
   dir.rewindDirectory();
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/json", "");
@@ -643,10 +644,12 @@ void printDirectory() {
   }
   server.sendContent("]");
   dir.close();
+  SD_CS(HIGH);
 }
 
 
 void handleNotFound() {
+   SD_CS(LOW);
   bool simulatestate;
   simulatestate = ColorSettings.Simulate;  // a hack as simulate state seem to make this handling crash..  conflict with SD calls? ;
   ColorSettings.Simulate = false;
@@ -656,6 +659,7 @@ void handleNotFound() {
   USBSerial.println(">");
   if (hasSD && loadFromSdCard(server.uri())) {
   ColorSettings.Simulate = simulatestate;
+   SD_CS(HIGH);
   return;
   }
   String message = "";
@@ -675,6 +679,7 @@ void handleNotFound() {
     message += " NAME:" + server.argName(i) + "\n VALUE:" + server.arg(i) + "\n";
   }
   server.send(404, "text/plain", message);  //404 is the error message
+  SD_CS(HIGH);
   USBSerial.print(message);
   ColorSettings.Simulate = simulatestate;
 }

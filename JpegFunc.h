@@ -16,15 +16,15 @@ static int _x, _y, _x_bound, _y_bound;
 // pixel drawing callback
 static int jpegDrawCallback(JPEGDRAW *pDraw)
 {
-  // Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+  // USBSerial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
   gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
   return 1;
 }
 
 static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 {
-    expander.digitalWrite(EX104,LOW);
-    // Serial.println("jpegOpenFile");
+    SD_CS(LOW);
+    // USBSerial.println("jpegOpenFile");
 #if defined(ARDUINO_ARCH_SAMD) && defined(SEEED_GROVE_UI_WIRELESS)
     _f = SD.open(szFilename, "r");
 #elif defined(TARGET_RP2040) || defined(PICO_RP2350)
@@ -44,19 +44,19 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 #endif
     *pFileSize = _f.size();
     return &_f;
-    expander.digitalWrite(EX104,HIGH);
+    SD_CS(HIGH);
 }
 
 static void jpegCloseFile(void *pHandle)
 {
-    // Serial.println("jpegCloseFile");
+    // USBSerial.println("jpegCloseFile");
     File *f = static_cast<File *>(pHandle);
     f->close();
 }
 
 static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
-    // Serial.printf("jpegReadFile, iLen: %d\n", iLen);
+    // USBSerial.printf("jpegReadFile, iLen: %d\n", iLen);
     File *f = static_cast<File *>(pFile->fHandle);
     size_t r = f->read(pBuf, iLen);
     return r;
@@ -64,7 +64,7 @@ static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 
 static int32_t jpegSeekFile(JPEGFILE *pFile, int32_t iPosition)
 {
-    // Serial.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
+    // USBSerial.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
     File *f = static_cast<File *>(pFile->fHandle);
     f->seek(iPosition);
     return iPosition;
