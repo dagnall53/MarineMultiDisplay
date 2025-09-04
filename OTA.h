@@ -85,7 +85,7 @@ extern _sButton WifiStatus;
 extern int Display_Page;
 extern void Display(bool reset, int page);
 
-extern bool WebServerActive;
+bool WebServerActive;
 WebServer server(80);
 File uploadFile;
 char SavedFile[30];

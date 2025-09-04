@@ -13,38 +13,20 @@ static JPEGDEC _jpeg;
 static File _f;
 static int _x, _y, _x_bound, _y_bound;
 
-// pixel drawing callback
-static int jpegDrawCallback(JPEGDRAW *pDraw)
-{
-  // USBSerial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-  gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
-  return 1;
-}
-
 static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 {
-    SD_CS(LOW);
     // USBSerial.println("jpegOpenFile");
-#if defined(ARDUINO_ARCH_SAMD) && defined(SEEED_GROVE_UI_WIRELESS)
-    _f = SD.open(szFilename, "r");
-#elif defined(TARGET_RP2040) || defined(PICO_RP2350)
-    _f = LittleFS.open(szFilename, "r");
-    // _f = SDFS.open(szFilename, "r");
-#elif defined(ESP32)
+
+#if defined(ESP32)
     // _f = FFat.open(szFilename, "r");
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
-    // _f = SD.open(szFilename, "r");
      _f = SD.open(szFilename, "r");
-#elif defined(ESP8266)
-    _f = LittleFS.open(szFilename, "r");
-    // _f = SD.open(szFilename, "r");
 #else
     _f = SD.open(szFilename, FILE_READ);
 #endif
     *pFileSize = _f.size();
     return &_f;
-    SD_CS(HIGH);
 }
 
 static void jpegCloseFile(void *pHandle)

@@ -33,36 +33,14 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  Despite the name,  NOTE FOR the MULTI DISPLAY. We do not convert N2K to 0183, but just get values and place in boatData! 
 */
 
-class tN2KdataRX : public tNMEA2000::tMsgHandler {
-public:
-  using tSendNMEA0183MessageCallback=void (*)(const tNMEA0183Msg &NMEA0183Msg);
 
-protected:
-  double Latitude;
-  double Longitude;
-  double Altitude;
-  double Variation;
-  double Heading;
-  double TargetHeading;
-  double COG;
-  double MCOG;
-  double SOG;
-  double WindSpeed;
-  double WindAngle;
-  bool WindSourceApparent;
-  double RudderPosition;
-  uint16_t DaysSince1970;
-  double SecondsSinceMidnight;
-  tNMEA0183 *pNMEA0183;
-  tSendNMEA0183MessageCallback SendNMEA0183MessageCallback;
-
-protected:
   
   void HandleHeading(const tN2kMsg &N2kMsg);            // 127250
   void HandleVariation(const tN2kMsg &N2kMsg);          // 127258
   void HandleBoatSpeed(const tN2kMsg &N2kMsg);          // 128259
   void HandleDepth(const tN2kMsg &N2kMsg);              // 128267
   void HandlePosition(const tN2kMsg &N2kMsg);           // 129025
+
   void HandleCOGSOG(const tN2kMsg &N2kMsg);             // 129026
   void HandleGNSS(const tN2kMsg &N2kMsg);               // 129029
   void HandleGNSSSystemTime(const tN2kMsg &N2kMsg);     // 126992 
@@ -70,19 +48,11 @@ protected:
   void HandleRudder(const tN2kMsg &N2kMsg);             // 127245
   void HandleWatertemp12(const tN2kMsg &N2kMsg);        //130312
   void HandleWatertemp16(const tN2kMsg &N2kMsg);        //130316
+// experimental functions
+  void HandleMFRData(const tN2kMsg &N2kMsg) ;           //126996 experimental to serial print  mfr data
+  void RequestProductInformation(uint8_t destination) ; // Use 0xFF for broadcast or specific address
 
-public:
-  tN2KdataRX(tNMEA2000 *_pNMEA2000, tNMEA0183 *_pNMEA0183) : tNMEA2000::tMsgHandler(0,_pNMEA2000) {
-    SendNMEA0183MessageCallback=0;
-    pNMEA0183=_pNMEA0183;
-    Latitude=N2kDoubleNA; Longitude=N2kDoubleNA; Altitude=N2kDoubleNA;
-    Variation=N2kDoubleNA; Heading=N2kDoubleNA; COG=N2kDoubleNA; SOG=N2kDoubleNA;
-    SecondsSinceMidnight=N2kDoubleNA; DaysSince1970=N2kUInt16NA;
 
-  }
-  void HandleMsg(const tN2kMsg &N2kMsg);
-  void SetSendNMEA0183MessageCallback(tSendNMEA0183MessageCallback _SendNMEA0183MessageCallback) {
-    SendNMEA0183MessageCallback=_SendNMEA0183MessageCallback;
-  }
-  void Update();
-};
+
+
+  String PGNDecode(int PGN);                              // decode the PGN to a readable name.. Useful for the decodeMode the bus?

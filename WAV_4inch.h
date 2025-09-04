@@ -133,7 +133,7 @@ https://github.com/Tinyu-Zhao/PCA9554
 // usage: expander.digitalWrite(n,LOW);expander.digitalWrite(n,HIGH)
 
 // P0 is EX101 P1 is ex102 etc. 
-#define EX101 0 //TP_RST
+#define EX101 0 //TP_RST TOUCH_RST
 #define EX102 1 //BL_EN
 #define EX103 2 //LCD_RST
 #define EX104 3 //SD_CS  SD_CS(LOW);

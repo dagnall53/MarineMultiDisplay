@@ -1,14 +1,14 @@
 
-// #ifndef _TOUCH_H_
-// #define _TOUCH_H_
+#ifndef _TOUCH_H_
+#define _TOUCH_H_
 
 
-// #include <TAMC_GT911.h>
-// #define TOUCH_ROTATION ROTATION_NORMAL
-// #define TOUCH_MAP_X1 480
-// #define TOUCH_MAP_X2 0
-// #define TOUCH_MAP_Y1 480
-// #define TOUCH_MAP_Y2 0
+#include <TAMC_GT911.h>
+#define TOUCH_ROTATION ROTATION_NORMAL
+#define TOUCH_MAP_X1 480
+#define TOUCH_MAP_X2 0
+#define TOUCH_MAP_Y1 480
+#define TOUCH_MAP_Y2 0
 
 // //nb were previously defined in display settings
 
@@ -26,4 +26,4 @@
 
 
 
-// #endif
+#endif

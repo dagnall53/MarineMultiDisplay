@@ -5,8 +5,7 @@ but highly modified!
 
 #include <Arduino.h>  //necessary for the String variables
 #include <SPI.h>
-#include <SD.h> // was SD.h
-
+#include <SD.h>
 #include "aux_functions.h"
 // defines gfx and has pin details of the display
 #include <NMEA0183.h>  // for the TL NMEA0183 library functions
@@ -20,7 +19,7 @@ extern int text_height;
 extern int Display_Page;
 extern _MyColors ColorSettings;
 extern _sDisplay_Config Display_Config;
-
+extern void showPictureFrame(_sButton &button,const char* name);
 
 extern double NMEA0183GetDouble(const char *data);  // have to do this as its local to NMEA0183Messagesmessages.cpp!
 
@@ -339,10 +338,10 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
 void UpdateLinef(uint16_t color, int font, _sButton &button, const char *fmt, ...) {  // Types sequential lines in the button space '&' for button to store printline?
   if (button.screenfull && button.debugpause) { return; }
   //USBSerial.printf(" lines  TypingspaceH =%i  number of lines=%i printing line <%i>\n",typingspaceH,LinesOfType,button.PrintLine);
-  static char msg[500] = { '\0' };
+  static char msg[600] = { '\0' };
   va_list args;
   va_start(args, fmt);
-  vsnprintf(msg, 500, fmt, args);
+  vsnprintf(msg, 600, fmt, args);
   va_end(args);
   int len = strlen(msg);
   CommonSub_UpdateLine(false, false, color, font, button, msg);

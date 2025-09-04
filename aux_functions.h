@@ -46,7 +46,7 @@ int GraphRange( double data, int low, int high, double dmin ,double dmax );
 // takes nmea field and places as double in struct data(.data)
 // not used outside aux_functions ??
 void toNewStruct(char *field, _sInstData &data); 
-void toNewStruct(double field, _sInstData &data);   // allow update of struct with simple double data
+void toNewStruct(double field, _sInstData &data);   // allow update of struct with simple double data (N2)
 double Double_sInstDataAdd(_sInstData &data1, _sInstData &data);//returns a double of value data.data +data1.data;
 
 int HexStringToBytes(const char *hexStr,

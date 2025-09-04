@@ -1,6 +1,6 @@
 /*
 N2KdataRX.cpp
-
+uses functions from :
 Copyright (c) 2015-2018 Timo Lappalainen, Kave Oy, www.kave.fi
 Adding AIS (c) 2019 Ronnie Zeiller, www.zeiller.eu
 
@@ -25,73 +25,38 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 my work here is based on example in Examples  N2KdataRX.cpp
 */
 
-#include "N2KdataRX.h"
 #include <N2kMessages.h>
 #include <N2kTypes.h>
-#include <NMEA0183Messages.h>
-#include <math.h>
-
 #include <math.h>
 #include <string.h>
 
 const double radToDeg = 180.0 / M_PI;
 #include "aux_functions.h"
 #include "Structures.h"
-
+#include "N2kDataRX.h"
 extern _sBoatData BoatData;  // BoatData values for the display , int double , when read, when displayed etc 
 
 
-
-
-//*****************************************************************************
-void tN2KdataRX::HandleMsg(const tN2kMsg &N2kMsg) {
-
-  switch (N2kMsg.PGN) {
-    // these update my structures on receipt:
-    case 127250UL: HandleHeading(N2kMsg); break;  //
-    case 128259UL: HandleBoatSpeed(N2kMsg); break;
-    case 128267UL: HandleDepth(N2kMsg); break;
-    case 129026UL: HandleCOGSOG(N2kMsg); break;
-    case 130306UL: HandleWind(N2kMsg); break;
-    // under test...
-    case 127245UL: HandleRudder(N2kMsg); break;  // 127245
-
-    case 130312UL: HandleWatertemp12(N2kMsg); break;
-    case 130316UL: HandleWatertemp16(N2kMsg); break;
-
-      //note we may later decide to add 130312 and 130314 PGNs that replace 130311
-
-    case 127258UL: HandleVariation(N2kMsg); break;
-    case 129025UL: HandlePosition(N2kMsg); break;  // lat long
-    case 129029UL: HandleGNSS(N2kMsg); break;
-    case 126992UL: HandleGNSSSystemTime(N2kMsg); break;
-
-    default: return;
-  }
-}
-
-
-
+  double Latitude;
+  double Longitude;
+  double Altitude;
+  //held in boatdata double Variation;
+  double Heading;
+  double TargetHeading;
+  double COG;
+  double MCOG;
+  double SOG;
+  double WindSpeed;
+  double WindAngle;
+  bool WindSourceApparent;
+  double RudderPosition;
+  uint16_t DaysSince1970;
+  double SecondsSinceMidnight;
+  tNMEA0183 *pNMEA0183;
+  
 
 //*****************************************************************************
-
-//****************************************************
-void tN2KdataRX::Update() {  // note other messages will be initiated immediately by their tN2KdataRX HandleMsg
-  static bool ResetDone = false;
-  // On the First Run, RESET the variables that are used as "indicators"  so that we do not get spurious Data sent on startup.
-  if (!ResetDone) {
-    ResetDone = true;  
-    Heading = N2kDoubleNA;
-    COG = N2kDoubleNA;
-    SOG = N2kDoubleNA;
-    WindSpeed = N2kDoubleNA;
-    WindAngle = N2kDoubleNA;
-  }
-
-}
-
-//*****************************************************************************
-void tN2KdataRX::HandleHeading(const tN2kMsg &N2kMsg) {
+void HandleHeading(const tN2kMsg &N2kMsg) { //127250
   /*
   1 Sequence ID
   2 Heading Sensor Reading
@@ -128,11 +93,11 @@ void tN2KdataRX::HandleHeading(const tN2kMsg &N2kMsg) {
         SendHDM = false;
       }  // Update Deviation, send HDG
       if (!N2kIsNA(_Variation)) {
-        Variation = _Variation;
+        BoatData.Variation = _Variation;
         SendHDM = false;
       }  // Update Variation, Send HDG
       if (!N2kIsNA(Heading) && !N2kIsNA(_Deviation)) { Heading -= Deviation; }
-      if (!N2kIsNA(Heading) && !N2kIsNA(_Variation)) { Heading -= Variation; }
+      if (!N2kIsNA(Heading) && !N2kIsNA(_Variation)) { Heading -= BoatData.Variation; }
       toNewStruct(Heading, BoatData.MagHeading);
        } else {  // data was "true" so send as true
       toNewStruct(Heading, BoatData.TrueHeading);
@@ -182,18 +147,18 @@ void tN2KdataRX::HandleHeading(const tN2kMsg &N2kMsg) {
 
 
 //*****************************************************************************
-void tN2KdataRX::HandleVariation(const tN2kMsg &N2kMsg) {
-  unsigned char SID;
-  tN2kMagneticVariation Source;
-  uint16_t LOCALDaysSince1970;
-  // Just saves the Variation for use in other functions.
-  ParseN2kMagneticVariation(N2kMsg, SID, Source, LOCALDaysSince1970, Variation);
-  BoatData.Variation = Variation; // just save value, not sInstData so not need to save time of data etc.. 
-  }
+// void HandleVariation(const tN2kMsg &N2kMsg) {
+//   unsigned char SID;
+//   tN2kMagneticVariation Source;
+//   uint16_t LOCALDaysSince1970;
+//   // Just saves the Variation for use in other functions.
+//   ParseN2kMagneticVariation(N2kMsg, SID, Source, LOCALDaysSince1970, _Variation);
+//   BoatData.Variation = _Variation; // just save value, not sInstData so not need to save time of data etc.. 
+//   }
 
 
 //*****************************************************************************
-void tN2KdataRX::HandleBoatSpeed(const tN2kMsg &N2kMsg) {
+void HandleBoatSpeed(const tN2kMsg &N2kMsg) { //128259
   unsigned char SID;
   double WaterReferenced;
   double GroundReferenced;
@@ -206,7 +171,17 @@ void tN2KdataRX::HandleBoatSpeed(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2KdataRX::HandleDepth(const tN2kMsg &N2kMsg) {
+void HandleDepth(const tN2kMsg &N2kMsg) {
+  unsigned char SID;
+  double DepthBelowTransducer;
+  double Offset;
+  double Range;
+  if (ParseN2kWaterDepth(N2kMsg, SID, DepthBelowTransducer, Offset, Range)) {
+    toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);
+     }
+}
+
+void WaterDepth(const tN2kMsg &N2kMsg) { // original name in datatdisplay example
   unsigned char SID;
   double DepthBelowTransducer;
   double Offset;
@@ -217,35 +192,35 @@ void tN2KdataRX::HandleDepth(const tN2kMsg &N2kMsg) {
 }
 
 //*****************************************************************************
-void tN2KdataRX::HandlePosition(const tN2kMsg &N2kMsg) {
+void HandlePosition(const tN2kMsg &N2kMsg) {
 
   if (ParseN2kPGN129025(N2kMsg, Latitude, Longitude)) {
-// needs toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);
+  // USBSerial.print(" In HandlePosition lat:");
+  // USBSerial.print(Latitude);
+  // USBSerial.print(" Lon:");
+  // USBSerial.println(Longitude);
+// needs toNewStruct ??
+      // BoatData.Latitude.data = Latitude*1e-07;   // N2000 lat is double at 1e-7 resolution
+      // BoatData.Longitude.data = Longitude*1e-07;
+      if (Latitude != -1000000000) {
+    toNewStruct( Longitude,BoatData.Longitude);
+    toNewStruct( Latitude,BoatData.Latitude);}
   }
   
 }
 
-//*****************************************************************************
-void tN2KdataRX::HandleCOGSOG(const tN2kMsg &N2kMsg) {
-  unsigned char SID;
-  tN2kHeadingReference HeadingReference;
-
-
-  if (ParseN2kCOGSOGRapid(N2kMsg, SID, HeadingReference, COG, SOG)) {
-    //get / set  MCOG
-    MCOG = (!N2kIsNA(COG) && !N2kIsNA(Variation) ? COG - Variation : NMEA0183DoubleNA);
-    if (HeadingReference == N2khr_magnetic) {
-      MCOG = COG;
-      if (!N2kIsNA(Variation)) COG -= Variation;
-    }
-    toNewStruct(COG, BoatData.COG);
-    toNewStruct(SOG, BoatData.SOG);
-    
-  }
+double Days_to_GPSdate(int days_since_1970) { // written largely by copilot AI!
+  time_t seconds = (time_t)days_since_1970 * 86400; // Convert days to seconds
+  struct tm *date = gmtime(&seconds); // Convert to UTC date
+  int dd = date->tm_mday;
+  int mm = date->tm_mon + 1; // tm_mon is 0-based
+  int yy = date->tm_year % 100; // Get last two digits of year
+  double ddmmyy = dd * 10000 + mm * 100 + yy;
+return ddmmyy;
 }
 
-//*****************************************************************************
-void tN2KdataRX::HandleGNSS(const tN2kMsg &N2kMsg) {
+
+void HandleGNSS(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   tN2kGNSStype GNSStype;
   tN2kGNSSmethod GNSSmethod;
@@ -257,18 +232,41 @@ void tN2KdataRX::HandleGNSS(const tN2kMsg &N2kMsg) {
   tN2kGNSStype ReferenceStationType;
   uint16_t ReferenceSationID;
   double AgeOfCorrection;
-  /*
- 
-*/
   if (ParseN2kGNSS(N2kMsg, SID, DaysSince1970, SecondsSinceMidnight, Latitude, Longitude, Altitude, GNSStype, GNSSmethod,
                    nSatellites, HDOP, PDOP, GeoidalSeparation,
                    nReferenceStations, ReferenceStationType, ReferenceSationID, AgeOfCorrection)) {
-    // do not have Position structure? toNewStruct(COG, BoatData.COG);
-
+    if (Latitude != -1000000000) {
+    toNewStruct( Longitude,BoatData.Longitude);
+    toNewStruct( Latitude,BoatData.Latitude);
+    BoatData.SatsInView=NMEA0183DoubleNA; if (nSatellites){BoatData.SatsInView=nSatellites;}
+    BoatData.GPSDate = Days_to_GPSdate(DaysSince1970);
+    BoatData.GPSTime =SecondsSinceMidnight ;}
   }
 }
 
-void tN2KdataRX::HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
+//*****************************************************************************
+void HandleCOGSOG(const tN2kMsg &N2kMsg) {
+  unsigned char SID;
+  tN2kHeadingReference HeadingReference;
+
+
+  if (ParseN2kCOGSOGRapid(N2kMsg, SID, HeadingReference, COG, SOG)) {
+    //get / set  MCOG
+    MCOG = (!N2kIsNA(COG) && !N2kIsNA(BoatData.Variation) ? COG - BoatData.Variation : NMEA0183DoubleNA);
+    if (HeadingReference == N2khr_magnetic) {
+      MCOG = COG;
+      if (!N2kIsNA(BoatData.Variation)) COG -= BoatData.Variation;
+    }
+    toNewStruct(COG, BoatData.COG);
+    toNewStruct(SOG, BoatData.SOG);
+    
+  }
+}
+
+//*****************************************************************************
+
+
+void HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
   unsigned char SID;
   uint16_t SystemDate;
   double SystemTime;
@@ -283,47 +281,22 @@ void tN2KdataRX::HandleGNSSSystemTime(const tN2kMsg &N2kMsg) {
     int GPSYear = tNMEA0183Msg::GetYear(tm);
     int LZD = 0;
     int LZMD = 0;
-    //toNewStruct(TIME, BoatData.TIME);
+    //toNewStruct(SystemDate, BoatData.GPSDate);
     // needs setStruct
   }
 }
 
-void tN2KdataRX::HandleWatertemp12(const tN2kMsg &N2kMsg) {
-  // Garmin depth sensor output as advised Erasmo J. D. Chiappetta Filho 02/06/25 
-  unsigned char SID, TempInstance;
-  tN2kTempSource TempSource;
-  double SeaTemp, SetTemperature;
-  SeaTemp = NMEA0183DoubleNA;
-  if (ParseN2kPGN130312(N2kMsg, SID, TempInstance, TempSource, SeaTemp, SetTemperature)) {
-    if (TempSource != N2kts_SeaTemperature) { return; }
-  //  toNewStruct(SeaTemp, BoatData.SeaTemp);
-    
-  }
-}
-void tN2KdataRX::HandleWatertemp16(const tN2kMsg &N2kMsg) {
-  // Garmin depth sensor output  advised  Erasmo J. D. Chiappetta Filho 02/06/25 
-  unsigned char SID, TempInstance;
-  tN2kTempSource TempSource;
-  double SeaTemp, SetTemperature;
-  SeaTemp = NMEA0183DoubleNA;
-  if (ParseN2kPGN130316(N2kMsg, SID, TempInstance, TempSource, SeaTemp, SetTemperature)) {
-    if (TempSource != N2kts_SeaTemperature) { return; }
-    //  toNewStruct(SeaTemp, BoatData.SeaTemp);
-    
-  }
-}
+
 
 //*****************************************************************************
-void tN2KdataRX::HandleWind(const tN2kMsg &N2kMsg) {
+void HandleWind(const tN2kMsg &N2kMsg) {
   /* see C:\Users\admin\Documents\Arduino\libraries\NMEA2000\Examples\NMEA2000ToNMEA0183\N2KdataRX.cpp
-*/
-
-
+  */
   unsigned char SID;
   tN2kWindReference WindReference;                               // NOTE this is local and N2K and different from the tNMEA0183WindReference
                                                                  //               that we store as (int)   00 ground 01ground north ref 02apparent waterlin 03 theoretical using cog sog 04 centerline theoretical based on water speed
                                                                  // 00=T & 01=T 02,03,04=A
-  tNMEA0183WindReference NMEA0183Reference = NMEA0183Wind_True;  // also LOCAL! just true and apparent
+  tNMEA0183WindReference NMEA0183Reference = NMEA0183Wind_Apparent;  // also LOCAL! just true and apparent
 
   if (ParseN2kWindSpeed(N2kMsg, SID, WindSpeed, WindAngle, WindReference)) {
     WindSourceApparent = false;  // this is the variable we will save for elsewhere
@@ -339,13 +312,15 @@ void tN2KdataRX::HandleWind(const tN2kMsg &N2kMsg) {
       NMEA0183Reference = NMEA0183Wind_True;
     };
     toNewStruct(WindAngle * radToDeg, BoatData.WindAngleApp);
-    toNewStruct(WindSpeed, BoatData.WindSpeedK);
+    toNewStruct(WindSpeed *1.9438, BoatData.WindSpeedK);
     //
   }
 }
 
+
+
 //*****************************************************************************
-void tN2KdataRX::HandleRudder(const tN2kMsg &N2kMsg) {
+void HandleRudder(const tN2kMsg &N2kMsg) {
 
   unsigned char Instance;
   tN2kRudderDirectionOrder RudderDirectionOrder;
@@ -357,8 +332,167 @@ void tN2KdataRX::HandleRudder(const tN2kMsg &N2kMsg) {
   }
 }
 
+//---------other utils etc..
+
+String PGNDecode(int PGN) {  // decode the PGN to a readable name.. Useful for the decodeMode the bus?
+  // https://endige.com/2050/nmea-2000-pgns-deciphered/
+  // see also https://canboat.github.io/canboat/canboat.xml#pgn-list
+  // Changed Type to String: from Char*// to avoid the warnings!
+  // I have added  to those PGN that store data for timed use: RMB APB RMC etc
+  switch (PGN) {
+    case 65359: return "Seatalk: Pilot Heading"; break;  //https://github.com/canboat/canboat/blob/master/analyzer/pgn.h
+    case 65379: return "Seatalk: Pilot Mode"; break;
+    case 65360: return "Seatalk: Pilot Locked Heading"; break;
+    case 65311: return "Magnetic Variation (Raymarine Proprietary)"; break;
+    case 126720: return "Raymarine Device ID"; break;
+    case 126992: return "System Time"; break;
+    case 126993: return "Heartbeat"; break;
+    case 127237: return "Heading/Track Control"; break;
+    case 127245: return "Rudder"; break;
+    case 127250: return "Vessel Heading, Deviation, Variation"; break;
+    case 127251: return "Rate of Turn"; break;
+    case 127258: return "Magnetic Var"; break;
+    case 127488: return "Engine Parameters, Rapid Update"; break;
+    case 127508: return "Battery Status"; break;
+    case 127513: return "Battery Configuration Status"; break;
+    case 128259: return "Speed, Water"; break;
+    case 128267: return "Water Depth"; break;
+    case 128275: return "Distance Log"; break;
+    case 129025: return "Position, Rapid Update"; break;
+    case 129026: return "COG SOG, Rapid Update"; break;
+    case 129029: return "GNSS Position"; break;
+    case 129033: return "Local Time Offset"; break;
+    case 129044: return "Datum"; break;
+    case 129283: return "Cross Track Error"; break;
+    case 129284: return "Navigation Data"; break;
+    case 129285: return "Navigation � Route/WP information"; break;
+    case 129291: return "Set & Drift, Rapid Update"; break;
+    case 129539: return "GNSS DOPs"; break;
+    case 129540: return "GNSS Sats in View"; break;
+    case 130066: return "Route/WP� List Attributes"; break;
+    case 130067: return "Route � WP Name & Position"; break;
+    case 130074: return "WP List � WP Name & Position"; break;
+    case 130306: return "Wind Data"; break;
+    case 130310: return "Environmental Parameters-deprecated"; break;
+    case 130311: return "Environmental Parameters-deprecated"; break;
+    case 130312: return "Temperature"; break;
+    case 130313: return "Humidity"; break;
+    case 130314: return "Actual Pressure"; break;
+    case 130316: return "Temperature, Extended Range"; break;
+    case 129038: return "AIS Class A Position Report"; break;
+    case 129039: return "AIS Class B Position Report"; break;
+    case 129040: return "AIS Class B Extended Position Report"; break;
+    case 129041: return "AIS Aids to Navigation (AtoN) Report"; break;
+    case 129793: return "AIS UTC and Date Report"; break;
+    case 129794: return "AIS Class A Static and Voyage Related Data"; break;
+    case 129798: return "AIS SAR Aircraft Position Report"; break;
+    case 129809: return "AIS Class B �CS� Static Data Report, Part A"; break;
+    case 129810: return "AIS Class B �CS� Static Data Report, Part B"; break;
+    case 60928: return "Address Claimed/cannot Claim"; break;
+    case 130916: return "Seatalk AP Unknown?"; break;
+    case 65240: return "Commanded Address"; break;
+    case 127257:return "Attitude yaw pitch etc"; break;
+
+    case 130848:return "Mfr proprietary fast packet";break;
+    case 130918:return "Mfr proprietary fast packet";break;
+    case 130577:return "Direction Data";break;
+    case 126996:return "Product Information";break;
+
+    default: return "Unknown ";break;
+  }
+  return "unknown";
+}
 
 
+// experimental  Show manufacturer data etc? // ai helped write
 
+bool ParseN2kPGN60928(const tN2kMsg &N2kMsg, uint64_t &NAME) {
+  if (N2kMsg.DataLen < 8) return false;
+
+  NAME = 0;
+  for (int i = 0; i < 8; i++) {
+    NAME |= ((uint64_t)N2kMsg.Data[i]) << (8 * i);
+  }
+  return true;
+}
+
+void HandleMFRData(const tN2kMsg &N2kMsg) {
+  //USBSerial.println("*********parse MFR data 126996 or 60928 *********");
+
+  if (N2kMsg.PGN == 60928) {
+    uint64_t NAME = 0;
+    if (ParseN2kPGN60928(N2kMsg, NAME)) {
+      // USBSerial.println("PGN 60928 - ISO Address Claim:");
+      // USBSerial.print("  Source Address: "); USBSerial.println(Source);
+      // Optional: decode fields from NAME
+      uint8_t industryGroup = (NAME >> 60) & 0x07;
+      uint8_t deviceClass    = (NAME >> 56) & 0x0F;
+      uint8_t deviceFunction = (NAME >> 48) & 0xFF;
+      uint16_t manufacturer  = (NAME >> 21) & 0x7FF;
+      uint32_t uniqueID      = NAME & 0x1FFFFF;
+
+      //USBSerial.print("  Industry Group: "); USBSerial.println(industryGroup);
+      USBSerial.print("  Device Source:   "); USBSerial.println(N2kMsg.Source);
+      USBSerial.print("  Device Class:   "); USBSerial.println(deviceClass);
+      USBSerial.print("  Function Code:  "); USBSerial.println(deviceFunction);
+      USBSerial.print("  Manufacturer:   "); USBSerial.println(manufacturer);
+      USBSerial.print("  Unique ID:      "); USBSerial.println(uniqueID);
+      //RequestProductInformation(N2kMsg.Source);
+    } else {
+      USBSerial.println("Failed to parse PGN 60928");
+    }
+  }
+  if (N2kMsg.PGN == 126996) {
+    // Scalars passed by reference
+    unsigned short N2kVersion = 0;
+    unsigned short ProductCode = 0;
+    unsigned char CertificationLevel = 0;
+    unsigned char LoadEquivalency = 0;
+
+    // Buffers for strings
+    const int ModelIDSize = 33;
+    const int SwCodeSize = 33;
+    const int ModelVersionSize = 33;
+    const int ModelSerialCodeSize = 33;
+
+    char ModelID[ModelIDSize] = {0};
+    char SwCode[SwCodeSize] = {0};
+    char ModelVersion[ModelVersionSize] = {0};
+    char ModelSerialCode[ModelSerialCodeSize] = {0};
+
+    // Parse the PGN
+    if (ParseN2kPGN126996(N2kMsg,
+                          N2kVersion,
+                          ProductCode,
+                          ModelIDSize, ModelID,
+                          SwCodeSize, SwCode,
+                          ModelVersionSize, ModelVersion,
+                          ModelSerialCodeSize, ModelSerialCode,
+                          CertificationLevel,
+                          LoadEquivalency)) {
+
+      USBSerial.println("PGN 126996 - Product Information:");
+      USBSerial.print("  NMEA 2000 Version: "); USBSerial.println(N2kVersion);
+      USBSerial.print("  Product Code: "); USBSerial.println(ProductCode);
+      USBSerial.print("  Model ID: "); USBSerial.println(ModelID);
+      USBSerial.print("  Software Code: "); USBSerial.println(SwCode);
+      USBSerial.print("  Model Version: "); USBSerial.println(ModelVersion);
+      USBSerial.print("  Serial Code: "); USBSerial.println(ModelSerialCode);
+      USBSerial.print("  Certification Level: "); USBSerial.println(CertificationLevel);
+      USBSerial.print("  Load Equivalency: "); USBSerial.println(LoadEquivalency);
+    } else {
+      USBSerial.println("Failed to parse PGN 126996");
+    }
+  }
+}
+
+extern tNMEA2000 &NMEA2000;
+
+void RequestProductInformation(uint8_t destination) {
+  tN2kMsg N2kMsg;
+  SetN2kPGNISORequest(N2kMsg,0xFF, 126996);  // Request PGN 126996
+  //N2kMsg.Destination = destination;    // Use 0xFF for broadcast or specific address
+  NMEA2000.SendMsg(N2kMsg);
+}
 
 

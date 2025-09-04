@@ -35,7 +35,6 @@ extern void EEPROM_WRITE(_sDisplay_Config B,_sWiFi_settings_Config A);
 extern void setFont(int);
 extern int Display_Page;
 extern TAMC_GT911 ts;
-//extern TouchDrvGT911 GT911;
 extern struct _sWiFi_settings_Config Current_Settings;
 extern struct _sDisplay_Config Display_Config;
 extern void TouchCrosshair(int);
