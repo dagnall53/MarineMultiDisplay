@@ -13,6 +13,14 @@ static JPEGDEC _jpeg;
 static File _f;
 static int _x, _y, _x_bound, _y_bound;
 
+// pixel drawing callback
+static int jpegDrawCallback(JPEGDRAW *pDraw)
+{
+  // Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+  gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
+  return 1;
+}
+
 static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 {
     // USBSerial.println("jpegOpenFile");
@@ -21,7 +29,7 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
     // _f = FFat.open(szFilename, "r");
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
-     _f = SD.open(szFilename, "r");
+     _f = SD_MMC.open(szFilename, "r");
 #else
     _f = SD.open(szFilename, FILE_READ);
 #endif

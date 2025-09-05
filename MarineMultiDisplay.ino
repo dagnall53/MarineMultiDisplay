@@ -69,7 +69,7 @@ tNMEA2000 &NMEA2000=*(new tNMEA2000_esp32xx());
 #include "WAV_4inch.h"  // defines GFX settings for Waveshare lcd 4 including touch
 #include "HWCDC.h"// setsHWCDC USBSerial;
 // WHY does Serial not work with this code and waveshare??? 
-//#include "LittleFS.h"
+
 
 //*********** for keyboard*************
 #include "Keyboard.h"
@@ -94,9 +94,18 @@ TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WID
 // allow comments in the JSON FILE
 #define ARDUINOJSON_ENABLE_COMMENTS 1
 #include <ArduinoJson.h>
-#include <SD.h>  // was SD.h  // pins set in 4inch.h
+#include <SD_MMC.h>  // was SD.h  // pins set in 4inch.h
 #include "SPI.h"
 #include "FS.h"
+//Changes for SD_MMC use .. for the waveshare board. This may avoid having to use the expander as SD_MMC.begin it does not use SDCS?
+bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() function
+  File file = SD_MMC.open(path);
+  if (file) {
+    file.close();
+    return true;
+  }
+  return false;
+}
 
 //jpeg
 #include "JpegFunc.h"
@@ -287,12 +296,11 @@ _sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // intefere
 bool LoadVictronConfiguration(const char* filename, _sMyVictronDevices& config) {
   // Open SD file for reading
   bool fault = false;
-  SD_CS(LOW);
-  if (!SD.exists(filename)) {
+  if (!SDfileExists(filename)) {
     USBSerial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);
     fault = true;
   }
-  File file = SD.open(filename, FILE_READ);
+  File file = SD_MMC.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read Victron JSON file"));
     fault = true;
@@ -327,14 +335,12 @@ bool LoadVictronConfiguration(const char* filename, _sMyVictronDevices& config) 
 void SaveVictronConfiguration(const char* filename, _sMyVictronDevices& config) {
   // USED for adding extra devices or for creating a new file if missing
   //Delete existing file, otherwise the configuration is appended to the file
-  SD_CS(LOW);
-  SD.remove(filename);
+  SD_MMC.remove(filename);
   char buff[15];
   // Open file for writing
-  File file = SD.open(filename, FILE_WRITE);
+  File file = SD_MMC.open(filename, FILE_WRITE);
   if (!file) {
     USBSerial.println(F("JSON: Victron: Failed to create SD file"));
-    SD_CS(HIGH);
     return;
   }
   USBSerial.printf(" We expect %i Victron devices", Num_Victron_Devices);
@@ -377,10 +383,10 @@ void SaveVictronConfiguration(const char* filename, _sMyVictronDevices& config) 
 void SaveDisplayConfiguration(const char* filename, _MyColors& set) {
   // Delete existing file, otherwise the configuration is appended to the file
   SD_CS(LOW);
-  SD.remove(filename);
+  SD_MMC.remove(filename);
   char buff[15];
   // Open file for writing
-  File file = SD.open(filename, FILE_WRITE);
+  File file = SD_MMC.open(filename, FILE_WRITE);
   if (!file) {
     USBSerial.println(F("JSON: Failed to create SD file"));
     SD_CS(HIGH);
@@ -422,7 +428,7 @@ void SaveDisplayConfiguration(const char* filename, _MyColors& set) {
 bool LoadDisplayConfiguration(const char* filename, _MyColors& set) {
   // Open SD file for reading
   SD_CS(LOW);
-  File file = SD.open(filename, FILE_READ);
+  File file = SD_MMC.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read JSON file"));
   }
@@ -463,8 +469,7 @@ bool LoadDisplayConfiguration(const char* filename, _MyColors& set) {
 
 bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Open SD file for reading
-  SD_CS(LOW);
-  if (!SD.exists(filename)) {
+  if (!SDfileExists(filename)) {
     USBSerial.printf("**JSON file %s did not exist\n Using defaults\n", filename);
     SaveConfiguration(filename, Default_JSON, Default_Settings);  //save defaults to sd file
     config = Default_JSON;
@@ -472,7 +477,7 @@ bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
     SD_CS(HIGH);
     return false;
   }
-  File file = SD.open(filename, FILE_READ);
+  File file = SD_MMC.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read JSON file"));
     SD_CS(HIGH);
@@ -552,10 +557,10 @@ bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
 void SaveConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Delete existing file, otherwise the configuration is appended to the file
   SD_CS(LOW);
-  SD.remove(filename);
+  SD_MMC.remove(filename);
   char buff[15];
   // Open file for writing
-  File file = SD.open(filename, FILE_WRITE);
+  File file = SD_MMC.open(filename, FILE_WRITE);
   if (!file) {
     USBSerial.println(F("JSON: Failed to create SD file"));
     SD_CS(HIGH);
@@ -618,7 +623,7 @@ void SaveConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
 void PrintJsonFile(const char* comment, const char* filename) {
   // Open file for reading
   SD_CS(LOW);
-  File file = SD.open(filename, FILE_READ);
+  File file = SD_MMC.open(filename, FILE_READ);
   USBSerial.printf(" %s JSON FILE %s is.", comment, filename);
   if (!file) {
     USBSerial.println(F("Failed to read file"));
@@ -790,7 +795,7 @@ void showPicture(const char* name) {
            0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
 }
 void showPictureFrame(_sButton& button, const char* name) {
-  if (!SD.exists(name)) { return; }
+  if (!SD_MMC.exists(name)) { return; }
   jpegDraw(name, jpegDrawCallback, true /* useBigEndian */,
            button.h /* x */, button.v /* y */, button.width /* widthLimit */, button.height /* heightLimit */);
   gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
@@ -2317,11 +2322,6 @@ void sendAdvicef(const char* fmt, ...) {  //complete object type suitable for ho
 
   //****           SD and image functions  include
 
-static int jpegDrawCallback(JPEGDRAW* pDraw) {
-  // Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
-  gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
-  return 1;
-}
 
 void SD_CS( bool state){
   expander.digitalWrite(EX104,state);
@@ -2369,25 +2369,21 @@ void SD_CS( bool state){
   void SD_Setup() {
     hasSD = false;
     USBSerial.println("SD Card START");
-    SPI.setHwCs(false);
-    SPI.begin(SD_SCK, SD_MISO, SD_MOSI);
-    //SD_MMC.setPins(SD_SCK, SD_MOSI, SD_MISO);  //#define SD_SCK  2 #define SD_MISO 4 #define SD_MOSI 1
+    //SPI.begin(SD_SCK, SD_MISO, SD_MOSI);
+    SD_MMC.setPins(SD_SCK, SD_MOSI, SD_MISO);  //#define SD_SCK  2 #define SD_MISO 4 #define SD_MOSI 1
     delay(10);
-    //if (!SD_MMC.begin("/sdcard", true)) {
-    SD_CS(LOW);
-
-    if (!SD.begin()) {  // no cs for wavesghare
+    if (!SD_MMC.begin("/sdcard", true)) {
       USBSerial.println("Card Mount Failed");
       gfx->println("NO SD Card");
-      SD_CS(HIGH);
       return;
     } else {
       hasSD = true;  // picture is run in setup, after load config
     }
-    uint8_t cardType = SD.cardType();
+
+    uint8_t cardType = SD_MMC.cardType();
+
     if (cardType == CARD_NONE) {
       USBSerial.println("No SD card attached");
-      SD_CS(HIGH);
       return;
     }
     USBSerial.print("SD Card Type: ");
@@ -2407,12 +2403,11 @@ void SD_CS( bool state){
       gfx->println("Unknown");
     }
 
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+    uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
     USBSerial.printf("SD Card Size: %lluMB\n", cardSize);
     gfx->printf("SD Card Size: %lluMB\n", cardSize);
     // USBSerial.println("*** SD card contents  (to three levels) ***");
     //listDir(SD_MMC, "/", 3);
-    SD_CS(HIGH);
   }
   //  ************  WIFI support functions *****************
 

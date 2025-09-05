@@ -44,7 +44,7 @@
 #include "Structures.h"
 
 #include <SPI.h>
-#include <SD.h> // was SD.h
+#include <SD_MMC.h> // was SD.h
 extern void SD_CS(bool state);
 //#include "LittleFS.h"
 extern bool hasFS;
@@ -92,7 +92,7 @@ char SavedFile[30];
 char InstLogFileName[25];
 char NMEALogFileName[25];
 
-extern bool SDFileExists(const char* path); // only for SD_MMC library
+extern bool SDfileExists(const char* path); // only for SD library
 
 // Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
 String html_Question() {
@@ -166,7 +166,7 @@ String html_startws() {
   st += ".local/edit/index.htm'>SD Files Editor</a></h1><br>"
         "<div class='version'>Saved Log files on SD </div>";
   SD_CS(LOW);
-  File dir = SD.open("/logs");
+  File dir = SD_MMC.open("/logs");
    
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
@@ -262,15 +262,13 @@ String style =
 // using local copy of the javascript ?..
 String serverIndex() {
   String st;
-  SD_CS(LOW);
-  if (SD.exists("/edit/jquery.min.js")) {
-    USBSerial.println("using local js");
+  if (SDfileExists("/edit/jquery.min.js")) {
+    Serial.println("using local js");
     st = "<script src='/edit/jquery.min.js'></script>";
   } else {
     USBSerial.println("using Internet js");
     st = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>";
   }
-  SD_CS(HIGH);
 
   /*"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"*/
   /*"<script src='/edit/jquery.min.js'></script>"*/
@@ -434,11 +432,11 @@ bool loadFromSdCard(String path) {
     dataType = "audio/mpeg";
   }
 
-  File dataFile = SD.open(path.c_str());
+  File dataFile = SD_MMC.open(path.c_str());
   if (dataFile.isDirectory()) {
     path += "/index.htm";
     dataType = "text/html";
-    dataFile = SD.open(path.c_str());
+    dataFile = SD_MMC.open(path.c_str());
   }
 
   if (!dataFile) {
@@ -465,10 +463,10 @@ void handleFileUpload() {
   HTTPUpload &upload = server.upload();
   SD_CS(LOW);
   if (upload.status == UPLOAD_FILE_START) {
-     if (SD.exists((char *)upload.filename.c_str())) {
-      SD.remove((char *)upload.filename.c_str());
+    if (SDfileExists((char *)upload.filename.c_str())) {
+      SD_MMC.remove((char *)upload.filename.c_str());
     }
-    uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
+    uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
     USBSerial.println(upload.filename);
     strcpy(SavedFile, upload.filename.c_str());
 
@@ -525,10 +523,10 @@ void handleFileUpload() {
 
 void deleteRecursive(String path) {
   SD_CS(LOW);
-  File file = SD.open((char *)path.c_str());
+  File file = SD_MMC.open((char *)path.c_str());
   if (!file.isDirectory()) {
     file.close();
-    SD.remove((char *)path.c_str());
+    SD_MMC.remove((char *)path.c_str());
     SD_CS(HIGH);
     return;
   }
@@ -546,13 +544,13 @@ void deleteRecursive(String path) {
     } else {
       entry.close();
       SD_CS(LOW);
-      SD.remove((char *)entryPath.c_str());
+      SD_MMC.remove((char *)entryPath.c_str());
       SD_CS(HIGH);
     }
     yield();
   }
   SD_CS(LOW);
-  SD.rmdir((char *)path.c_str());
+  SD_MMC.rmdir((char *)path.c_str());
   SD_CS(HIGH);
   file.close();
 }
@@ -562,13 +560,10 @@ void handleDelete() {
     return returnFail("BAD ARGS");
   }
   String path = server.arg(0);
-  SD_CS(LOW);
-  if (path == "/" || !SD.exists((char *)path.c_str())) {
+  if (path == "/" || !SDfileExists((char *)path.c_str())) {
     returnFail("BAD PATH");
-    SD_CS(HIGH);
     return;
   }
-  SD_CS(HIGH);
   deleteRecursive(path);
   returnOK();
 }
@@ -581,19 +576,19 @@ void handleCreate() {
   }
   String path = server.arg(0);
   SD_CS(LOW);
-  if (path == "/" || SD.exists((char *)path.c_str())) {
+   if (path == "/" || SDfileExists((char *)path.c_str())) {
     returnFail("BAD PATH");SD_CS(HIGH);
     return;
   }
 
   if (path.indexOf('.') > 0) {
-    File file = SD.open((char *)path.c_str(), FILE_WRITE);
+    File file = SD_MMC.open((char *)path.c_str(), FILE_WRITE);
     if (file) {
       file.write(0);
       file.close();
     }
   } else {
-    SD.mkdir((char *)path.c_str());
+    SD_MMC.mkdir((char *)path.c_str());
   }
   SD_CS(HIGH);
   returnOK();
@@ -605,11 +600,11 @@ void printDirectory() {
   }
   String path = server.arg("dir");
   SD_CS(LOW);
-  if (path != "/" && !SD.exists((char *)path.c_str())) {
+   if (path != "/" && !SDfileExists((char *)path.c_str())) {
     SD_CS(HIGH);
     return returnFail("BAD PATH");
   }
-  File dir = SD.open((char *)path.c_str());
+  File dir = SD_MMC.open((char *)path.c_str());
   path = String();
   if (!dir.isDirectory()) {
     dir.close();SD_CS(HIGH);
@@ -873,7 +868,7 @@ void StartInstlogfile() {
   snprintf(InstLogFileName, 25, "/logs/%6i.log", int(BoatData.GPSDate));
   //  USBSerial.printf("  <%s> \n",InstLogFileName);
   SD_CS(LOW);
-  File file = SD.open(InstLogFileName);
+  File file = SD_MMC.open(InstLogFileName);
   SD_CS(HIGH);
   if (!file) {
     //USBSerial.println("File doesn't exist");
@@ -884,7 +879,7 @@ void StartInstlogfile() {
         BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
         */
         SD_CS(LOW);
-    writeFile(SD, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
+    writeFile(SD_MMC, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
     SD_CS(HIGH);
     file.close();
     return;
@@ -903,12 +898,12 @@ void StartNMEAlogfile() {
   // If the data.txt file doesn't exist
   // Create a (FIXED NAME!) file on the SD card and write the data labels
   SD_CS(LOW);
-  File file = SD.open("/logs/NMEA.log");
+  File file = SD_MMC.open("/logs/NMEA.log");
   if (!file) {
     //USBSerial.println("File doens't exist");
     NMEAINSTlogFileStarted = true;
     USBSerial.printf("Creating NMEA LOG file. and header..\n");
-    writeFile(SD, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
+    writeFile(SD_MMC, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
     file.close();
     SD_CS(HIGH);
     return;
@@ -934,7 +929,7 @@ void NMEALOG(const char *fmt, ...) {
   // USBSerial.printf("  Logging to:<%s>", NMEALogFileName);
   // USBSerial.print("  Log  data: ");
   // USBSerial.println(msg);
-  appendFile(SD, "/logs/NMEA.log", msg);
+  appendFile(SD_MMC, "/logs/NMEA.log", msg);
 }
 
 void INSTLOG(const char *fmt, ...) {
@@ -951,7 +946,7 @@ void INSTLOG(const char *fmt, ...) {
   // USBSerial.printf("  Logging to:<%s>", InstLogFileName);
   // USBSerial.print("  Log  data: ");
   // USBSerial.println(msg);
-  appendFile(SD, InstLogFileName, msg);
+  appendFile(SD_MMC, InstLogFileName, msg);
 }
 
 

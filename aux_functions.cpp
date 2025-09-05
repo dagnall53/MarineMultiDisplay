@@ -5,7 +5,7 @@ but highly modified!
 
 #include <Arduino.h>  //necessary for the String variables
 #include <SPI.h>
-#include <SD.h>
+//#include <SD.h>
 #include "aux_functions.h"
 // defines gfx and has pin details of the display
 #include <NMEA0183.h>  // for the TL NMEA0183 library functions
