@@ -44,7 +44,7 @@
 #include "Structures.h"
 
 #include <SPI.h>
-#include <SD_MMC.h> // was SD.h
+#include <SD_MMC.h>  // was SD.h
 extern void SD_CS(bool state);
 //#include "LittleFS.h"
 extern bool hasFS;
@@ -92,7 +92,24 @@ char SavedFile[30];
 char InstLogFileName[25];
 char NMEALogFileName[25];
 
-extern bool SDfileExists(const char* path); // only for SD library
+extern bool SDfileExists(const char *path);  // only for SD library
+
+// from https://randomnerdtutorials.com/esp32-data-logging-temperature-to-microsd-card/
+void writeFile(fs::FS &fs, const char *path, const char *message) {
+  USBSerial.printf("Writing file: %s\n", path);
+
+  File file = fs.open(path, FILE_WRITE);
+  if (!file) {
+    USBSerial.println("Failed to open file for writing");
+    return;
+  }
+  if (file.print(message)) {
+    //  USBSerial.println("File written");
+  } else {
+    USBSerial.println("Write failed");
+  }
+  file.close();
+}
 
 // Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
 String html_Question() {
@@ -167,7 +184,7 @@ String html_startws() {
         "<div class='version'>Saved Log files on SD </div>";
   SD_CS(LOW);
   File dir = SD_MMC.open("/logs");
-   
+
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
     USBSerial.println(entry.path());
@@ -456,37 +473,59 @@ bool loadFromSdCard(String path) {
   return true;
 }
 
+
+
 void handleFileUpload() {
+  bool FileSaved = false;
   if (server.uri() != "/edit") {
     return;
   }
   HTTPUpload &upload = server.upload();
-  SD_CS(LOW);
-  if (upload.status == UPLOAD_FILE_START) {
-    if (SDfileExists((char *)upload.filename.c_str())) {
-      SD_MMC.remove((char *)upload.filename.c_str());
-    }
-    uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
-    USBSerial.println(upload.filename);
-    strcpy(SavedFile, upload.filename.c_str());
-
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (uploadFile) {
-      uploadFile.write(upload.buf, upload.currentSize);
-    }
-    USBSerial.print("Upload: WRITE, Bytes: ");
-    USBSerial.println(upload.currentSize);
-  } else if (upload.status == UPLOAD_FILE_END) {
-    if (uploadFile) {
-      uploadFile.close();
-    }
-    USBSerial.print("Upload: END, Size: ");
-    USBSerial.print(upload.totalSize);
-    USBSerial.print(" filename: <");
-    USBSerial.print(SavedFile);
-    USBSerial.print("> lookfor:eg. <");
-    USBSerial.print(ColorsFilename);
-    USBSerial.println(">");
+  USBSerial.print("--handleFileUpload server.upload[");  USBSerial.print(upload.filename.c_str());  USBSerial.print("]  status:");  USBSerial.println(upload.status);
+  SD_CS(LOW);               // try to do expander port stuff only once?
+                            // rewrite as Case to help spot problems with SD_MMC not writing (not closing )
+  switch (upload.status) {  // 0 is exists :1 File Write  :2 File end
+    case 0:
+      USBSerial.println("UPLOAD_FILE_START");
+      if (SD_MMC.exists((char *)upload.filename.c_str())) {
+        USBSerial.print("         Exists , delete it ..");
+        if (SD_MMC.remove(upload.filename.c_str())) {
+          USBSerial.println("deleted");
+        } else {
+          USBSerial.println("FAILED delete ");
+          return;
+        }
+      }
+      uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
+      USBSerial.println(upload.filename);
+      strcpy(SavedFile, upload.filename.c_str());
+      USBSerial.println(" upload file set ");
+      break;
+    case 1:
+      USBSerial.println("Trying to UPLOAD_FILE_WRITE");
+      if (uploadFile) {
+        uploadFile.write(upload.buf, upload.currentSize);
+      }
+      USBSerial.print("Upload: WRITE, Bytes: ");
+      USBSerial.println(upload.currentSize);
+      break;
+    case 2:
+      USBSerial.println("Trying to UPLOAD_FILE_END");
+      if (uploadFile) {
+        USBSerial.print("Trying to uploadFile.close()");
+        //uploadFile.close();  // this fails with timeouts!
+        uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
+        USBSerial.println("  done");
+        FileSaved = true;
+        SD_CS(HIGH); 
+        USBSerial.print("Upload: END, Size: ");
+        USBSerial.print(upload.totalSize);
+        USBSerial.print(" filename: <");
+        USBSerial.println(SavedFile);
+      }
+      break;
+  }
+  if (FileSaved) {
     //Add equivalent to web initiated save here if the upload.filename filename is the config.txt or vconfig.txt?
     // so that the saved settings are actually used immediately by the display - rather than waiting for the save button or
     //  power off.
@@ -518,7 +557,8 @@ void handleFileUpload() {
     }
     SavedFile[0] = 0;
   }
-  SD_CS(HIGH);
+  USBSerial.println("--- end of handle upload ---");
+  //SD_CS(HIGH);
 }
 
 void deleteRecursive(String path) {
@@ -543,13 +583,10 @@ void deleteRecursive(String path) {
       deleteRecursive(entryPath);
     } else {
       entry.close();
-      SD_CS(LOW);
       SD_MMC.remove((char *)entryPath.c_str());
-      SD_CS(HIGH);
     }
     yield();
   }
-  SD_CS(LOW);
   SD_MMC.rmdir((char *)path.c_str());
   SD_CS(HIGH);
   file.close();
@@ -559,25 +596,28 @@ void handleDelete() {
   if (server.args() == 0) {
     return returnFail("BAD ARGS");
   }
+  SD_CS(LOW);
   String path = server.arg(0);
   if (path == "/" || !SDfileExists((char *)path.c_str())) {
-    returnFail("BAD PATH");
+    returnFail("BAD PATH");SD_CS(HIGH);
     return;
   }
   deleteRecursive(path);
+  SD_CS(HIGH);
   returnOK();
 }
 
 void handleCreate() {
-      WifiGFXinterrupt(8, WifiStatus, "Running Editor");
-    WebServerActive=true;
+  WifiGFXinterrupt(8, WifiStatus, "Running Editor");
+  WebServerActive = true;
   if (server.args() == 0) {
     return returnFail("BAD ARGS");
   }
   String path = server.arg(0);
   SD_CS(LOW);
-   if (path == "/" || SDfileExists((char *)path.c_str())) {
-    returnFail("BAD PATH");SD_CS(HIGH);
+  if (path == "/" || SDfileExists((char *)path.c_str())) {
+    returnFail("BAD PATH");
+    SD_CS(HIGH);
     return;
   }
 
@@ -600,17 +640,18 @@ void printDirectory() {
   }
   String path = server.arg("dir");
   SD_CS(LOW);
-   if (path != "/" && !SDfileExists((char *)path.c_str())) {
+  if (path != "/" && !SDfileExists((char *)path.c_str())) {
     SD_CS(HIGH);
     return returnFail("BAD PATH");
   }
   File dir = SD_MMC.open((char *)path.c_str());
   path = String();
   if (!dir.isDirectory()) {
-    dir.close();SD_CS(HIGH);
+    dir.close();
+    SD_CS(HIGH);
     return returnFail("NOT DIR");
   }
-  
+
   dir.rewindDirectory();
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/json", "");
@@ -644,7 +685,7 @@ void printDirectory() {
 
 
 void handleNotFound() {
-   SD_CS(LOW);
+  SD_CS(LOW);
   bool simulatestate;
   simulatestate = ColorSettings.Simulate;  // a hack as simulate state seem to make this handling crash..  conflict with SD calls? ;
   ColorSettings.Simulate = false;
@@ -653,9 +694,9 @@ void handleNotFound() {
   USBSerial.print(server.uri());
   USBSerial.println(">");
   if (hasSD && loadFromSdCard(server.uri())) {
-  ColorSettings.Simulate = simulatestate;
-   SD_CS(HIGH);
-  return;
+    ColorSettings.Simulate = simulatestate;
+    SD_CS(HIGH);
+    return;
   }
   String message = "";
   if (!hasSD) {
@@ -699,7 +740,7 @@ void SetupWebstuff() {
   server.on("/", HTTP_GET, []() {
     USBSerial.println(" handling  root");
     WifiGFXinterrupt(8, WifiStatus, "Running Webserver");
-    WebServerActive=true;
+    WebServerActive = true;
     handleRoot();
   });
 
@@ -819,22 +860,7 @@ void SetupWebstuff() {
   USBSerial.println("HTTP server started");
 }
 
-// from https://randomnerdtutorials.com/esp32-data-logging-temperature-to-microsd-card/
-void writeFile(fs::FS &fs, const char *path, const char *message) {
-  USBSerial.printf("Writing file: %s\n", path);
 
-  File file = fs.open(path, FILE_WRITE);
-  if (!file) {
-    USBSerial.println("Failed to open file for writing");
-    return;
-  }
-  if (file.print(message)) {
-    //  USBSerial.println("File written");
-  } else {
-    USBSerial.println("Write failed");
-  }
-  file.close();
-}
 
 // Append data to the SD card (DON'T MODIFY THIS FUNCTION)
 void appendFile(fs::FS &fs, const char *path, const char *message) {
@@ -878,7 +904,7 @@ void StartInstlogfile() {
     /*    int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60,
         BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
         */
-        SD_CS(LOW);
+    SD_CS(LOW);
     writeFile(SD_MMC, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
     SD_CS(HIGH);
     file.close();

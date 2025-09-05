@@ -99,11 +99,14 @@ TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WID
 #include "FS.h"
 //Changes for SD_MMC use .. for the waveshare board. This may avoid having to use the expander as SD_MMC.begin it does not use SDCS?
 bool SDfileExists(const char* path) {  // SD_MMC is missing SDfileExists() function
+ SD_CS(LOW);
   File file = SD_MMC.open(path);
   if (file) {
     file.close();
+    SD_CS(HIGH);
     return true;
   }
+  SD_CS(HIGH);
   return false;
 }
 
@@ -300,6 +303,7 @@ bool LoadVictronConfiguration(const char* filename, _sMyVictronDevices& config) 
     USBSerial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);
     fault = true;
   }
+  SD_CS(LOW);
   File file = SD_MMC.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read Victron JSON file"));
@@ -474,9 +478,9 @@ bool LoadConfiguration(const char* filename, _sDisplay_Config& config, _sWiFi_se
     SaveConfiguration(filename, Default_JSON, Default_Settings);  //save defaults to sd file
     config = Default_JSON;
     settings = Default_Settings;
-    SD_CS(HIGH);
     return false;
   }
+  SD_CS(LOW);
   File file = SD_MMC.open(filename, FILE_READ);
   if (!file) {
     USBSerial.println(F("**Failed to read JSON file"));
@@ -2060,7 +2064,7 @@ double ValidData(_sInstData variable) {  // To avoid showing NMEA0183DoubleNA va
 }
 
   void loop() {
-    static int number;USBSerial.print(".");number++; if (number>40){number=0;USBSerial.println();}
+   // static int number;USBSerial.print(".");number++; if (number>40){number=0;USBSerial.println();}
     
     static unsigned long LogInterval;
     static unsigned long DebugInterval;
@@ -2324,7 +2328,9 @@ void sendAdvicef(const char* fmt, ...) {  //complete object type suitable for ho
 
 
 void SD_CS( bool state){
-  expander.digitalWrite(EX104,state);
+  static bool laststate;
+  if (laststate != state) {expander.digitalWrite(EX104,state); USBSerial.printf("  Setting SD_CS state: %i\n", state); }
+  laststate=state;
 }
 
   void listDir(fs::FS & fs, const char* dirname, uint8_t levels) {
