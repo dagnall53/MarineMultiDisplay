@@ -53,10 +53,10 @@ char nmea_ext_buffer[1000];
    if (!donotdisturb){ 
    if (strlen(nmea_ext_buffer)<=752){
       memcpy(&rxdata,incomingData,sizeof(rxdata));
-           //  USBSerial.print(" **Esp nmea_Ext is<");USBSerial.print(strlen(nmea_EXT));USBSerial.print("> rxdata is<");USBSerial.print(strlen(rxdata));USBSerial.print(">long  NMEAext isnow <");
+           //  Serial.print(" **Esp nmea_Ext is<");Serial.print(strlen(nmea_EXT));Serial.print("> rxdata is<");Serial.print(strlen(rxdata));Serial.print(">long  NMEAext isnow <");
       strcat(nmea_ext_buffer, rxdata);}
    }
-           // USBSerial.print(nmea_EXT);USBSerial.print("> length now<");USBSerial.print(strlen(nmea_EXT));USBSerial.println(">");
+           // Serial.print(nmea_EXT);Serial.print("> length now<");Serial.print(strlen(nmea_EXT));Serial.println(">");
   }
 #else
   void Update_ESPNOW(const uint8_t* mac, const uint8_t* incomingData, int len) {
@@ -67,10 +67,10 @@ char nmea_ext_buffer[1000];
    if (!donotdisturb){ 
    if (strlen(nmea_ext_buffer)<=752){
       memcpy(&rxdata,incomingData,sizeof(rxdata));
-           //  USBSerial.print(" **Esp nmea_Ext is<");USBSerial.print(strlen(nmea_EXT));USBSerial.print("> rxdata is<");USBSerial.print(strlen(rxdata));USBSerial.print(">long  NMEAext isnow <");
+           //  Serial.print(" **Esp nmea_Ext is<");Serial.print(strlen(nmea_EXT));Serial.print("> rxdata is<");Serial.print(strlen(rxdata));Serial.print(">long  NMEAext isnow <");
       strcat(nmea_ext_buffer, rxdata);}
    }
-           // USBSerial.print(nmea_EXT);USBSerial.print("> length now<");USBSerial.print(strlen(nmea_EXT));USBSerial.println(">");
+           // Serial.print(nmea_EXT);Serial.print("> length now<");Serial.print(strlen(nmea_EXT));Serial.println(">");
   }
 #endif
 
@@ -88,7 +88,7 @@ bool Start_ESP_EXT() {  // start espnow and set interrupt to function Update_ESP
   #endif
   if (esp_now_add_peer(&peerInfo) == ESP_OK) { success = true; }
   esp_wifi_get_channel(espnowchannel,secondch);
-  USBSerial.println(" ESP-Now setup completed"); 
+  Serial.println(" ESP-Now setup completed"); 
   return success;
 }
 
@@ -126,7 +126,7 @@ extern struct _sDisplay_Config Display_Config;
 void EXTHeartbeat() {
   if (!EspNowIsRunning) { return; }
   if (Last_EXT_Sent + 10000 <= millis()) {  // 10 sec.
-  //USBSerial.println("Sending heartbeat");
+  //Serial.println("Sending heartbeat");
     Last_EXT_Sent = millis();               // but we also update Last_EXT_Sent in the EXT send..
                                             //EXTSENDf("_%s_:ch%d_\r\n", Project, WiFi.channel());  
                                             // BUT We must send with a \r\n!!
@@ -144,7 +144,7 @@ void EXTSEND(const char* buf) {  // same format as TCP send etc..  83 size for N
   //sendAdvicef(" esp-now Sending: (length %i) Wifich<%i>  peer_ch<%i> ", strlen(myData), WiFi.channel(), peerInfo.channel);
   Last_EXT_Sent = millis();
   esp_err_t result = esp_now_send(peerInfo.peer_addr, (uint8_t*)&myData, sizeof(myData));
-  //if (result == ESP_OK) {USBSerial.println(" esp-now SENT");}// <%s> (%i long) in msg max [%i] long \n",myData,strlen(myData), sizeof(myData));}else{USBSerial.println(" ESP failed to send");}
+  //if (result == ESP_OK) {Serial.println(" esp-now SENT");}// <%s> (%i long) in msg max [%i] long \n",myData,strlen(myData), sizeof(myData));}else{Serial.println(" ESP failed to send");}
   //if (result != ESP_OK) {EspNowIsRunning=false;}   // but then we need something in Loop to re-establish the link ??
 }
 

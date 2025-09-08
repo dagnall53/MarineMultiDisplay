@@ -23,7 +23,7 @@ static int jpegDrawCallback(JPEGDRAW *pDraw)
 
 static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 {
-    // USBSerial.println("jpegOpenFile");
+    // Serial.println("jpegOpenFile");
 
 #if defined(ESP32)
     // _f = FFat.open(szFilename, "r");
@@ -40,7 +40,7 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
 
 static void jpegCloseFile(void *pHandle)
 {
-    // USBSerial.println("jpegCloseFile");
+    // Serial.println("jpegCloseFile");
     File *f = static_cast<File *>(pHandle);
     f->close();
     SD_CS(HIGH);
@@ -48,7 +48,7 @@ static void jpegCloseFile(void *pHandle)
 
 static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
-    // USBSerial.printf("jpegReadFile, iLen: %d\n", iLen);
+    // Serial.printf("jpegReadFile, iLen: %d\n", iLen);
     File *f = static_cast<File *>(pFile->fHandle);
     size_t r = f->read(pBuf, iLen);
     return r;
@@ -56,7 +56,7 @@ static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 
 static int32_t jpegSeekFile(JPEGFILE *pFile, int32_t iPosition)
 {
-    // USBSerial.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
+    // Serial.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
     File *f = static_cast<File *>(pFile->fHandle);
     f->seek(iPosition);
     return iPosition;

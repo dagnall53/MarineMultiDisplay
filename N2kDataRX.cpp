@@ -195,10 +195,10 @@ void WaterDepth(const tN2kMsg &N2kMsg) { // original name in datatdisplay exampl
 void HandlePosition(const tN2kMsg &N2kMsg) {
 
   if (ParseN2kPGN129025(N2kMsg, Latitude, Longitude)) {
-  // USBSerial.print(" In HandlePosition lat:");
-  // USBSerial.print(Latitude);
-  // USBSerial.print(" Lon:");
-  // USBSerial.println(Longitude);
+  // Serial.print(" In HandlePosition lat:");
+  // Serial.print(Latitude);
+  // Serial.print(" Lon:");
+  // Serial.println(Longitude);
 // needs toNewStruct ??
       // BoatData.Latitude.data = Latitude*1e-07;   // N2000 lat is double at 1e-7 resolution
       // BoatData.Longitude.data = Longitude*1e-07;
@@ -417,13 +417,13 @@ bool ParseN2kPGN60928(const tN2kMsg &N2kMsg, uint64_t &NAME) {
 }
 
 void HandleMFRData(const tN2kMsg &N2kMsg) {
-  //USBSerial.println("*********parse MFR data 126996 or 60928 *********");
+  //Serial.println("*********parse MFR data 126996 or 60928 *********");
 
   if (N2kMsg.PGN == 60928) {
     uint64_t NAME = 0;
     if (ParseN2kPGN60928(N2kMsg, NAME)) {
-      // USBSerial.println("PGN 60928 - ISO Address Claim:");
-      // USBSerial.print("  Source Address: "); USBSerial.println(Source);
+      // Serial.println("PGN 60928 - ISO Address Claim:");
+      // Serial.print("  Source Address: "); Serial.println(Source);
       // Optional: decode fields from NAME
       uint8_t industryGroup = (NAME >> 60) & 0x07;
       uint8_t deviceClass    = (NAME >> 56) & 0x0F;
@@ -431,15 +431,15 @@ void HandleMFRData(const tN2kMsg &N2kMsg) {
       uint16_t manufacturer  = (NAME >> 21) & 0x7FF;
       uint32_t uniqueID      = NAME & 0x1FFFFF;
 
-      //USBSerial.print("  Industry Group: "); USBSerial.println(industryGroup);
-      USBSerial.print("  Device Source:   "); USBSerial.println(N2kMsg.Source);
-      USBSerial.print("  Device Class:   "); USBSerial.println(deviceClass);
-      USBSerial.print("  Function Code:  "); USBSerial.println(deviceFunction);
-      USBSerial.print("  Manufacturer:   "); USBSerial.println(manufacturer);
-      USBSerial.print("  Unique ID:      "); USBSerial.println(uniqueID);
+      //Serial.print("  Industry Group: "); Serial.println(industryGroup);
+      Serial.print("  Device Source:   "); Serial.println(N2kMsg.Source);
+      Serial.print("  Device Class:   "); Serial.println(deviceClass);
+      Serial.print("  Function Code:  "); Serial.println(deviceFunction);
+      Serial.print("  Manufacturer:   "); Serial.println(manufacturer);
+      Serial.print("  Unique ID:      "); Serial.println(uniqueID);
       //RequestProductInformation(N2kMsg.Source);
     } else {
-      USBSerial.println("Failed to parse PGN 60928");
+      Serial.println("Failed to parse PGN 60928");
     }
   }
   if (N2kMsg.PGN == 126996) {
@@ -471,17 +471,17 @@ void HandleMFRData(const tN2kMsg &N2kMsg) {
                           CertificationLevel,
                           LoadEquivalency)) {
 
-      USBSerial.println("PGN 126996 - Product Information:");
-      USBSerial.print("  NMEA 2000 Version: "); USBSerial.println(N2kVersion);
-      USBSerial.print("  Product Code: "); USBSerial.println(ProductCode);
-      USBSerial.print("  Model ID: "); USBSerial.println(ModelID);
-      USBSerial.print("  Software Code: "); USBSerial.println(SwCode);
-      USBSerial.print("  Model Version: "); USBSerial.println(ModelVersion);
-      USBSerial.print("  Serial Code: "); USBSerial.println(ModelSerialCode);
-      USBSerial.print("  Certification Level: "); USBSerial.println(CertificationLevel);
-      USBSerial.print("  Load Equivalency: "); USBSerial.println(LoadEquivalency);
+      Serial.println("PGN 126996 - Product Information:");
+      Serial.print("  NMEA 2000 Version: "); Serial.println(N2kVersion);
+      Serial.print("  Product Code: "); Serial.println(ProductCode);
+      Serial.print("  Model ID: "); Serial.println(ModelID);
+      Serial.print("  Software Code: "); Serial.println(SwCode);
+      Serial.print("  Model Version: "); Serial.println(ModelVersion);
+      Serial.print("  Serial Code: "); Serial.println(ModelSerialCode);
+      Serial.print("  Certification Level: "); Serial.println(CertificationLevel);
+      Serial.print("  Load Equivalency: "); Serial.println(LoadEquivalency);
     } else {
-      USBSerial.println("Failed to parse PGN 126996");
+      Serial.println("Failed to parse PGN 126996");
     }
   }
 }

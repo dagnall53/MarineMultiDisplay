@@ -4,6 +4,12 @@ FOR WAVESHARE 4inch LCD
 https://www.waveshare.com/esp32-s3-touch-lcd-4.htm
 https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
+also need ?
+#define ARDUINO_USB_MODE 1
+#define ARDUINO_USB_CDC_ON_BOOT 1
+to get serial.print working 
+(or set in tools-> USB CDC )
+
  ******************************************************************************/
  
 #ifndef _WAV_DEF_H

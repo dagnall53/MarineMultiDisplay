@@ -96,16 +96,16 @@ extern bool SDexists(const char *path);  // only for SD library
 
 // //****************write file etc from examples and  from (eg) https://randomnerdtutorials.com/esp32-data-logging-temperature-to-microsd-card/
 void writeFile(fs::FS &fs, const char *path, const char *message) {
-  USBSerial.printf("*writeFile  Writing file: [%s]  [%s]\n", path, message);
+  Serial.printf("*writeFile  Writing file: [%s]  [%s]\n", path, message);
   File file = fs.open(path, FILE_WRITE);
   if (!file) {
-    USBSerial.println("*writeFile Failed to open file for writing");
+    Serial.println("*writeFile Failed to open file for writing");
     return;
   }
   if (file.print(message)) {
-    //  USBSerial.println("File written");
+    //  Serial.println("File written");
   } else {
-    USBSerial.println("*writeFile Write failed");
+    Serial.println("*writeFile Write failed");
   }
   file.close();
 }
@@ -193,7 +193,7 @@ String html_startws() {
 
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
-    USBSerial.println(entry.path());
+    Serial.println(entry.path());
     if (!entry) { break; }
     filename = String(entry.path());
     st += "<h1 ><a class='button-linkSmall' href='http://";
@@ -227,10 +227,10 @@ String style =
 String serverIndex() {
   String st;
   if (SDexists("/edit/jquery.min.js")) {
-    USBSerial.println("using local js");
+    Serial.println("using local js");
     st = "<script src='/edit/jquery.min.js'></script>";
   } else {
-    USBSerial.println("using Internet js");
+    Serial.println("using Internet js");
     st = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>";
   }
 
@@ -295,14 +295,14 @@ void returnFail(String msg) {
 }
 
 void handleRoot() {
-  //USBSerial.println(" Sending local html version of Root webpage");
+  //Serial.println(" Sending local html version of Root webpage");
   SD_CS("LOW");
   server.send(200, "text/html", html_startws() + "\r\n");
 }
 
 bool loadFromSDcard(String path) {
   String dataType = "text/plain";
- // USBSerial.println(" 307 In   loadFromSDcard ");
+ // Serial.println(" 307 In   loadFromSDcard ");
   //  previous version used just startws.htm  html from SD card.
   if (path.endsWith("/")) {  // send our local version of intial webpage with modified path!
     handleRoot();
@@ -336,7 +336,7 @@ bool loadFromSDcard(String path) {
   } else if (path.endsWith(".mp3")) {
     dataType = "audio/mpeg";
   }
-  //USBSerial.print(" 339 In   loadFromSDcard  :"); USBSerial.println();
+  //Serial.print(" 339 In   loadFromSDcard  :"); Serial.println();
   File dataFile = SD.open(path.c_str());
 
   if (dataFile.isDirectory()) {
@@ -346,7 +346,7 @@ bool loadFromSDcard(String path) {
   }
 
   if (!dataFile) {
-   // USBSerial.println("352 not data file");
+   // Serial.println("352 not data file");
     SD_CS(HIGH);
     return false;
   }
@@ -356,7 +356,7 @@ bool loadFromSDcard(String path) {
   }
 
   if (server.streamFile(dataFile, dataType) != dataFile.size()) {
-    USBSerial.println("Sent less data than expected!");
+    Serial.println("Sent less data than expected!");
   }
   dataFile.close();
   SD_CS(HIGH);
@@ -364,15 +364,15 @@ bool loadFromSDcard(String path) {
 }
 
 void ShowHandlerdata(String text, HTTPUpload &upload ){
-  USBSerial.print(" \n **");USBSerial.print(text);
-  USBSerial.print(" Phase ");USBSerial.print(upload.status); 
-  USBSerial.print("  filename["); USBSerial.print(upload.filename.c_str());
-  USBSerial.print("] currentSize: Bytes: ");
-  USBSerial.print(upload.currentSize);
-  USBSerial.print(" totalSize: ");
-  USBSerial.println(upload.totalSize);
-  //USBSerial.println("Data ");
- // USBSerial.println(upload.buf);
+  Serial.print(" \n **");Serial.print(text);
+  Serial.print(" Phase ");Serial.print(upload.status); 
+  Serial.print("  filename["); Serial.print(upload.filename.c_str());
+  Serial.print("] currentSize: Bytes: ");
+  Serial.print(upload.currentSize);
+  Serial.print(" totalSize: ");
+  Serial.println(upload.totalSize);
+  //Serial.println("Data ");
+ // Serial.println(upload.buf);
 
 }
 
@@ -401,7 +401,7 @@ void handleFileUpload() {
     //File will have been saved, so 'load' it into the actual code.
     // remember strcmp returns zero if equal! or a number of the place the characters do not match
     if (strcmp(SavedFile, Setupfilename) == 0) {
-      USBSerial.println("Re-Loading Config");
+      Serial.println("Re-Loading Config");
       LoadConfiguration(Setupfilename, Display_Config, Current_Settings);
       SaveConfiguration(Setupfilename, Display_Config, Current_Settings);  // and re-save, so that any new format to the file is saved
       delay(50);
@@ -409,7 +409,7 @@ void handleFileUpload() {
       delay(50);
     }
     if (strcmp(SavedFile, VictronDevicesSetupfilename) == 0) {
-      USBSerial.println("Re-Loading Victron Config");
+      Serial.println("Re-Loading Victron Config");
       LoadVictronConfiguration(VictronDevicesSetupfilename, victronDevices);
       SaveVictronConfiguration(VictronDevicesSetupfilename, victronDevices);  // and re-save, so that any new format to the file is saved
       delay(50);
@@ -417,7 +417,7 @@ void handleFileUpload() {
       delay(50);
     }
     if (strcmp(SavedFile, ColorsFilename) == 0) {
-      USBSerial.println("Re-Loading Colour Config");
+      Serial.println("Re-Loading Colour Config");
       LoadDisplayConfiguration(ColorsFilename, ColorSettings);
       SaveDisplayConfiguration(ColorsFilename, ColorSettings);  // and re-save, so that any new format to the file is saved
       delay(50);
@@ -426,7 +426,7 @@ void handleFileUpload() {
     }
     SavedFile[0] = 0;
   }
-  USBSerial.println("--- end of handle upload ---");
+  Serial.println("--- end of handle upload ---");
   //SD_CS(HIGH);
 }
 
@@ -560,16 +560,16 @@ void handleNotFound() {
    simulatestate = ColorSettings.Simulate;  // a hack as simulate state seem to make this handling crash..  conflict with SD calls? ;
    ColorSettings.Simulate = false;
 
-  USBSerial.print(" handling: server.uri:<");
-  USBSerial.print(server.uri());
-  USBSerial.print(">");USBSerial.printf(" %s \n",hasSD?"HAS SD": "No SD");
+  Serial.print(" handling: server.uri:<");
+  Serial.print(server.uri());
+  Serial.print(">");Serial.printf(" %s \n",hasSD?"HAS SD": "No SD");
   if (hasSD && loadFromSDcard(server.uri())) {
-    USBSerial.println(" Loaded from SD card ");
+    Serial.println(" Loaded from SD card ");
   //  ColorSettings.Simulate = simulatestate;
     SD_CS(HIGH);
     return;
   }
- // USBSerial.println(" Line 575");
+ // Serial.println(" Line 575");
   String message = "";
   if (!hasSD) {
     message += "SD.card Not Detected\n\n";
@@ -588,7 +588,7 @@ void handleNotFound() {
   }
   server.send(404, "text/plain", message);  //404 is the error message
   SD_CS(HIGH);
-  USBSerial.print(message);
+  Serial.print(message);
   ColorSettings.Simulate = simulatestate;
 }
 
@@ -602,15 +602,15 @@ void handleQuestion() {
 void SetupWebstuff() {
   if (MDNS.begin(Display_Config.PanelName)) {
     MDNS.addService("http", "tcp", 80);
-    USBSerial.println("MDNS responder started");
-    USBSerial.print("You can now connect to http://");
-    USBSerial.print(Display_Config.PanelName);
-    USBSerial.println(".local");
+    Serial.println("MDNS responder started");
+    Serial.print("You can now connect to http://");
+    Serial.print(Display_Config.PanelName);
+    Serial.println(".local");
     WifiGFXinterrupt(8, WifiStatus, "MDNS responder started\nconnect to\n http://%s.local", Display_Config.PanelName);
   }
   //**************
   server.on("/", HTTP_GET, []() {
-    USBSerial.println(" handling  root");
+    Serial.println(" handling  root");
     WifiGFXinterrupt(8, WifiStatus, "Running Webserver");
     WebServerActive = true;
     handleRoot();
@@ -644,17 +644,17 @@ void SetupWebstuff() {
   server.on("/Save", HTTP_GET, []() {
     handleRoot();
     if (LoadConfiguration(Setupfilename, Display_Config, Current_Settings)) {
-      USBSerial.println("***Updating EEPROM from ");
+      Serial.println("***Updating EEPROM from ");
       EEPROM_WRITE(Display_Config, Current_Settings);
     }  // stops overwrite with bad JSON data!!
     if (LoadVictronConfiguration(VictronDevicesSetupfilename, victronDevices)) {
       PrintJsonFile(" Check Updated Victron settings after Web initiated SAVE ", VictronDevicesSetupfilename);
-      USBSerial.println("***Updated Victron data settings");
+      Serial.println("***Updated Victron data settings");
     }
     if (LoadDisplayConfiguration(ColorsFilename, ColorSettings)) {
-      USBSerial.println(" USING JSON for Colours data settings");
+      Serial.println(" USING JSON for Colours data settings");
     } else {
-      USBSerial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT and Making File on SD****\n\n");
+      Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT and Making File on SD****\n\n");
       SaveDisplayConfiguration(ColorsFilename, ColorSettings);  // should write a default file if it was missing?
     }
     delay(50);
@@ -694,8 +694,8 @@ void SetupWebstuff() {
         gfx->setCursor(0, 40);
         gfx->setTextWrap(true);
         gfx->printf("Update: %s\n", upload.filename.c_str());
-        USBSerial.printf("Update: %s\n", upload.filename.c_str());
-        USBSerial.printf("   current size: %u   total size %u\n", upload.currentSize, upload.totalSize);
+        Serial.printf("Update: %s\n", upload.filename.c_str());
+        Serial.printf("   current size: %u   total size %u\n", upload.currentSize, upload.totalSize);
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  //start with max available size
           Update.printError(Serial);
         }
@@ -710,13 +710,13 @@ void SetupWebstuff() {
         if (upload.totalSize >= next) {
 
           gfx->printf("%dk ", next / 1024);
-          USBSerial.printf("%dk ", next / 1024);
+          Serial.printf("%dk ", next / 1024);
           next += chunk_size;
         }
       } else if (upload.status == UPLOAD_FILE_END) {
         if (Update.end(true)) {             //true to set the size to the current progress
           gfx->printf("Update Success:n");  // no point in sending size to display - it only flashes momentarily!
-          USBSerial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+          Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
           delay(500);
         } else {
           Update.printError(Serial);
@@ -729,24 +729,24 @@ void SetupWebstuff() {
 
 
   server.begin();
-  USBSerial.println("HTTP server started");
+  Serial.println("HTTP server started");
 }
 
 
 
 // Append data to the SD card (DON'T MODIFY THIS FUNCTION)
 void appendFile(fs::FS &fs, const char *path, const char *message) {
-  // USBSerial.printf("Appending to file: %s\n", path);
+  // Serial.printf("Appending to file: %s\n", path);
 
   File file = fs.open(path, FILE_APPEND);
   if (!file) {
-    // USBSerial.println("Failed to open file for appending");
+    // Serial.println("Failed to open file for appending");
     return;
   }
   if (file.print(message)) {
-    //  USBSerial.println("Message appended");
+    //  Serial.println("Message appended");
   } else {
-    //  USBSerial.println("Append failed");
+    //  Serial.println("Append failed");
   }
   file.close();
 }
@@ -762,16 +762,16 @@ void StartInstlogfile() {
   if (BoatData.GPSDate == 0) { return; }
   if (BoatData.GPSDate == NMEA0183DoubleNA) { return; }  // and check for NMEA0183DoubleNA
   //We have a date so we can use this for the file name!
-  // USBSerial.printf("  ***** LOG FILE DEBUG ***  use: <%6i>  to make name..  ",int(BoatData.GPSDate));
+  // Serial.printf("  ***** LOG FILE DEBUG ***  use: <%6i>  to make name..  ",int(BoatData.GPSDate));
   snprintf(InstLogFileName, 25, "/logs/%6i.log", int(BoatData.GPSDate));
-  //  USBSerial.printf("  <%s> \n",InstLogFileName);
+  //  Serial.printf("  <%s> \n",InstLogFileName);
   SD_CS(LOW);
   File file = SD.open(InstLogFileName);
   SD_CS(HIGH);
   if (!file) {
-    //USBSerial.println("File doesn't exist");
+    //Serial.println("File doesn't exist");
     INSTlogFileStarted = true;
-    USBSerial.printf("Creating <%s> Instrument LOG file. and header..\n", InstLogFileName);
+    Serial.printf("Creating <%s> Instrument LOG file. and header..\n", InstLogFileName);
     // data will be added by a see the  LOG( fmt ...) in the main loop at 5 sec intervals
     /*    int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60,
         BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
@@ -783,7 +783,7 @@ void StartInstlogfile() {
     return;
   } else {
     INSTlogFileStarted = true;
-    USBSerial.println("Log File already exists.. appending");
+    Serial.println("Log File already exists.. appending");
   }
   file.close();
 }
@@ -798,16 +798,16 @@ void StartNMEAlogfile() {
   SD_CS(LOW);
   File file = SD.open("/logs/NMEA.log");
   if (!file) {
-    //USBSerial.println("File doens't exist");
+    //Serial.println("File doens't exist");
     NMEAINSTlogFileStarted = true;
-    USBSerial.printf("Creating NMEA LOG file. and header..\n");
+    Serial.printf("Creating NMEA LOG file. and header..\n");
     writeFile(SD, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
     file.close();
     SD_CS(HIGH);
     return;
   } else {
     NMEAINSTlogFileStarted = true;
-    USBSerial.println("NMEA log File already exists.. appending");
+    Serial.println("NMEA log File already exists.. appending");
   }
   SD_CS(HIGH);
   file.close();
@@ -824,9 +824,9 @@ void NMEALOG(const char *fmt, ...) {
   vsnprintf(msg, 799, fmt, args);
   va_end(args);
   int len = strlen(msg);
-  // USBSerial.printf("  Logging to:<%s>", NMEALogFileName);
-  // USBSerial.print("  Log  data: ");
-  // USBSerial.println(msg);
+  // Serial.printf("  Logging to:<%s>", NMEALogFileName);
+  // Serial.print("  Log  data: ");
+  // Serial.println(msg);
   appendFile(SD, "/logs/NMEA.log", msg);
 }
 
@@ -841,9 +841,9 @@ void INSTLOG(const char *fmt, ...) {
   vsnprintf(msg, 128, fmt, args);
   va_end(args);
   int len = strlen(msg);
-  // USBSerial.printf("  Logging to:<%s>", InstLogFileName);
-  // USBSerial.print("  Log  data: ");
-  // USBSerial.println(msg);
+  // Serial.printf("  Logging to:<%s>", InstLogFileName);
+  // Serial.print("  Log  data: ");
+  // Serial.println(msg);
   appendFile(SD, InstLogFileName, msg);
 }
 
@@ -857,9 +857,9 @@ void INSTLOG(const char *fmt, ...) {
 //   lFreeKB *= SDvol()->blocksPerCluster()/2;
 //SD_CS(HIGH);
 //   // Display free space
-//   USBSerial.print("Free space: ");
-//   USBSerial.print(lFreeKB);
-//   USBSerial.println(" KB");
+//   Serial.print("Free space: ");
+//   Serial.print(lFreeKB);
+//   Serial.println(" KB");
 // }
 // String EditorHTM(){ attempt to save this as code and npt as SD file..  do this once we get the DS working more reliably? 
 //   String st;

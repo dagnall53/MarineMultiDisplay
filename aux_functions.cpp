@@ -95,12 +95,12 @@ boolean FillTokenLast(char *ptr) {
 extern void EventTiming(String input);  // to permit timing functions here during development
 
 bool NeedleinHaystack(char ch1, char ch2, char ch3, char *haystack, int &compareOffset) {
-  // USBSerial.printf("\n Looking for<%c%c%c> in strlen(%i) %s \n", ch1, ch2, ch3, strlen(haystack), haystack);
+  // Serial.printf("\n Looking for<%c%c%c> in strlen(%i) %s \n", ch1, ch2, ch3, strlen(haystack), haystack);
   compareOffset = 0;
   // if (needle[0] == '\0') { return false; }
   for (compareOffset = 0; (compareOffset <= strlen(haystack)); compareOffset++) {
     if ((ch1 == haystack[compareOffset]) && (ch2 == haystack[compareOffset + 1]) && (ch3 == haystack[compareOffset + 2])) {
-      //    USBSerial.printf("Found at %i\n", compareOffset);
+      //    Serial.printf("Found at %i\n", compareOffset);
       return true;
     }
   }
@@ -109,12 +109,12 @@ bool NeedleinHaystack(char ch1, char ch2, char ch3, char *haystack, int &compare
 }
 
 //********* Add this if needed in the case statements to help sort bugs!
-// USBSerial.println(" Fields:");
+// Serial.println(" Fields:");
 // for (int x = 0; x <= Num_DataFields; x++) {
-//   USBSerial.print(Field[x]);
-//   USBSerial.print(",");
+//   Serial.print(Field[x]);
+//   Serial.print(",");
 // }
-// USBSerial.println("> ");
+// Serial.println("> ");
 /* ref  from TL functions..
 double NMEA0183GetDouble(const char *data) {
   double val = NMEA0183DoubleNA;
@@ -166,14 +166,14 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array
   }
   p = Field[Num_DataFields];  // searches for '*' and if not found, looks for a CR
   if (!FillTokenLast(Field[Num_DataFields])) { return false; }
-  //USBSerial.printf("  Found  <%i> Fields Field0<%s> Field1<%s> Field2<%s> Field3<%s>\n", Num_DataFields, Field[0],Field[1], Field[2], Field[3]);
+  //Serial.printf("  Found  <%i> Fields Field0<%s> Field1<%s> Field2<%s> Field3<%s>\n", Num_DataFields, Field[0],Field[1], Field[2], Field[3]);
   //NeedleInHaystack/4/will (should !) identify the command.  Note Nul to prevent zero ! being passed to Switch or Div4
   //                  0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19....
   char nmeafunct[] = "NUL,DBT,DPT,DBK,MWV,VHW,RMC,APB,GLL,HDG,HDM,MTW,MWD,NOP,XS,,AK,,ALK,BWC,WPL,GSV ";  // more can be added to
   // Not using Field[0] as some commands have only two characters. so we can look for (eg) 'XS,' from $IIXS, =13
   if (NeedleinHaystack(buf[3], buf[4], buf[5], nmeafunct, Index) == false) { return false; }
-  // USBSerial.printf(" Using case %i \n", Index / 4);
-  // USBSerial.println(" Fields:");for(int x=0 ;int <Num_DataFields;int++){USBSerial.print(Field[x]);USBSerial.print(",");} USBSerial.println("> ");
+  // Serial.printf(" Using case %i \n", Index / 4);
+  // Serial.println(" Fields:");for(int x=0 ;int <Num_DataFields;int++){Serial.print(Field[x]);Serial.print(",");} Serial.println("> ");
 
   switch (Index / 4) {
     case 1:  //dbt
@@ -211,7 +211,7 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array
 
       BoatData.Latitude.data = LatLonToDouble(Field[3], Field[4][0]);   // using TL's functions that return null value
       BoatData.Longitude.data = LatLonToDouble(Field[5], Field[6][0]);  //nb we use +1 on his numbering that omits the command
-                                                                        //        USBSerial.println(BoatData.GPSTime); USBSerial.println(BoatData.Latitude);  USBSerial.println(BoatData.Longitude);  USBSerial.println(BoatData.SOG);
+                                                                        //        Serial.println(BoatData.GPSTime); Serial.println(BoatData.Latitude);  Serial.println(BoatData.Longitude);  Serial.println(BoatData.SOG);
       BoatData.GPSTime = NMEA0183GPTimeToSeconds(Field[1]);
       BoatData.LOCTime = NMEA0183GPTimeToSeconds(Field[1]) +3600* Display_Config.LocalTimeOffset  ;
       while ( (int(BoatData.LOCTime) / 3600) >= 24) {BoatData.LOCTime=BoatData.LOCTime-86400;}
@@ -240,13 +240,13 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array
       break;
 
     case 19:  //GSV
-      // USBSerial.printf("\n Debug GSV ? numdatafields<%i>  ", Num_DataFields);
+      // Serial.printf("\n Debug GSV ? numdatafields<%i>  ", Num_DataFields);
       //          if (Num_DataFields < 10) { return false; }
-      //        USBSerial.println("Fields<");                  // un copy this lot to assist debugging!!
+      //        Serial.println("Fields<");                  // un copy this lot to assist debugging!!
       //        for (int x = 0; x <= Num_DataFields; x++) {
-      //          USBSerial.printf("%i=<%s>,",x,Field[x]);
+      //          Serial.printf("%i=<%s>,",x,Field[x]);
       //        }
-      //        USBSerial.println(" ");
+      //        Serial.println(" ");
       //  Not new struct, sats in view is just a double. not an inststruct. toNewStruct(Field[3], BoatData.SatsInView);
       BoatData.SatsInView = NMEA0183GetDouble(Field[3]);
 
@@ -336,7 +336,7 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
 
 void UpdateLinef(uint16_t color, int font, _sButton &button, const char *fmt, ...) {  // Types sequential lines in the button space '&' for button to store printline?
   if (button.screenfull && button.debugpause) { return; }
-  //USBSerial.printf(" lines  TypingspaceH =%i  number of lines=%i printing line <%i>\n",typingspaceH,LinesOfType,button.PrintLine);
+  //Serial.printf(" lines  TypingspaceH =%i  number of lines=%i printing line <%i>\n",typingspaceH,LinesOfType,button.PrintLine);
   static char msg[600] = { '\0' };
   va_list args;
   va_start(args, fmt);
@@ -357,7 +357,7 @@ void UpdateLinef(int font, _sButton &button, const char *fmt, ...) {  // Types s
 }
 
 void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
-  //USBSerial.print(" UD2S: ");USBSerial.println(data); this version does not use the border for the height evaluation ! 
+  //Serial.print(" UD2S: ");Serial.println(data); this version does not use the border for the height evaluation ! 
   static char msg[300] = { '\0' };
   char digits[30];
   char decimal[30];
@@ -382,7 +382,7 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   int len = strlen(msg);
   // split msg at the decimal point .. so must have decimal point!
   // if (typingspaceW >=300){
-  // USBSerial.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
+  // Serial.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
 
   if (strcspn(msg, delimiter) != strlen(msg)) {
     token = strtok(msg, delimiter);
@@ -406,15 +406,15 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   setFont(smallfont);
   gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);    // get text bounds for decimal
                                                                     // if (typingspaceW >=300){
-                                                                    //   USBSerial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
+                                                                    //   Serial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
                                                                     //   }
   // if (((TBw1 + TBw2) >= typingspaceW) || (TBh1 >= typingspaceH)) {  // too big!!
   //   if ((TBw1 <= typingspaceW) && (TBh1 <= typingspaceH)) {         //just print digits not decimals
   //     TBw2 = 0;
   //     decimal[0] = 0;
   //     decimal[1] = 0;
-  //   } else {  // USBSerial.print("***DEBUG <"); USBSerial.print(msg);USBSerial.print("> became <");USBSerial.print(digits);
-  //             // USBSerial.print(decimal);USBSerial.println("> and was too big to print in box");
+  //   } else {  // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
+  //             // Serial.print(decimal);Serial.println("> and was too big to print in box");
   //     gfx->setTextBound(0, 0, 480, 480);
   //     return;
   //   }
@@ -467,7 +467,7 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   int len = strlen(msg);
   // split msg at the decimal point .. so must have decimal point!
   // if (typingspaceW >=300){
-  // USBSerial.printf("** Debug Msg is <%s> typingspacew=%i ",msg,typingspaceW);}
+  // Serial.printf("** Debug Msg is <%s> typingspacew=%i ",msg,typingspaceW);}
 
   if (strcspn(msg, delimiter) != strlen(msg)) {
     token = strtok(msg, delimiter);
@@ -495,8 +495,8 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
       TBw2 = 0;
       decimal[0] = 0;
       decimal[1] = 0;
-    } else {  // USBSerial.print("***DEBUG <"); USBSerial.print(msg);USBSerial.print("> became <");USBSerial.print(digits);
-              // USBSerial.print(decimal);USBSerial.println("> and was too big to print in box");
+    } else {  // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
+              // Serial.print(decimal);Serial.println("> and was too big to print in box");
       gfx->setTextBound(0, 0, 480, 480);  //reset text bounds
       data.displayed = true;
       return;
@@ -542,7 +542,7 @@ void UpdateDataTwoSize(bool horizCenter, bool vertCenter, int bigfont, int small
   if (data.greyed) { return; }
   if (!data.displayed) {
     gfx->setTextSize(1);
-    //  USBSerial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
+    //  Serial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
     Sub_for_UpdateTwoSize(1, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
     Sub_for_UpdateTwoSize(1, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
     data.displayed = true;  //reset to false inside toNewStruct
@@ -562,7 +562,7 @@ void UpdateDataTwoSize(int magnify, bool horizCenter, bool vertCenter, int bigfo
   if (data.greyed) { return; }
   if (!data.displayed) {
     gfx->setTextSize(magnify);
-    //  USBSerial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
+    //  Serial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
     data.displayed = true;  //reset to false inside toNewStruct
@@ -596,7 +596,7 @@ void GFXBorderBoxPrintf(_sButton button, const char *fmt, ...) {
 
 void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // add a top left title to the box Best used with FONT 0 ,FreeMono8pt7b
   int Font_Before;
-  //USBSerial.println("Font at start is %i",MasterFont);
+  //Serial.println("Font at start is %i",MasterFont);
   Font_Before = MasterFont;
   setFont(font);
   static char Title[300] = { '\0' };
@@ -609,12 +609,12 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
   int len = strlen(Title);
   gfx->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
   gfx->setTextColor(WHITE, button.BorderColor);
- // USBSerial.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
+ // Serial.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
   if ((button.v - TBh) >= 0) {  // text writes from point at bottom left .. have we room to draw 'above' the box?
     gfx->setCursor(button.h, button.v); 
     gfx->fillRect(button.h, button.v-TBh, TBw, TBh, button.BorderColor);
-    //USBSerial.printf(" h v positioned\n");
-  } else { //USBSerial.printf(" moved down to TBH (%i) \n",TBh);
+    //Serial.printf(" h v positioned\n");
+  } else { //Serial.printf(" moved down to TBH (%i) \n",TBh);
     gfx->setCursor(button.h, TBh-2); 
     gfx->fillRect(button.h, 2, TBw, TBh, button.BorderColor); 
     // move 'inside' box by moving down.. -2 just because this does not leave a gap with the small FreeMono8pt7b font (0) I normally chose
@@ -622,11 +622,11 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
     // (Font 3 is monobold 8, prints like font 0 ,but is less clear IMHO. 
   }
   gfx->print(Title);
-  setFont(Font_Before);  //USBSerial.println("Font selected is %i",MasterFont);
+  setFont(Font_Before);  //Serial.println("Font selected is %i",MasterFont);
 }
 void AddTitleInsideBox(int font, int pos, _sButton button, const char *fmt, ...) {  // Pos 1 2 3 4 for top right, botom right etc. add a top left title to the box
   int Font_Before;
-  //USBSerial.println("Font at start is %i",MasterFont);
+  //Serial.println("Font at start is %i",MasterFont);
   Font_Before = MasterFont;
   setFont(font);
   static char Title[300] = { '\0' };
@@ -666,7 +666,7 @@ void AddTitleInsideBox(int font, int pos, _sButton button, const char *fmt, ...)
       break;
   }
   gfx->print(Title);
-  setFont(Font_Before);  //USBSerial.println("Font selected is %i",MasterFont);
+  setFont(Font_Before);  //Serial.println("Font selected is %i",MasterFont);
 }
 
 int Circular(int x, int min, int max) {  // returns circulated data in range min to max
@@ -756,7 +756,7 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
 //       graph[x].v = (button.v + button.bordersize + (button.height / 2));
 //       graph[x].h = (button.h + button.bordersize + (button.width / 2));
 //     }
-//     // USBSerial.printf(" Debug Graph..'zeroed' to mid point of  h%i  v%i",graph[1].h,graph[1].v);
+//     // Serial.printf(" Debug Graph..'zeroed' to mid point of  h%i  v%i",graph[1].h,graph[1].v);
 //     //initial fill and border (same as writeinborder box codes )
 //     gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
 //     gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
@@ -785,7 +785,7 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
 //       Pdrawline(graph[index], graph[index + 1], button.BackColor);
 //     }
 //   }
-//   //USBSerial.printf(" Graph Index %i\n", index);
+//   //Serial.printf(" Graph Index %i\n", index);
 //   //get graph point.. V is 'data' horiz is 'index'
 //   graph[index].v = GraphRange(data, button.v + button.height - button.bordersize - dotsize, button.v + button.bordersize + dotsize, dmin, dmax);
 //   graph[index].h = GraphRange(index, button.h + button.bordersize + dotsize, button.h + button.width - button.bordersize - dotsize, 0, Hmax);
@@ -817,9 +817,9 @@ void SCROLLGraph(bool reset,int instance, int dotsize, bool line, _sButton butto
   data = DATA.data;
   //dotsize = 3;
   if (reset) {
-    //USBSerial.printf(" RESETTING SCROLLGRAPH  %i  %i ",Display_Page, Displaypage[instance]); 
+    //Serial.printf(" RESETTING SCROLLGRAPH  %i  %i ",Display_Page, Displaypage[instance]); 
     Displaypage[instance] = Display_Page;
-  //  USBSerial.printf(" after..   %i  %i \n",Display_Page, Displaypage[instance]); 
+  //  Serial.printf(" after..   %i  %i \n",Display_Page, Displaypage[instance]); 
 
     // for (int x = 0; x <= Hmax; x++) {  //reset all points !!
     //   graph[x][instance].v = (button.v + button.bordersize + (button.height / 2));
@@ -854,7 +854,7 @@ void SCROLLGraph(bool reset,int instance, int dotsize, bool line, _sButton butto
   //graph[Hmax].h = GraphRange(Hmax, button.h + button.bordersize + dotsize, button.h + button.width - button.bordersize - dotsize, 0, Hmax);
      //for (int x =1; x<= Hmax-1;x++){
       for (int x = Hmax-samplesread; x <= Hmax; x++) {
-     // USBSerial.printf(" SCROLLGRAPH (x) %i (h) %i (v)%i \n",x,graph[x][instance].h,graph[x][instance].v );
+     // Serial.printf(" SCROLLGRAPH (x) %i (h) %i (v)%i \n",x,graph[x][instance].h,graph[x][instance].v );
      if (line && (x >= 2)) {
       if((graph[x-1][instance].v>= boxxtop+2  ) && (graph[x][instance].v>= boxxtop+2 )){
         Pdrawline(graph[x-1][instance], graph[x][instance], button.TextColor);}
