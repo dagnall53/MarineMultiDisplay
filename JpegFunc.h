@@ -29,6 +29,7 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
     // _f = FFat.open(szFilename, "r");
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
+    SD_CS(LOW);
      _f = SD.open(szFilename, "r");
 #else
     _f = SD.open(szFilename, FILE_READ);
@@ -42,6 +43,7 @@ static void jpegCloseFile(void *pHandle)
     // USBSerial.println("jpegCloseFile");
     File *f = static_cast<File *>(pHandle);
     f->close();
+    SD_CS(HIGH);
 }
 
 static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)

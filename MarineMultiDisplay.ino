@@ -67,8 +67,12 @@ tNMEA2000 &NMEA2000=*(new tNMEA2000_esp32xx());
 #include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation'
 // Original version was for GFX 1.3.1 only. #include "GUITIONESP32-S3-4848S040_GFX_133.h"
 #include "WAV_4inch.h"  // defines GFX settings for Waveshare lcd 4 including touch
-#include "HWCDC.h"// setsHWCDC USBSerial;
+//#include "HWCDC.h"// setsHWCDC so we hav eto use USBSerial;
 // WHY does Serial not work with this code and waveshare??? 
+//set Tools > USB CDC On Boot > Enabled
+
+
+
 
 
 //*********** for keyboard*************
@@ -1940,6 +1944,12 @@ const IPAddress sub255(255, 255, 255, 0);   // the default Subnet Mask in in Sof
 
 void setup() {
   //CONFIG_ESP_BROWNOUT_DET_LVL_SEL_5 ??
+  esp_task_wdt_init(10, true);  // 10s timeout
+    // Add current task (loop task) to the watchdog
+  esp_task_wdt_add(NULL);
+
+
+
   USBSerial.begin(115200);
   USBSerial.println("Starting NMEA Display ");
   USBSerial.println(soft_version);
@@ -2075,6 +2085,10 @@ double ValidData(_sInstData variable) {  // To avoid showing NMEA0183DoubleNA va
     static unsigned long LogInterval;
     static unsigned long DebugInterval;
     static unsigned long SSIDSearchInterval;
+  // Feed the watchdog
+  esp_task_wdt_reset();
+
+
     timeupdate();
   //  USBSerial.print("time ");USBSerial.println(millis());
     //USBSerial.printf(" s<%i>",millis()-Interval);Interval=millis();
@@ -2336,8 +2350,8 @@ void sendAdvicef(const char* fmt, ...) {  //complete object type suitable for ho
 
 void SD_CS( bool state){
   static bool laststate;
-  if (laststate != state) {expander.digitalWrite(EX104,state);USBSerial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  USBSerial.printf("  Setting SD_CS state: %i\n", state); }
-  //if (state==HIGH){ USBSerial.print("+++ Setting SD_CD OFF +++");}
+  if (laststate != state) {expander.digitalWrite(EX104,state);}//USBSerial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  USBSerial.printf("  Setting SD_CS state: %i\n", state); }
+
   laststate=state;
 }
 //see also OTA.h (needs some sorting  where I keep these files!)

@@ -95,7 +95,7 @@ using //(deleted), 00 60 Good results == type9 default
 #include <TAMC_GT911.h>
 //#include "TouchDrvGT911.hpp"
 
-#define TOUCH_INT 16          //
+#define TOUCH_INT 16          // 16
 #define TOUCH_RST -1          // EX101 will reset it at the start ?
 
 #define TOUCH_SDA  15
