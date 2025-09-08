@@ -48,8 +48,8 @@ The Esptool program will upload the program onto your board and the display boar
 
 You will next need to get a new microSD card, ( I used 4Gb), and format it using FAT32.
 Then copy the whole of the "SdRoot" folder onto the SD card. 
-I have a bat file that can do this.. Click the link below to download the file "MakeSDcard.bat" from the github.
-<a href="Click to download/" download>https://dagnall53.github.io/NMEADisplay/build/MakeSDcard.bat</a>
+I have a bat file that can do this.. Click the link below to download the file "MakeSD.card.bat" from the github.
+<a href="Click to download/" download>https://dagnall53.github.io/NMEADisplay/build/MakeSD.card.bat</a>
 Save this somewhere convenient such as downloads. Run the program .. 
 It will download files from github SdRoot to the (root of) the Drive you specify.
 

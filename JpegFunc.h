@@ -29,9 +29,9 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
     // _f = FFat.open(szFilename, "r");
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
-     _f = SD_MMC.open(szFilename, "r");
+     _f = SD.open(szFilename, "r");
 #else
-    _f = SD_MMC.open(szFilename, FILE_READ);
+    _f = SD.open(szFilename, FILE_READ);
 #endif
     *pFileSize = _f.size();
     return &_f;

@@ -26,9 +26,9 @@
   File Names longer than 8 charecters will be truncated by the SD library, so keep filenames shorter
   index.htm is the default index (works on subfolders as well)
 
-  upload the contents of SdRoot to the root of the SDcard and access the editor by going to 
+  upload the contents of SdRoot to the root of the SD.card and access the editor by going to 
   http://nmeadisplay.local/edit
-  To retrieve the contents of SDcard, visit http://nmeadisplay.local/list?dir=/
+  To retrieve the contents of SD.card, visit http://nmeadisplay.local/list?dir=/
       dir is the argument that needs to be passed to the function PrintDirectory via HTTP Get request.
   NB  in my version nmeadisplay is settable in the config.txt, so you may need to access 192.168.4.1 if accessing the AP.. 
 
@@ -44,7 +44,7 @@
 #include "Structures.h"
 
 #include <SPI.h>
-#include <SD_MMC.h>  // was SD.h
+#include <SD.h>  // was SDh
 extern void SD_CS(bool state);
 //#include "LittleFS.h"
 extern bool hasFS;
@@ -87,29 +87,33 @@ extern void Display(bool reset, int page);
 
 bool WebServerActive;
 WebServer server(80);
-File uploadFile;
+File SDuploadFile;
 char SavedFile[30];
 char InstLogFileName[25];
 char NMEALogFileName[25];
 
-extern bool SDfileExists(const char *path);  // only for SD library
+extern bool SDexists(const char *path);  // only for SD library
 
-// from https://randomnerdtutorials.com/esp32-data-logging-temperature-to-microsd-card/
+// //****************write file etc from examples and  from (eg) https://randomnerdtutorials.com/esp32-data-logging-temperature-to-microsd-card/
 void writeFile(fs::FS &fs, const char *path, const char *message) {
-  USBSerial.printf("Writing file: %s\n", path);
-
+  USBSerial.printf("*writeFile  Writing file: [%s]  [%s]\n", path, message);
   File file = fs.open(path, FILE_WRITE);
   if (!file) {
-    USBSerial.println("Failed to open file for writing");
+    USBSerial.println("*writeFile Failed to open file for writing");
     return;
   }
   if (file.print(message)) {
     //  USBSerial.println("File written");
   } else {
-    USBSerial.println("Write failed");
+    USBSerial.println("*writeFile Write failed");
   }
   file.close();
 }
+
+
+
+// //***************************************************
+
 
 // Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
 String html_Question() {
@@ -164,9 +168,12 @@ String html_startws() {
     "border: 1px solid #666;transition: background-color 0.3s;font-size: 10px;"
     "background: #3498db; color: #fff;height: auto;}"
     "h1 {margin: 10px 0;font-size: 18px;}</style></head>"
-    "<body>"
-    "<img src='/v3small.jpg'><br>"
+    "<body>";
+  if (SDexists ("/v3small.jpg")){
+    st+= "<img src='/v3small.jpg'><br>"
     "<div class='title'>";
+  } 
+      
   st += String(Display_Config.PanelName);
   st += "</div>"
         "<div class='version'>";
@@ -179,11 +186,11 @@ String html_startws() {
   st += String(Display_Config.PanelName);
   st += ".local/OTA'>OTA UPDATE</a></h1>"
         "<h1><a class='button-link' href='http://";
-  st += String(Display_Config.PanelName);
+ if (hasSD) {
+   st += String(Display_Config.PanelName);
   st += ".local/edit/index.htm'>SD Files Editor</a></h1><br>"
         "<div class='version'>Saved Log files on SD </div>";
-  SD_CS(LOW);
-  File dir = SD_MMC.open("/logs");
+  File dir = SD.open("/logs");
 
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
@@ -200,69 +207,10 @@ String html_startws() {
     st += "</a></h1>";
     entry.close();
   }
-  SD_CS(HIGH);
+ }
   st += "</body></html> ";
   return st;
 }
-
-// String html_startwsFS() {
-//   String logs, filename;
-//   String st =
-//     "<html> <head> <meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-//     "<meta http-equiv='content-type' content='text/html;' charset='utf-8'>"
-//     "<title>NavDisplay</title>"
-//     "<style>"
-//     "body {background-color: white;color: black;text-align: center;font-family: sans-serif;color: #777;}"
-//     ".title {font-size: 2em; margin: 20px 0;text-align: center;}"
-//     ".version {text-align: center;margin-bottom: 10px;}"
-//     ".button-link {display: inline-block;padding: 0px 15px;background-color: #006;"
-//     "color: white;text-decoration: none;border-radius: 4px;margin: 5px 0;"
-//     "border: 1px solid #666;transition: background-color 0.3s;font-size: 15px;"
-//     "background: #3498db; color: #fff;height: auto;}"
-//     ".button-link:hover {background-color: #666;}"
-//     ".button-linkSmall {display: inline-block;padding: 0px 15px;background-color: #006;"
-//     "color: white;text-decoration: none;border-radius: 4px;margin: 5px 0;"
-//     "border: 1px solid #666;transition: background-color 0.3s;font-size: 10px;"
-//     "background: #3498db; color: #fff;height: auto;}"
-//     "h1 {margin: 10px 0;font-size: 18px;}</style></head>"
-//     "<body>"
-//     "<img src='/v3small.jpg'><br>"
-//     "<div class='title'>";
-//   st += String(Display_Config.PanelName);
-//   st += "</div>"
-//         "<div class='version'>";
-//   st += String(soft_version);
-//   st += "</div>"
-//         "<h1><a class='button-link' href='http://";
-//   st += String(Display_Config.PanelName);
-//   st += ".local/Reset'>RESTART</a></h1>"
-//         "<h1><a class='button-link' href='http://";
-//   st += String(Display_Config.PanelName);
-//   st += ".local/OTA'>OTA UPDATE</a></h1>"
-//         "<h1><a class='button-link' href='http://";
-//   st += String(Display_Config.PanelName);
-//   st += ".local/edit/index.htm'>SD Files Editor</a></h1><br>"
-//         "<div class='version'>Saved Log files on SD </div>";
-//   File dir = LittleFS.open("/logs");
-//   for (int cnt = 0; true; ++cnt) {
-//     File entry = dir.openNextFile();
-//     USBSerial.println(entry.path());
-//     if (!entry) { break; }
-//     filename = String(entry.path());
-//     st += "<h1 ><a class='button-linkSmall' href='http://";
-//     st += String(Display_Config.PanelName);
-//     st += ".local";
-//     st += filename;
-//     st += "'> ";
-//     st += " View ";
-//     st += filename;
-//     st += "</a></h1>";
-//     entry.close();
-//   }
-//   st += "</body></html> ";
-//   return st;
-// }
-
 
 
 /* Style  Noted: Arduino will mis-colour some parts*/
@@ -279,8 +227,8 @@ String style =
 // using local copy of the javascript ?..
 String serverIndex() {
   String st;
-  if (SDfileExists("/edit/jquery.min.js")) {
-    Serial.println("using local js");
+  if (SDexists("/edit/jquery.min.js")) {
+    USBSerial.println("using local js");
     st = "<script src='/edit/jquery.min.js'></script>";
   } else {
     USBSerial.println("using Internet js");
@@ -336,65 +284,6 @@ String serverIndex() {
         + style;
   return st;
 }
-// String serverIndexFS() {
-//   String st;
-//   if (LittleFS.exists("/edit/jquery.min.js")) {
-//     USBSerial.println("using local js");
-//     st = "<script src='/edit/jquery.min.js'></script>";
-//   } else {
-//     USBSerial.println("using Internet js");
-//     st = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>";
-//   }
-
-//   /*"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"*/
-//   /*"<script src='/edit/jquery.min.js'></script>"*/
-//   st += "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-//         "<input type='file' name='update' id='file' onchange='sub(this)' style=display:none>"
-//         "<h1>OTA Interface for NMEA DISPLAY</h1>"
-//         "<br><center>"
-//         + String(soft_version) + "</center> <br>"
-//                                  "<label id='file-input' for='file'>   Choose file...</label>"
-//                                  "<input type='submit' class=btn value='Update'>"
-//                                  "<br><br>"
-//                                  "<div id='prg'></div>"
-//                                  "<br><div id='prgbar'><div id='bar'></div></div><br></form>"
-//                                  "<script>"
-//                                  "function sub(obj){"
-//                                  "var fileName = obj.value.split('\\\\');"
-//                                  "document.getElementById('file-input').innerHTML = '   '+ fileName[fileName.length-1];"
-//                                  "};"
-//                                  "$('form').submit(function(e){"
-//                                  "e.preventDefault();"
-//                                  "var form = $('#upload_form')[0];"
-//                                  "var data = new FormData(form);"
-//                                  "$.ajax({"
-//                                  "url: '/update',"
-//                                  "type: 'POST',"
-//                                  "data: data,"
-//                                  "contentType: false,"
-//                                  "processData:false,"
-//                                  "xhr: function() {"
-//                                  "var xhr = new window.XMLHttpRequest();"
-//                                  "xhr.upload.addEventListener('progress', function(evt) {"
-//                                  "if (evt.lengthComputable) {"
-//                                  "var per = evt.loaded / evt.total;"
-//                                  "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
-//                                  "$('#bar').css('width',Math.round(per*100) + '%');"
-//                                  "}"
-//                                  "}, false);"
-//                                  "return xhr;"
-//                                  "},"
-//                                  "success:function(d, s) {"
-//                                  "console.log('success!') "
-//                                  "},"
-//                                  "error: function (a, b, c) {"
-//                                  "}"
-//                                  "});"
-//                                  "});"
-//                                  "</script>"
-//         + style;
-//   return st;
-// }
 
 
 
@@ -407,17 +296,17 @@ void returnFail(String msg) {
 }
 
 void handleRoot() {
-  USBSerial.println(" sending local html version");
+  USBSerial.println(" Sending local html version of Root webpage");
+  SD_CS("LOW");
   server.send(200, "text/html", html_startws() + "\r\n");
 }
 
-bool loadFromSdCard(String path) {
-  SD_CS(LOW);
+bool loadFromSDcard(String path) {
   String dataType = "text/plain";
+  USBSerial.println(" 307 In   loadFromSDcard ");
   //  previous version used just startws.htm  html from SD card.
-  if (path.endsWith("/")) {  // send our local version with modified path!
+  if (path.endsWith("/")) {  // send our local version of intial webpage with modified path!
     handleRoot();
-    SD_CS(HIGH);
     return true;
     //will not get here now!
     path += "startws.htm";  // start our html file from  the SD !
@@ -448,15 +337,17 @@ bool loadFromSdCard(String path) {
   } else if (path.endsWith(".mp3")) {
     dataType = "audio/mpeg";
   }
+  USBSerial.print(" 342 In   loadFromSDcard  :"); USBSerial.println();
+  File dataFile = SD.open(path.c_str());
 
-  File dataFile = SD_MMC.open(path.c_str());
   if (dataFile.isDirectory()) {
     path += "/index.htm";
     dataType = "text/html";
-    dataFile = SD_MMC.open(path.c_str());
+    dataFile = SD.open(path.c_str());
   }
 
   if (!dataFile) {
+    USBSerial.println("352 not data file");
     SD_CS(HIGH);
     return false;
   }
@@ -473,57 +364,36 @@ bool loadFromSdCard(String path) {
   return true;
 }
 
+void ShowHandlerdata(String text, HTTPUpload &upload ){
+  USBSerial.print(" \n **");USBSerial.print(text);
+  USBSerial.print(" Phase ");USBSerial.print(upload.status); 
+  USBSerial.print("  filename["); USBSerial.print(upload.filename.c_str());
+  USBSerial.print("] currentSize: Bytes: ");
+  USBSerial.print(upload.currentSize);
+  USBSerial.print(" totalSize: ");
+  USBSerial.println(upload.totalSize);
+  //USBSerial.println("Data ");
+ // USBSerial.println(upload.buf);
 
+}
 
 void handleFileUpload() {
-  bool FileSaved = false;
-  if (server.uri() != "/edit") {
-    return;
-  }
+  static bool FileSaved = false;
+  if (server.uri() != "/edit") { return; }
   HTTPUpload &upload = server.upload();
-  USBSerial.print("--handleFileUpload server.upload[");  USBSerial.print(upload.filename.c_str());  USBSerial.print("]  status:");  USBSerial.println(upload.status);
-  SD_CS(LOW);               // try to do expander port stuff only once?
-                            // rewrite as Case to help spot problems with SD_MMC not writing (not closing )
-  switch (upload.status) {  // 0 is exists :1 File Write  :2 File end
-    case 0:
-      USBSerial.println("UPLOAD_FILE_START");
-      if (SD_MMC.exists((char *)upload.filename.c_str())) {
-        USBSerial.print("         Exists , delete it ..");
-        if (SD_MMC.remove(upload.filename.c_str())) {
-          USBSerial.println("deleted");
-        } else {
-          USBSerial.println("FAILED delete ");
-          return;
-        }
-      }
-      uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
-      USBSerial.println(upload.filename);
-      strcpy(SavedFile, upload.filename.c_str());
-      USBSerial.println(" upload file set ");
-      break;
-    case 1:
-      USBSerial.println("Trying to UPLOAD_FILE_WRITE");
-      if (uploadFile) {
-        uploadFile.write(upload.buf, upload.currentSize);
-      }
-      USBSerial.print("Upload: WRITE, Bytes: ");
-      USBSerial.println(upload.currentSize);
-      break;
-    case 2:
-      USBSerial.println("Trying to UPLOAD_FILE_END");
-      if (uploadFile) {
-        USBSerial.print("Trying to uploadFile.close()");
-        //uploadFile.close();  // this fails with timeouts!
-        uploadFile = SD_MMC.open(upload.filename.c_str(), FILE_WRITE);
-        USBSerial.println("  done");
-        FileSaved = true;
-        SD_CS(HIGH); 
-        USBSerial.print("Upload: END, Size: ");
-        USBSerial.print(upload.totalSize);
-        USBSerial.print(" filename: <");
-        USBSerial.println(SavedFile);
-      }
-      break;
+  ShowHandlerdata(" ", upload);   
+  SD_CS(LOW); 
+   if (upload.status == UPLOAD_FILE_START) {
+        if (SDexists((char *)upload.filename.c_str())) { SD.remove((char *)upload.filename.c_str());  }
+    SDuploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
+     }
+  
+  else if (upload.status == UPLOAD_FILE_WRITE) {
+       if (SDuploadFile) { SDuploadFile.write(upload.buf, upload.currentSize); }
+      } 
+  else if (upload.status == UPLOAD_FILE_END) {
+     if (SDuploadFile) { SDuploadFile.close(); }
+    SD_CS(HIGH); 
   }
   if (FileSaved) {
     //Add equivalent to web initiated save here if the upload.filename filename is the config.txt or vconfig.txt?
@@ -563,10 +433,10 @@ void handleFileUpload() {
 
 void deleteRecursive(String path) {
   SD_CS(LOW);
-  File file = SD_MMC.open((char *)path.c_str());
+  File file = SD.open((char *)path.c_str());
   if (!file.isDirectory()) {
     file.close();
-    SD_MMC.remove((char *)path.c_str());
+    SD.remove((char *)path.c_str());
     SD_CS(HIGH);
     return;
   }
@@ -583,11 +453,11 @@ void deleteRecursive(String path) {
       deleteRecursive(entryPath);
     } else {
       entry.close();
-      SD_MMC.remove((char *)entryPath.c_str());
+      SD.remove((char *)entryPath.c_str());
     }
     yield();
   }
-  SD_MMC.rmdir((char *)path.c_str());
+  SD.rmdir((char *)path.c_str());
   SD_CS(HIGH);
   file.close();
 }
@@ -598,8 +468,9 @@ void handleDelete() {
   }
   SD_CS(LOW);
   String path = server.arg(0);
-  if (path == "/" || !SDfileExists((char *)path.c_str())) {
-    returnFail("BAD PATH");SD_CS(HIGH);
+  if (path == "/" || !SDexists((char *)path.c_str())) {
+    returnFail("BAD PATH");
+    SD_CS(HIGH);
     return;
   }
   deleteRecursive(path);
@@ -615,20 +486,20 @@ void handleCreate() {
   }
   String path = server.arg(0);
   SD_CS(LOW);
-  if (path == "/" || SDfileExists((char *)path.c_str())) {
+  if (path == "/" || SDexists((char *)path.c_str())) {
     returnFail("BAD PATH");
     SD_CS(HIGH);
     return;
   }
 
   if (path.indexOf('.') > 0) {
-    File file = SD_MMC.open((char *)path.c_str(), FILE_WRITE);
+    File file = SD.open((char *)path.c_str(), FILE_WRITE);
     if (file) {
       file.write(0);
       file.close();
     }
   } else {
-    SD_MMC.mkdir((char *)path.c_str());
+    SD.mkdir((char *)path.c_str());
   }
   SD_CS(HIGH);
   returnOK();
@@ -640,11 +511,11 @@ void printDirectory() {
   }
   String path = server.arg("dir");
   SD_CS(LOW);
-  if (path != "/" && !SDfileExists((char *)path.c_str())) {
+  if (path != "/" && !SDexists((char *)path.c_str())) {
     SD_CS(HIGH);
     return returnFail("BAD PATH");
   }
-  File dir = SD_MMC.open((char *)path.c_str());
+  File dir = SD.open((char *)path.c_str());
   path = String();
   if (!dir.isDirectory()) {
     dir.close();
@@ -686,21 +557,23 @@ void printDirectory() {
 
 void handleNotFound() {
   SD_CS(LOW);
-  bool simulatestate;
-  simulatestate = ColorSettings.Simulate;  // a hack as simulate state seem to make this handling crash..  conflict with SD calls? ;
-  ColorSettings.Simulate = false;
+   bool simulatestate;
+   simulatestate = ColorSettings.Simulate;  // a hack as simulate state seem to make this handling crash..  conflict with SD calls? ;
+   ColorSettings.Simulate = false;
 
   USBSerial.print(" handling: server.uri:<");
   USBSerial.print(server.uri());
-  USBSerial.println(">");
-  if (hasSD && loadFromSdCard(server.uri())) {
-    ColorSettings.Simulate = simulatestate;
+  USBSerial.print(">");USBSerial.printf(" %s \n",hasSD?"HAS SD": "No SD");
+  if (hasSD && loadFromSDcard(server.uri())) {
+    USBSerial.println(" Loaded from SD card ");
+  //  ColorSettings.Simulate = simulatestate;
     SD_CS(HIGH);
     return;
   }
+  USBSerial.println(" Line 575");
   String message = "";
   if (!hasSD) {
-    message += "SDCARD Not Detected\n\n";
+    message += "SD.card Not Detected\n\n";
   } else {
     message += " not understood\n\n";
   }
@@ -894,7 +767,7 @@ void StartInstlogfile() {
   snprintf(InstLogFileName, 25, "/logs/%6i.log", int(BoatData.GPSDate));
   //  USBSerial.printf("  <%s> \n",InstLogFileName);
   SD_CS(LOW);
-  File file = SD_MMC.open(InstLogFileName);
+  File file = SD.open(InstLogFileName);
   SD_CS(HIGH);
   if (!file) {
     //USBSerial.println("File doesn't exist");
@@ -905,7 +778,7 @@ void StartInstlogfile() {
         BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
         */
     SD_CS(LOW);
-    writeFile(SD_MMC, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
+    writeFile(SD, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
     SD_CS(HIGH);
     file.close();
     return;
@@ -924,12 +797,12 @@ void StartNMEAlogfile() {
   // If the data.txt file doesn't exist
   // Create a (FIXED NAME!) file on the SD card and write the data labels
   SD_CS(LOW);
-  File file = SD_MMC.open("/logs/NMEA.log");
+  File file = SD.open("/logs/NMEA.log");
   if (!file) {
     //USBSerial.println("File doens't exist");
     NMEAINSTlogFileStarted = true;
     USBSerial.printf("Creating NMEA LOG file. and header..\n");
-    writeFile(SD_MMC, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
+    writeFile(SD, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
     file.close();
     SD_CS(HIGH);
     return;
@@ -955,7 +828,7 @@ void NMEALOG(const char *fmt, ...) {
   // USBSerial.printf("  Logging to:<%s>", NMEALogFileName);
   // USBSerial.print("  Log  data: ");
   // USBSerial.println(msg);
-  appendFile(SD_MMC, "/logs/NMEA.log", msg);
+  appendFile(SD, "/logs/NMEA.log", msg);
 }
 
 void INSTLOG(const char *fmt, ...) {
@@ -972,7 +845,7 @@ void INSTLOG(const char *fmt, ...) {
   // USBSerial.printf("  Logging to:<%s>", InstLogFileName);
   // USBSerial.print("  Log  data: ");
   // USBSerial.println(msg);
-  appendFile(SD_MMC, InstLogFileName, msg);
+  appendFile(SD, InstLogFileName, msg);
 }
 
 
@@ -981,8 +854,8 @@ void INSTLOG(const char *fmt, ...) {
 // void ShowFreeSpace() {
 //   // Calculate free space (volume free clusters * blocks per clusters / 2)
 //SD_CS(LOW);
-//   long lFreeKB = SD.vol()->freeClusterCount();
-//   lFreeKB *= SD.vol()->blocksPerCluster()/2;
+//   long lFreeKB = SDvol()->freeClusterCount();
+//   lFreeKB *= SDvol()->blocksPerCluster()/2;
 //SD_CS(HIGH);
 //   // Display free space
 //   USBSerial.print("Free space: ");
