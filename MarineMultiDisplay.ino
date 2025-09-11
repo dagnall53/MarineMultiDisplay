@@ -33,9 +33,9 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 
 // some wifi stuff
 //NB these may not be used -- I have tried to do some simplification
-IPAddress udp_ap(0, 0, 0, 0);              // the IP address to send UDP data in SoftAP mode
-IPAddress udp_st(0, 0, 0, 0);              // the IP address to send UDP data in Station mode
-IPAddress sta_ip(0, 0, 0, 0);              // the IP address (or received from DHCP if 0.0.0.0) in Station mode
+//IPAddress udp_ap(0, 0, 0, 0);              // the IP address to send UDP data in SoftAP mode
+//IPAddress udp_st(0, 0, 0, 0);              // the IP address to send UDP data in Station mode
+//IPAddress sta_ip(0, 0, 0, 0);              // the IP address (or received from DHCP if 0.0.0.0) in Station mode
 IPAddress gateway(0, 0, 0, 0);             // the IP address for Gateway in Station mode
 IPAddress subnet(0, 0, 0, 0);              // the SubNet Mask in Station mode
 IPAddress Null_ip(0, 0, 0, 0);             //  A null IP address for the gateway
@@ -63,7 +63,13 @@ ESPFMfGK filemgr(filemanagerport);
 
 
 
+
 // my sub files
+
+//#include "ESP_NOW_files.h"
+#include "OTA.h"
+extern bool HaltOtherOperations;
+
 #include "aux_functions.h"  //.cpp calls  #include "WAV_4inch_pins.h"
 
 #include "Display.h"
@@ -75,7 +81,9 @@ ESPFMfGK filemgr(filemanagerport);
 
 //TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH, TOUCH_HEIGHT);
 
+// for victron display pages
 
+#include "VICTRONBLE.h"
 
 const char soft_version[] = "VERSION W.1";
 
@@ -87,14 +95,24 @@ bool dataUpdated;     // flag that Nmea Data has been updated
 //
 /*int EpromKEY;  char ssid[25];  char password[25];  char UDP_PORT[5]; UDP_ON;Serial_on; ESP_NOW_ON;  N2K_ON;  Log_ON;
   int log_interval_setting;   bool NMEA_log_ON;  bool BLE_enable;*/
-//_sWiFi_settings_Config Default_Settings = { 17, "GUESTBOAT", "12345678", "2002", false, false, true, true, false, 1000, false, false };
+//Config.txt holds both Default and Display settings in one file
+const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
 _sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default
 _sDisplay_Config Display_Config;
 _sWiFi_settings_Config Saved_Settings;
 _sWiFi_settings_Config Current_Settings;
 _sWiFi_settings_Config Default_Settings_JSON = { 17, "GUESTBOAT", "12345678", "2002", false, false, true, true, false, 1000, false, false };
 
-const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
+int Num_Victron_Devices;
+int CommonDisplayWIdth;
+const char* VictronDevicesSetupfilename = "/vconfig.txt";  // <- SD library uses 8.3 filenames
+_sMyVictronDevices victronDevices;
+
+char VictronBuffer[2000];  // way to transfer results in a way similar to NMEA text.
+
+const char* ColorsFilename = "/colortest.txt";  // <- SD library uses 8.3 filenames?
+_MyColors ColorSettings;
+
 int MasterFont;                             //global for font! Idea is to use to reset font after 'temporary' seletion of another
 String Fontname;
 int text_height = 12;  //so we can get them if we change heights etc inside functions
@@ -194,22 +212,27 @@ _sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // intefere
 
 #include <PCA9554.h>     // Load the PCA9554 Library
 PCA9554 expander(0x20);  // Create an expander object at this expander address
+//#include "esp_task_wdt.h"
 
 
 void setup() {
 
   Setup_expander(ExpanderSCL, ExpanderSDA, EX106);
   Serial.begin(115200);
- 
+ // esp_task_wdt_init(10, true);  // 10 seconds timeout
+ // esp_task_wdt_add(NULL);      // Add current task to WDT
+
+
   InitNMEA2000();
   Serial.begin(115200);
   Serial.println("Starting NMEA Display ");
   Serial.println(soft_version);
   WiFi.softAPConfig(ap_ip, Null_ip, sub255);
   ConnectWiFiusingCurrentSettings();
+  SetupWebstuff();
   Init_GFX();
   Fatfs_Setup();  // set up FATFS
- // SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
+//  SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
   if (LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings)) {
     Serial.println(" USING FATS JSON for wifi and display settings");
     Display_Page= Display_Config.Start_Page;
@@ -220,18 +243,50 @@ void setup() {
       Current_Settings = Default_Settings_JSON;
     Serial.println(" USING EEPROM data, display set to defaults");
    }
+    if (LoadVictronConfiguration(1, VictronDevicesSetupfilename, victronDevices)) {
+    Serial.println(" USING FATS JSON for Victron data settings");
+  } else {
+    Serial.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");
+    Num_Victron_Devices = 6;
+    CommonDisplayWIdth = 150;
+    SaveVictronConfiguration(1,VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
+  }
+  if (LoadDisplayConfiguration(1,ColorsFilename, ColorSettings)) {
+    Serial.println(" USING FATS JSON for Colours data settings");
+  } else {
+    Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
+    SaveDisplayConfiguration(1,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+  }
+ //Start_ESP_EXT();  //  Sets esp_now links to the current WiFi.channel etc.
+  BLEsetup();       // setup Victron BLE interface (does not do much!!)
+
 
   Display(true, Display_Page);
   // once wifi working..
   setupFilemanager();
+  HaltOtherOperations=false;
+ // esp_task_wdt_reset();  // Reset watchdog if loop completes
 }
 
 void loop() {
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchInterval;
-  NMEA2000.ParseMessages();
-  Display(Display_Page);
+  // if(millis()>= DebugInterval){
+
+  // Serial.printf("%4.2f FreeHeap: %d ",((float)millis())/1000, ESP.getFreeHeap());
+  // Serial.printf("StackHWM: %d\n", uxTaskGetStackHighWaterMark(NULL));
+  //  DebugInterval= millis()+1000;
+  // }
+  delay(1);
+  //SD_CS("LOW");
+ 
+  server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?) 
+  //SD_CS("HIGH");
+
+  if (!HaltOtherOperations){ 
+    filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work
+    Display(Display_Page);
 
   if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchInterval)) {  // repeat at intervals to check..
     SSIDSearchInterval = millis() + scansearchinterval;                          //
@@ -247,13 +302,15 @@ void loop() {
     delay(50);  // change page back, having set zero above which alows the graphics to reset up the boxes etc.
   }
 
+  ///  BLEloop DO not try to do N2000 interrupts and BLE interrupts at the same time
+    if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
+      BLEloop();} 
+      else 
+      {NMEA2000.ParseMessages();} 
+  }
 
-  yield();
+ // esp_task_wdt_reset();  // Reset watchdog if loop completes for testing 
 
-  //  SD_CS("LOW");
-  filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work
-  //  server.handleClient();  // for OTA webserver etc. need to turn on SD .. . ;
-  //  SD_CS("HIGH");
 }
 
 void wifiSetup() {
@@ -418,6 +475,210 @@ void EEPROM_READ() {
     Serial.println("Using DEFAULTS");
     EEPROM_WRITE(Default_JSON, Default_Settings_JSON);
   }
+}
+
+bool LoadVictronConfiguration(int FS,  const char* filename, _sMyVictronDevices& config) {
+  // Open SD file for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
+  bool fault = false;
+  File file;
+  if(FS==0){if (!hasSD){return false;}
+    SD_CS(LOW);
+    if (!SDexists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
+    file = SD.open(filename, FILE_READ);
+  }
+   if(FS==1){if (!hasFATS){return false;}
+    if (!FFat.exists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
+    file = FFat.open(filename, FILE_READ);
+   }
+  
+  if (!file) {Serial.println(F("**Failed to read Victron JSON file"));fault = true;}
+  
+  // Allocate a temporary JsonDocument
+  char temp[15];
+  JsonDocument doc;
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, file);
+  if (error) {
+    Serial.println(F("**Failed to deserialise victron JSON file"));
+    fault = true;
+  }
+  Num_Victron_Devices = doc["Num_Devices"] | 4;
+  CommonDisplayWIdth = doc["CommonDisplayWIdth"] | 150;
+  for (int index = 0; index < Num_Victron_Devices; index++) {
+    strlcpy(config.charMacAddr[index], doc["device" + String(index) + ".mac"] | "macaddress", sizeof(config.charMacAddr[index]));
+    strlcpy(config.charKey[index], doc["device" + String(index) + ".key"] | "key", sizeof(config.charKey[index]));
+    strlcpy(config.FileCommentName[index], doc["device" + String(index) + ".comment"] | "?name?", sizeof(config.FileCommentName[index]));
+    config.VICTRON_BLE_RECORD_TYPE[index] = doc["device" + String(index) + ".VICTRON_BLE_RECORD_TYPE"] | 1;  //default solar Mppt
+    config.displayH[index] = doc["device" + String(index) + ".DisplayH"];
+    config.displayV[index] = doc["device" + String(index) + ".DisplayV"];
+    config.displayHeight[index] = doc["device" + String(index) + ".DisplayHeight"] | 150;
+    strlcpy(config.DisplayShow[index], doc["device" + String(index) + ".DisplayShow"] | "PVIA", sizeof(config.DisplayShow[index]));
+  }
+  // Close the file (Curiously, File's destructor doesn't close the file)
+
+  file.close();
+  if(FS==0){SD_CS(HIGH);}
+  return !fault;  // report success
+}
+void SaveVictronConfiguration(int FS, const char* filename, _sMyVictronDevices& config) {
+  // USED for adding extra devices or for creating a new file if missing
+  //Delete existing file, otherwise the configuration is appended to the file
+  File file;
+  char buff[15];
+  if (FS==0) {if (!hasSD){SD_CS(HIGH);return;}
+    SD_CS(LOW);
+    SD.remove(filename);
+    // Open file for writing
+    file = SD.open(filename, FILE_WRITE);
+  }
+  if (FS==1) {if (!hasFATS) {return;}
+  FFat.remove(filename);
+  // Open file for writing
+  file = FFat.open(filename, FILE_WRITE);
+ }
+  if (!file) {
+    Serial.println(F("JSON: Victron: Failed to create SD file"));
+    return;
+  }
+  Serial.printf(" We expect %i Victron devices", Num_Victron_Devices);
+  // Allocate a temporary JsonDocument
+  JsonDocument doc;
+  doc[" Comment"] = " DisplayShow Options: 'P' Power 'V' Battery Volts 'I' Battery Current";
+  doc[" C"] = " 'v' second Battery Volts 'i' second Battery Current  (ac charger only)";
+  doc[" C1"] = "'L' Load current 'S' State of charge 'E' error codes 'T' Temperature";
+  doc[" C2"] = " 'A' Aux reading(t or starter) ";
+
+
+  doc[" Example"] = "for SmartShunt, IAS will display current, State of charge and Additional data( starter V or temperature)";
+  doc[" Example"] = "for Battery Monitor: V will display Voltage (only)";
+  doc[" note"] = "Display height is also adjustable for each 'device', and devices can be duplicated";
+  doc[" note "] = "VICTRON_BLE_RECORD_TYPE:   SOLAR_CHARGER =1,  BATTERY_MONITOR = 2, AC Charger = 8";
+  doc["Num_Devices"] = Num_Victron_Devices;
+  doc["Common_width"] = CommonDisplayWIdth;
+  // doc[" Comment1"]= "for Shunt, VIA will display Battery Volts, Current, Additional data";
+  // doc[" Comment2"]= "for SOLAR, PIA will display solar Power, battery Current, Additional data";
+  for (int index = 0; index < Num_Victron_Devices; index++) {
+    doc["device" + String(index) + ".mac"] = config.charMacAddr[index];
+    doc["device" + String(index) + ".key"] = config.charKey[index];
+    doc["device" + String(index) + ".comment"] = config.FileCommentName[index];
+    doc["device" + String(index) + ".VICTRON_BLE_RECORD_TYPE"] = config.VICTRON_BLE_RECORD_TYPE[index];
+    doc["device" + String(index) + ".DisplayH"] = config.displayH[index];
+    doc["device" + String(index) + ".DisplayV"] = config.displayV[index];
+    doc["device" + String(index) + ".DisplayHeight"] = config.displayHeight[index];
+    doc["device" + String(index) + ".DisplayShow"] = config.DisplayShow[index];
+  }
+
+  // Serialize JSON to file
+  if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
+    Serial.println(F("JSON: Failed to write to Victron SD file"));
+  }
+  // Close the file, //but print serial as a check
+  file.close();
+  if (FS==0){SD_CS(HIGH);}
+  PrintJsonFile("Check after Saving configuration ", filename);
+}
+void SaveDisplayConfiguration(int FS, const char* filename, _MyColors& set) {
+  // Delete existing file, otherwise the configuration is appended to the file
+  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
+  char buff[15];
+  File file;
+  if (FS==0) {if (!hasSD){SD_CS(HIGH);return;}
+  SD_CS(LOW);
+  SD.remove(filename);
+    // Open file for writing
+  file = SD.open(filename, FILE_WRITE);
+ }
+  if (FS==1) {
+    if (!hasFATS) {return;}
+  FFat.remove(filename);
+  // Open file for writing
+  file = FFat.open(filename, FILE_WRITE);
+ }
+  if (!file) { Serial.println(F("JSON: Failed to create SD file"));SD_CS(HIGH);return;}
+
+  // Allocate a temporary JsonDocument
+  JsonDocument doc;
+  // Set the values in the JSON file.. // NOT ALL ARE read yet!!
+  //modify how the display works
+  doc["_comments_"] = "Colours as integers";
+  doc["WHITE"] = WHITE;
+  doc["BLUE"] = BLUE;
+  doc["BLACK"] = BLACK;
+  doc["GREEN"] = GREEN;
+  doc["RED"] = RED;
+
+  doc["TextColor"] = set.TextColor;
+  doc["BackColor"] = set.BackColor;
+  doc["BorderColor"] = set.BorderColor;
+  doc["_comments_"] = "These sizes below are for some font tests in victron display!";
+ // doc["BoxH"] = set.BoxH;
+ // doc["BoxW"] = set.BoxW;
+  doc["FontH"] = set.FontH;
+  doc["FontS"] = set.FontS;
+  doc["Simulate"] = set.Simulate True_False;
+  doc["Debug"] = set.Debug True_False;
+  doc["BLEDebug"] = set.BLEDebug True_False;
+  doc["ShowRawDecryptedDataFor"] = set.ShowRawDecryptedDataFor;
+  doc["Frame"] = set.Frame True_False;
+  // Serialize JSON to file
+  if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
+    Serial.println(F("JSON: Failed to write to SD file"));
+  }
+  // Close the file, but print serial as a check
+  file.close();
+  if (FS==0){SD_CS(HIGH);}
+  PrintJsonFile("Check after Saving configuration ", filename);
+}
+bool LoadDisplayConfiguration(int FS,const char* filename, _MyColors& set) {
+  // Openfile for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
+  bool fault = false;
+  File file;
+  if(FS==0){if (!hasSD){return false;}
+    SD_CS(LOW);
+    if (!SDexists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
+    file = SD.open(filename, FILE_READ);
+  }
+   if(FS==1){if (!hasFATS){return false;}
+    if (!FFat.exists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
+    file = FFat.open(filename, FILE_READ);
+   }
+  
+  if (!file) {
+    Serial.println(F("**Failed to read JSON file"));
+  }
+  // Allocate a temporary JsonDocument
+  char temp[15];
+  JsonDocument doc;
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, file);
+  if (error) {
+    Serial.println(F("**Failed to deserialise JSON file"));
+  }
+  // gett here means we can set defaults, regardless!
+
+  set.TextColor = doc["TextColor"] | BLACK;
+  set.BackColor = doc["BackColor"] | WHITE;
+  set.BorderColor = doc["BorderColor"] | BLUE;
+ // set.BoxW = doc["BoxW"] | 46;
+ // set.BoxH = doc["BoxH"] | 100;
+
+  set.FontH = doc["FontH"] | WHITE;
+  set.FontS = doc["FontS"] | WHITE;
+  strlcpy(temp, doc["Simulate"] | "false", sizeof(temp));
+  set.Simulate = (strcmp(temp, "false"));
+  strlcpy(temp, doc["Frame"] | "false", sizeof(temp));
+  set.Frame = (strcmp(temp, "false"));
+  strlcpy(temp, doc["Debug"] | "false", sizeof(temp));
+  set.Debug = (strcmp(temp, "false"));
+  strlcpy(temp, doc["BLEDebug"] | "false", sizeof(temp));
+  set.BLEDebug = (strcmp(temp, "false"));
+
+  set.ShowRawDecryptedDataFor = doc["ShowRawDecryptedDataFor"] | 1;
+  // Close the file (Curiously, File's destructor doesn't close the file)
+  file.close();
+  SD_CS(HIGH);
+  if (!error) { return true; }
+  return false;
 }
 
 bool LoadConfiguration(int FS,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
@@ -629,6 +890,8 @@ void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
 void ShowToplinesettings(String Text) {
   ShowToplinesettings(Current_Settings, Text);
 }
+
+
 boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B) {  // Does NOT compare the display page number or key!
   bool same = true;
   // have to check each variable individually
@@ -785,7 +1048,8 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       //  gfx->println(WiFi.SSID());
       Serial.print(WiFi.SSID());
       Serial.println(">");
-      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>", WiFi.SSID());
+    //  WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>", WiFi.SSID());
+      MDNS_START(); //(includes advice above)
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
       // take care with printf. It can quickly crash if it gets stuff it cannot deal with.
@@ -815,7 +1079,6 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       Serial.println(WiFi.localIP());
       WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>\nIP:%i.%i.%i.%i\n", WiFi.SSID(),
                        WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-      //setupFilemanager();
       break;
 
     case ARDUINO_EVENT_WIFI_AP_START:
@@ -1011,7 +1274,7 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
     if (SPISDCS == -1) {SD_CS(HIGH);SD_CS(LOW);}
     SPI.begin(SPISCK, SPIMISO, SPIMOSI);
     delay(10);
-    if(!SD.begin()){ Serial.println("Card Mount Failed");gfx->println("NO SD Card");SD_CS(HIGH); return;}
+    if(!SD.begin()){ Serial.println("Card Mount Failed");gfx->println("NO SD Card");hasSD = false;SD_CS(HIGH);return;}
     else{ hasSD = true;  // picture will be  run in setup, after load config
       if (!filemgr.AddFS(SD, "SD-Card", false)) { Serial.println(F("Adding SD to file manager failed."));}
         else{ Serial.println(F("  Added SD to file manager"));} // add the SD file manager to the Trek style file display 
@@ -1047,17 +1310,24 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
 
 
 void SD_CS( bool state){
-  if (SDCS == -1){  //SDCS set -1 for Wavshare using Expander.
+  if (!hasSD) {return;}
+  if (SDCS == -1){  //SDCS set -1 for Wavshare which uses using Expander for SD_CS .
   static bool laststate;
   if (laststate != state) {expander.digitalWrite(EX104,state);}//Serial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  Serial.printf("  Setting SD_CS state: %i\n", state); }
-
   laststate=state;
   }
 
 }
 bool SDexists(const char* path) {  //SD_CS to be done before this is called ! (equivalent to SD_MMC . Exists() function )
-  
+  if (!hasSD) {return false;}
   File file = SD.open(path);
   if (file) { file.close(); return true;}
     return false;
+}
+void timeupdate() {
+  static unsigned long tick;
+  while ((millis() >= tick)) {
+    tick = tick + 1000;  // not millis or you can get 'slip'
+    BoatData.LOCTime = BoatData.LOCTime + 1;
+  }
 }

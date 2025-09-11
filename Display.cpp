@@ -5,6 +5,7 @@
 #include <N2kMessages.h> // isNKNA 
 #include "Keyboard.h" // for keyboard functions
 #include "JpegFunc.h"
+#include "VICTRONBLE.h"  //sets #ifndef Victronble_h
 
 extern bool WIFIGFXBoxdisplaystarted;
 extern  _sWiFi_settings_Config Current_Settings;

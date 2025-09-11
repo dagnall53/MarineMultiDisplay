@@ -11,9 +11,12 @@ The user is responsible for cross-checking data with other sources, exercising j
 No liability for any loss, damage, or injury resulting from the use of this instrument will be accepted. </i>
 
 This project now supports direct nMEA2000 connection. 
-It also works with NMEA0183 data from any wireless NMEA Gateway that sends NMEA 0183 instrument readings on UDP.
-
-<p align="center"> Version 3 display <img width = 400 src="https://github.com/user-attachments/assets/a6a14548-3c6a-4396-b0af-098bd9176c43" width="200" /></p>
+It (will eventually) also work with NMEA0183 data from any wireless NMEA Gateway that sends NMEA 0183 instrument readings on UDP.
+But for now it just supports the N2K and Victron displays.
+Working with this board has been problematic compared to the Guitron version. It seems very sensitive to WDT timouts. Especially for the SD card. 
+So the SD card has been disabled (as well as the touch screen) on this code.  
+However, a redeeming feature is that I have made use of the Flash memory to act as a FATFS file server and replaced the editor on the old version with a VERY nice editor from https://github.com/holgerlembke/.
+This new editor is worth keeping and I may update the original NMEA display in the future to use this editor and the Flash/FATFS for file storage. 
 
 
 ## HOW TO INSTALL FIRST TIME

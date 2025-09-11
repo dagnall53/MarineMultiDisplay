@@ -40,8 +40,8 @@ struct _MyColors {  // for later Day/Night settings
   uint16_t TextColor;
   uint16_t BackColor;
   uint16_t BorderColor;
-  int BoxW;
-  int BoxH;
+ // int BoxW;
+ // int BoxH;
   int FontH;
   int FontS;
   bool Simulate;
@@ -95,32 +95,6 @@ struct Phv {   // struct for int positions h v typically on screen
 /// for Victron stuff:
 
 
-
-
-//not used -- maybe later? 
-// struct _sVicdevice {  // will need a new equivalent to toNewStruct(char *field, _sInstData &data); 
-//   int Device_Type=0;   // selector equivalent to VICTRON_BLE_RECORD_TYPE {1=solar 2=smartshunt..     }
-//   double data; // use for main reading, assumed voltage
-//   double lastdata ;
-//   double data2 ; // use for secondary reading, assumed current
-//   double lastdata2 ;
-//   double data3 ; // use for tertiary reading, aux batt, temp? etc.. 
-//   double lastdata3 ;
-//   double data4; // use for quadrenary (?) reading, aux batt, temp? etc.. 
-//   double lastdata4 ;
-  
-//   unsigned long updated;
-//   bool displayed;  // displayed is used by Digital displays
-//   bool greyed;     // when the data is OLD! 
-//   bool graphed;    // is used by Graphs, so you can display digital and graph on same page!
-// };
-
-// struct _sVictronData {
-//   _sVicdevice MainBatteryshunt, AuxbatteryShunt, EngineBatteryshunt,
-//   Mainsolar, Secondsolar, mainscharger;
-// };
-
-
 struct _sMyVictronDevices{   // equivalent to _sDisplay_Config all known victron devices MAc and encryption keys.
                 //10 index for multiple saved instrument settings first
   char charMacAddr[20][13];   // a 12 char (+1!) array  typ= "ea9df3ebc625"  
@@ -128,7 +102,7 @@ struct _sMyVictronDevices{   // equivalent to _sDisplay_Config all known victron
   char FileCommentName [20][32];  // name from file that will be used in Display
   int displayV[20];
   int displayH[20];
-  char DisplayShow[20][10];  // to be used to decide which variables will be diaplayed = eg V volts I current
+  char DisplayShow[20][10];  // to be used to decide which variables will be displayed = eg V volts I current
   uint8_t VICTRON_BLE_RECORD_TYPE[20];  // INTEGER DESCRIPTOR FOR   DEVICE TYPE (1,2,8 WORK) for use with simulation!
   int displayHeight[20];
   char DeviceVictronName[20][32];  // My DisplayShow to be used to help differentiate devices that give similar VICTRON_BLE_RECORD_TYPE but need more information for a good display

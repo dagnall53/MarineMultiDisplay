@@ -35,7 +35,7 @@ const double radToDeg = 180.0 / M_PI;
 #include "Structures.h"
 #include "N2kDataRX.h"
 extern _sBoatData BoatData;  // BoatData values for the display , int double , when read, when displayed etc 
-
+extern _sDisplay_Config Display_Config;
 
   double Latitude;
   double Longitude;
@@ -241,7 +241,8 @@ void HandleGNSS(const tN2kMsg &N2kMsg) {
     toNewStruct( Latitude,BoatData.Latitude);
     BoatData.SatsInView=NMEA0183DoubleNA; if (nSatellites){BoatData.SatsInView=nSatellites;}
     BoatData.GPSDate = Days_to_GPSdate(DaysSince1970);
-    BoatData.GPSTime =SecondsSinceMidnight ;}
+    BoatData.GPSTime =SecondsSinceMidnight ;
+    BoatData.LOCTime = SecondsSinceMidnight +3600* Display_Config.LocalTimeOffset  ;}
   }
 }
 

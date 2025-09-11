@@ -1,5 +1,5 @@
-// Adds the filé systems
-void addFileSystems(void) {
+// Adds the file systems
+void addFileSystems(void) {  // not used!! 
   // set configTzTime() in setup() to get valid file dates. Otherwise they are kaputt[tm].
 
   // This adds the Storage into the Filemanager. You have to at least call one of those.

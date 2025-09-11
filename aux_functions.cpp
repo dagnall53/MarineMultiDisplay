@@ -213,9 +213,10 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array
 
       BoatData.Latitude.data = LatLonToDouble(Field[3], Field[4][0]);   // using TL's functions that return null value
       BoatData.Longitude.data = LatLonToDouble(Field[5], Field[6][0]);  //nb we use +1 on his numbering that omits the command
-                                                                        //        Serial.println(BoatData.GPSTime); Serial.println(BoatData.Latitude);  Serial.println(BoatData.Longitude);  Serial.println(BoatData.SOG);
+ 
       BoatData.GPSTime = NMEA0183GPTimeToSeconds(Field[1]);
       BoatData.LOCTime = NMEA0183GPTimeToSeconds(Field[1]) +3600* Display_Config.LocalTimeOffset  ;
+      
       while ( (int(BoatData.LOCTime) / 3600) >= 24) {BoatData.LOCTime=BoatData.LOCTime-86400;}
       while ( int(int(BoatData.LOCTime) / 3600) < 1) {BoatData.LOCTime=BoatData.LOCTime+86400;}
       while ( (int(BoatData.LOCTime) / 3600) >= 24) {BoatData.LOCTime=BoatData.LOCTime-86400;} //catch wrap around 
