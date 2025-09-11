@@ -17,6 +17,7 @@ Working with this board has been problematic compared to the Guitron version. It
 So the SD card has been disabled (as well as the touch screen) on this code.  
 However, a redeeming feature is that I have made use of the Flash memory to act as a FATFS file server and replaced the editor on the old version with a VERY nice editor from https://github.com/holgerlembke/.
 This new editor is worth keeping and I may update the original NMEA display in the future to use this editor and the Flash/FATFS for file storage. 
+<img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
 
 
 ## HOW TO INSTALL FIRST TIME
