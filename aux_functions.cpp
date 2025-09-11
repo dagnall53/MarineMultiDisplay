@@ -6,7 +6,6 @@ but highly modified!
 #include <Arduino.h>  //necessary for the String variables
 #include <SPI.h>
 #include "aux_functions.h"
-// defines gfx and has pin details of the display
 #include <NMEA0183.h>  // for the TL NMEA0183 library functions
 #include <NMEA0183Msg.h>
 #include <NMEA0183Messages.h>
@@ -19,6 +18,9 @@ extern int Display_Page;
 extern _MyColors ColorSettings;
 extern _sDisplay_Config Display_Config;
 extern void showPictureFrame(_sButton &button,const char* name);
+
+
+
 
 extern double NMEA0183GetDouble(const char *data);  // have to do this as its local to NMEA0183Messagesmessages.cpp!
 
@@ -905,3 +907,12 @@ int HexStringToBytes(const char *hexStr,
     output[finalLen] = '\0';
     return 0;
 }
+
+
+
+
+
+
+
+
+

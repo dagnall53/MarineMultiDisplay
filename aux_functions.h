@@ -5,6 +5,10 @@
 #include "Structures.h"  // to tell it about the _sBoatData and button structs.
 #include <Arduino_GFX_Library.h>  // for the graphics functions
 extern Arduino_RGB_Display  *gfx ; //  change if alternate displays !
+
+#define On_Off ? "ON " : "OFF"  // if 1 first case else second (0 or off) same number of chars to try and helps some flashing later
+#define True_False ? "true" : "false"
+
 bool processPacket(const char* buf,  _sBoatData &stringBD );
 
 //** Graphics display functions ***
@@ -53,5 +57,6 @@ int HexStringToBytes(const char *hexStr,
                      unsigned char *output,
                      unsigned int *outputLen);
 
+// other stuff placed here now 
 
 #endif

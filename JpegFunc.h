@@ -8,10 +8,13 @@
 #define _JPEGFUNC_H_
 
 #include <JPEGDEC.h>
+#include "aux_functions.h"
 
 static JPEGDEC _jpeg;
 static File _f;
 static int _x, _y, _x_bound, _y_bound;
+
+
 
 // pixel drawing callback
 static int jpegDrawCallback(JPEGDRAW *pDraw)
@@ -29,11 +32,12 @@ static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
     // _f = FFat.open(szFilename, "r");
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
-    SD_CS(LOW);
-     _f = SD.open(szFilename, "r");
+    //SD_CS(LOW);
+    // _f = SD.open(szFilename, "r");
 #else
-    _f = SD.open(szFilename, FILE_READ);
+    //_f = SD.open(szFilename, FILE_READ);
 #endif
+   _f = FFat.open(szFilename, "r");
     *pFileSize = _f.size();
     return &_f;
 }
@@ -43,7 +47,7 @@ static void jpegCloseFile(void *pHandle)
     // Serial.println("jpegCloseFile");
     File *f = static_cast<File *>(pHandle);
     f->close();
-    SD_CS(HIGH);
+
 }
 
 static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
@@ -106,4 +110,8 @@ static void jpegDraw(
     _jpeg.close();
 }
 
+void showPicture(const char* name) {
+  jpegDraw(name, jpegDrawCallback, true /* useBigEndian */,
+           0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
+}
 #endif // _JPEGFUNC_H_

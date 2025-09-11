@@ -15,8 +15,6 @@ to get serial.print working
 #ifndef _WAV_DEF_H
 #define _WAV_DEF_H
 
-
-
 Arduino_DataBus *bus = new Arduino_SWSPI(
   GFX_NOT_DEFINED /* DC */,
   42 /* CS /12*/,                // Chip Select pin
@@ -47,43 +45,35 @@ Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
   2 /* rotation */,  true /* auto_flush */,  bus, // as defined in Arduino_DataBus *bus 
   GFX_NOT_DEFINED /* RST */,  st7701_type1_init_operations,  sizeof(st7701_type1_init_operations));  ///DAGNALL NOTE  type 1 selected in GFX clock demo - I think it should be type 9 ?
 
-/* Wavshare type X inits fot correct colours .. 
 
+/* Exploring Wavshare type X inits for correct colours .. 
 MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Display.h Line 511     WRITE_COMMAND_8, 0x21,   // 0x20 normal, 0x21 IPS
 1 wrong, inverted but readable
 2 wrong
 3,4,5,6,7,8 unusabl
 8 wrong, different Top part unused? (like 2?)
 9 wrong but usable
-*/
-
-
-/* V3.3 compiler & gfx 1.6.0 incompatibility notes:  type9 seems to flicker: 
-V3 & 1.5.5 type9 & 1  both crash horribly 
-//notes on Arduino_GFX/src/display/Arduino_RGB_Display.h
-my location: C:\Users\admin\OneDrive\DocOneDrive\Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Display.h
-COLOUR INVERSION:
-type 1 and type 9 differ in IPs settings (WRITE_COMMAND_8, 0x20, // 0x20 normal, 0x21 IPS )
-and MDT  (WRITE_C8_D8, 0xCD, 0x00   08/ 00)  MDT: isRGB pixel format argument. MDT=”0”, 'normal'.  MDT=”1”,(set to 8) pixel collect to DB[17:0]. PAGE 276 of manual
-Type9 has it set to 0 (Line 1358) - Type1 to 08 
-Both use RGB666 which seems essential... but im not sure why as it is physicaly wired 565!
-
-Note: Use Type1 & the colours will be inverted!  
-in Type 9 is no setting of 'IPS' (it is commented out), it sets 'MDT' to 0 (Line 1358): and RGB 666 (0x60): this works.
-checking combinations to see if I can change flicker effect: using 2.0.17 :
-using 0x21 and 0 0x60 :Inverted colours
-using 0x21 and CD=0x08 0x60;  still inverted
-using 0x20 and CD =0x08 0x60; v. strange partially correct pallette
-using  0x20 08  0x50         TRY 565 : 0X50 ...BETTER but not correct coverage of full spectrum
-using  0x20,00,50 ;              565 again.. still strange MDT does not seem to affect this ? 
-using 0x20, 00 60 Good results 
-using //(deleted), 00 60 Good results == type9 default  
- ------------------------------------------------
+ ------------NOTES ------------------------------------
  WRITE_C8_D8, 0xCD, 0x00 //  08/ 00(Line 1358)
  //WRITE_COMMAND_8, 0x20, // 0x20 normal, 0x21 IPS (Line 1450)
  WRITE_C8_D8, 0x3A, 0x60, // 0x70 RGB888, 0x60 RGB666, 0x50 RGB565 (Line 1451)
  
 */
+
+/*******************************************************************************
+Pins and defines for GFX - various versions!
+FOR WAVESHARE 4inch LCD 
+https://www.waveshare.com/esp32-s3-touch-lcd-4.htm
+https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+
+also need ?
+#define ARDUINO_USB_MODE 1
+#define ARDUINO_USB_CDC_ON_BOOT 1
+to get serial.print working 
+(or set in tools-> USB CDC )
+
+ ******************************************************************************/
+ 
 //** OTHER PINS
 
 //#define TFT_BL GFX_BL  // or EX105 ?  not used??
@@ -95,17 +85,16 @@ using //(deleted), 00 60 Good results == type9 default
 #define SD_SCK  2
 #define SD_MISO 4
 #define SD_MOSI 1
-//#define SD_CS   is port ex104  ?? Not called up?? 
+#define SDCS  -1 // NOTE not SD_CS, which is a function! is port ex104  ?? Not called up?? 
 
 //** 12/08/2025 ... not working!! touch interface **************************
-#include <TAMC_GT911.h>
-//#include "TouchDrvGT911.hpp"
+//#include <TAMC_GT911.h>
 
 #define TOUCH_INT 16          // 16
 #define TOUCH_RST -1          // EX101 will reset it at the start ?
-
 #define TOUCH_SDA  15
 #define TOUCH_SCL  7
+
 #define TOUCH_WIDTH  480
 #define TOUCH_HEIGHT 480
 
@@ -123,8 +112,8 @@ using //(deleted), 00 60 Good results == type9 default
 https://github.com/Tinyu-Zhao/PCA9554
 
 */
-#include <PCA9554.h>     // Load the PCA9554 Library
-#include <Wire.h>        // Load the Wire Library
+// #include <PCA9554.h>     // Load the PCA9554 Library
+// #include <Wire.h>        // Load the Wire Library
 
 //  PCA9554 Addressing
 //  Address     A2  A1  A0
@@ -147,9 +136,6 @@ https://github.com/Tinyu-Zhao/PCA9554
 #define EX106 5 //BUZZER enable
 #define ExpanderSDA 15
 #define ExpanderSCL 7
-
-
-PCA9554 expander(0x20);  // Create an object at this address
 
 
 
