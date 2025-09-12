@@ -28,7 +28,7 @@ If confused, check Device Manager and look for the USB-SERIAL CH340 port.
 Remember the port number!
 
 Click the link below to download the file "WebProgram.bat" from the github.
-<a href="https://dagnall53.github.io/MarineMultiDisplay/build/WebProgram.bat" download>Download WebProgram.bat</a>
+<a href="https://dagnall53.github.io/MarineMultiDisplay/build/MMDWebProgram.bat" download>Download MMD WebProgram.bat</a>
 
 Save this somewhere convenient such as downloads.
 Run the program .. 
