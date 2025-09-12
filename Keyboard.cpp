@@ -34,11 +34,16 @@ extern int text_height;  //so we can get them if we change heights etc inside fu
 extern void EEPROM_WRITE(_sDisplay_Config B,_sWiFi_settings_Config A);
 extern void setFont(int);
 extern int Display_Page;
+
+#include <TAMC_GT911.h>
 extern TAMC_GT911 ts;
+extern bool Touch_available;
+
 extern struct _sWiFi_settings_Config Current_Settings;
 extern struct _sDisplay_Config Display_Config;
 extern void TouchCrosshair(int);
 extern int text_offset;
+
 
 void WriteinKey(int h, int v, int size, const char* TEXT) {  //Write WHITE text in filled BLACK box of text height at h,v (using fontoffset to use TOP LEFT of text convention)
   gfx->fillRect(h, v, 480, text_height * size, WHITE);
@@ -68,57 +73,58 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
     Keyboardinuse=true;
   }
   int st;
-  // if ((ts.isTouched)) {
-  //   st = KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps);
-  //   //Serial.printf(" Pressure test %i  KEYchr<%i> Bool <%i>\n",ts.points[0].size,ts.points[0].x, ts.points[0].y,KEY,st );
-  // }
+  if(Touch_available){
+  if ((ts.isTouched)) {
+    st = KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps);
+    //Serial.printf(" Pressure test %i  KEYchr<%i> Bool <%i>\n",ts.points[0].size,ts.points[0].x, ts.points[0].y,KEY,st );
+  }
 
-  // if (!KeyPressUsed && (ts.isTouched) && (ts.points[0].size > 10) && (KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps))) {
-  // //  Serial.printf(" Keyboard check inputsizeof<%i>   sizeof_here *data(%i)   currentlen<%i>\n", sizeof_data, sizeof(*DATA), strlen(Local_var));
-  //   KeyPressUsed = true;
-  //   lastkeypressed = millis();
-  //   Command_Key = false;
-  //   //Serial.printf(" Key test %s \n",KEY);
-  //   if (!strcmp(KEY, "^")) {
-  //     caps = caps + 1;
-  //     if (caps > 2) { caps = 0; }  
-  //     keyboard(caps);
-  //     Command_Key = true;
-  //   }
-  //   if (!strcmp(KEY, "DEL")) {
-  //     Local_var[strlen(Local_var) - 1] = '\0';  // NOTE single inverted comma !!!
-  //     Command_Key = true;
-  //   }
-  //   if (!strcmp(KEY, "CLR")) {
-  //     Local_var[0] = '\0';
-  //     Command_Key = true;
-  //   }
-  //   if (!strcmp(KEY, "MEM")) {
-  //     strcpy(Local_var, DATA);
-  //     //Serial.printf(" reset  <%s> \n",Local_var);
-  //     WriteinKey(result_positionX, result_positionY, 1, Local_var);
-  //     Command_Key = true;
-  //   }
-  //   if (!strcmp(KEY, "ENT")) {
-  //     strcpy(DATA, Local_var);
-  //     Serial.printf("Updated data: was %s is  %s", DATA, Local_var);
-  //     strncpy(DATA, Local_var, sizeof_data);  // limit_size so we cannot overwrite the original array size
-  //     Command_Key = true;
-  //     VariableChanged = false;
-  //     EEPROM_WRITE(Display_Config,Current_Settings);
-  //     Keyboardinuse=false;
-  //     setFont(0);
-  //     Display_Page=-1; //Always return to settings, page -1
-  //   }
-  //   if (!Command_Key) {  //Serial.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
-  //     strcat(Local_var, KEY);
-  //   }
-  //   Serial.printf(" end of loop <%s> \n",Local_var);
-  //   setFont(4);
-  //   WriteinKey(result_positionX, result_positionY, 1, Local_var);
-  //   }
-  // if (!ts.isTouched && KeyPressUsed && (millis() > (250 + lastkeypressed))) { KeyPressUsed = false; }
-
+  if (!KeyPressUsed && (ts.isTouched) && (ts.points[0].size > 10) && (KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps))) {
+  //  Serial.printf(" Keyboard check inputsizeof<%i>   sizeof_here *data(%i)   currentlen<%i>\n", sizeof_data, sizeof(*DATA), strlen(Local_var));
+    KeyPressUsed = true;
+    lastkeypressed = millis();
+    Command_Key = false;
+    //Serial.printf(" Key test %s \n",KEY);
+    if (!strcmp(KEY, "^")) {
+      caps = caps + 1;
+      if (caps > 2) { caps = 0; }  
+      keyboard(caps);
+      Command_Key = true;
+    }
+    if (!strcmp(KEY, "DEL")) {
+      Local_var[strlen(Local_var) - 1] = '\0';  // NOTE single inverted comma !!!
+      Command_Key = true;
+    }
+    if (!strcmp(KEY, "CLR")) {
+      Local_var[0] = '\0';
+      Command_Key = true;
+    }
+    if (!strcmp(KEY, "MEM")) {
+      strcpy(Local_var, DATA);
+      //Serial.printf(" reset  <%s> \n",Local_var);
+      WriteinKey(result_positionX, result_positionY, 1, Local_var);
+      Command_Key = true;
+    }
+    if (!strcmp(KEY, "ENT")) {
+      strcpy(DATA, Local_var);
+      Serial.printf("Updated data: was %s is  %s", DATA, Local_var);
+      strncpy(DATA, Local_var, sizeof_data);  // limit_size so we cannot overwrite the original array size
+      Command_Key = true;
+      VariableChanged = false;
+      EEPROM_WRITE(Display_Config,Current_Settings);
+      Keyboardinuse=false;
+      setFont(0);
+      Display_Page=-1; //Always return to settings, page -1
+    }
+    if (!Command_Key) {  //Serial.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
+      strcat(Local_var, KEY);
+    }
+    Serial.printf(" end of loop <%s> \n",Local_var);
+    setFont(4);
+    WriteinKey(result_positionX, result_positionY, 1, Local_var);
+    }
+  if (!ts.isTouched && KeyPressUsed && (millis() > (250 + lastkeypressed))) { KeyPressUsed = false; }
+  }
 }
 
 

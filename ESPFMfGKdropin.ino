@@ -26,7 +26,7 @@ void addFileSystems(void) {  // not used!!
   // /**/
 
   // /**/
-  // const byte SS = 5;  // D8
+  // const byte SS = 5;  // D8 chip select 
   // if (SD.begin(SS)) {
   //   if (!filemgr.AddFS(SD, "SD-Card", false)) {
   //     Serial.println(F("Adding SD failed."));

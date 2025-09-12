@@ -1,5 +1,6 @@
 #include "Display.h"
 #include "aux_functions.h"
+#include <WiFi.h>
 #include <Arduino_GFX_Library.h> // defines colours BLUE etc
 #include <FFat.h>  // defines FATFS functions for local files 
 #include <N2kMessages.h> // isNKNA 
@@ -30,6 +31,9 @@ extern boolean IsConnected;    // may be used in AP_AND_STA to flag connection s
 extern boolean AttemptingConnect;      // to note that WIFI.begin has been started
 extern int NetworksFound; 
 
+#include <TAMC_GT911.h>
+extern TAMC_GT911 ts;
+extern bool Touch_available;
 
 void Display(int page) {
   Display(false, page);
@@ -296,12 +300,12 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (RunSetup || DataChanged) {
         EEPROM_READ();  // makes sure eeprom update data is latest and synchronised! 
         setFont(3);
-        GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA Log and Source selects");
-        GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
-        AddTitleBorderBox(0, Switch6, "B LOG");
-        GFXBorderBoxPrintf(Switch7, Current_Settings.NMEA_log_ON On_Off);
-        AddTitleBorderBox(0, Switch7, "N LOG");
-        GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON On_Off);
+        GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
+        // GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
+        // AddTitleBorderBox(0, Switch6, "B LOG");
+        // GFXBorderBoxPrintf(Switch7, Current_Settings.NMEA_log_ON On_Off);
+        // AddTitleBorderBox(0, Switch7, "N LOG");
+        GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON ? Current_Settings.UDP_PORT :"OFF");
         AddTitleBorderBox(0, Switch8, "UDP");
         GFXBorderBoxPrintf(Switch9, Current_Settings.ESP_NOW_ON On_Off);
         AddTitleBorderBox(0, Switch9, "ESP-N");
@@ -309,7 +313,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         AddTitleBorderBox(0, Switch10, "N2K");
 
         GFXBorderBoxPrintf(Switch11, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        AddTitleBorderBox(0, Switch11, "EEPROM");
+        AddTitleBorderBox(0, Switch11, "FLASH");
 
         if (!Terminal.debugpause) {
           AddTitleBorderBox(0, Terminal, "TERMINAL");
@@ -331,17 +335,17 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
           AddTitleBorderBox(0, Terminal, "-paused-");
         }
       }
-      if (CheckButton(Switch6)) {
-        Current_Settings.Log_ON = !Current_Settings.Log_ON;
-       // NO LOGGING YET if (Current_Settings.Log_ON) { StartInstlogfile(); }
-        DataChanged = true;
-      };
+      // if (CheckButton(Switch6)) {
+      //   Current_Settings.Log_ON = !Current_Settings.Log_ON;
+      //  // NO LOGGING YET if (Current_Settings.Log_ON) { StartInstlogfile(); }
+      //   DataChanged = true;
+      // };
 
-      if (CheckButton(Switch7)) {
-        Current_Settings.NMEA_log_ON = !Current_Settings.NMEA_log_ON;
-       //  NO LOGGING YET if (Current_Settings.NMEA_log_ON) { StartNMEAlogfile(); }
-        DataChanged = true;
-      };
+      // if (CheckButton(Switch7)) {
+      //   Current_Settings.NMEA_log_ON = !Current_Settings.NMEA_log_ON;
+      //  //  NO LOGGING YET if (Current_Settings.NMEA_log_ON) { StartNMEAlogfile(); }
+      //   DataChanged = true;
+      // };
 
       if (CheckButton(Switch8)) {
         Current_Settings.UDP_ON = !Current_Settings.UDP_ON;
@@ -458,25 +462,26 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         slowdown = millis();
         //other stuff?
       }
-
-      // if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
-      //   //TouchCrosshair(1);
-      //   wifissidpointer = ((ts.points[0].y - 200) / text_height) - 1;
-      //   int str_len = WiFi.SSID(wifissidpointer).length() + 1;
-      //   char result[str_len];
-      //   //  Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
-      //   //  Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
-      //   if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
-      //     WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
-      //     if (str_len == 1) {
-      //       GFXBorderBoxPrintf(SecondRowButton, "Set via Keyboard?");
-      //     } else {
-      //       GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);
-      //     }
-      //   } else {
-      //     GFXBorderBoxPrintf(SecondRowButton, "ssid too long ");
-      //   }
-      // }
+if(Touch_available){
+      if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
+        //TouchCrosshair(1);
+        wifissidpointer = ((ts.points[0].y - 200) / text_height) - 1;
+        int str_len = WiFi.SSID(wifissidpointer).length() + 1;
+        char result[str_len];
+        //  Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
+        //  Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
+        if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
+          WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
+          if (str_len == 1) {
+            GFXBorderBoxPrintf(SecondRowButton, "Set via Keyboard?");
+          } else {
+            GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);
+          }
+        } else {
+          GFXBorderBoxPrintf(SecondRowButton, "ssid too long ");
+        }
+      }
+}
       if (CheckButton(TopRightbutton)) {
         GFXBorderBoxPrintf(SecondRowButton, " Starting WiFi re-SCAN / reconnect ");
         AttemptingConnect = false;  // so that Scan can do a full scan..
@@ -1018,15 +1023,17 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
 }
 
   bool CheckButton(_sButton & button) {  // trigger on release. needs index (s) to remember which button!
+  if(Touch_available){
     //trigger on release! does not sense !isTouched ..  use Keypressed in each button struct to keep track!
-    // if (ts.isTouched && !button.Keypressed && (millis() - button.LastDetect >= 250)) {
-    //   if (XYinBox(ts.points[0].x, ts.points[0].y, button.h, button.v, button.width, button.height)) {
-    //     //Serial.printf(" Checkbutton size%i state %i %i \n",ts.points[0].size,ts.isTouched,XYinBox(ts.points[0].x, ts.points[0].y,button.h,button.v,button.width,button.height));
-    //     button.Keypressed = true;
-    //     button.LastDetect = millis();
-    //   }
-    //   return false;
-    // }
+    if (ts.isTouched && !button.Keypressed && (millis() - button.LastDetect >= 250)) {
+      if (XYinBox(ts.points[0].x, ts.points[0].y, button.h, button.v, button.width, button.height)) {
+        //Serial.printf(" Checkbutton size%i state %i %i \n",ts.points[0].size,ts.isTouched,XYinBox(ts.points[0].x, ts.points[0].y,button.h,button.v,button.width,button.height));
+        button.Keypressed = true;
+        button.LastDetect = millis();
+      }
+      return false;
+    }
+  }
     if (button.Keypressed && (millis() - button.LastDetect >= 250)) {
       //Serial.printf(" Checkbutton released from  %i %i\n",button.h,button.v);
       button.Keypressed = false;

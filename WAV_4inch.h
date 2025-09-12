@@ -136,6 +136,8 @@ https://github.com/Tinyu-Zhao/PCA9554
 #define EX106 5 //BUZZER enable
 #define ExpanderSDA 15
 #define ExpanderSCL 7
+// (same as #define TOUCH_SDA  15
+// #define TOUCH_SCL  7)
 
 
 

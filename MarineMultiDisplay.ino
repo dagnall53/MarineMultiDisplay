@@ -4,6 +4,10 @@
 
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
+
+const char soft_version[] = "VERSION W.2";
+
+
 #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare module boards!
 #define ESP32_CAN_RX_PIN GPIO_NUM_0  // for the waveshare module boards!
 // #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on 8 way connector boards!
@@ -32,10 +36,6 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 #include <TAMC_GT911.h>
 
 // some wifi stuff
-//NB these may not be used -- I have tried to do some simplification
-//IPAddress udp_ap(0, 0, 0, 0);              // the IP address to send UDP data in SoftAP mode
-//IPAddress udp_st(0, 0, 0, 0);              // the IP address to send UDP data in Station mode
-//IPAddress sta_ip(0, 0, 0, 0);              // the IP address (or received from DHCP if 0.0.0.0) in Station mode
 IPAddress gateway(0, 0, 0, 0);             // the IP address for Gateway in Station mode
 IPAddress subnet(0, 0, 0, 0);              // the SubNet Mask in Station mode
 IPAddress Null_ip(0, 0, 0, 0);             //  A null IP address for the gateway
@@ -47,13 +47,22 @@ boolean AttemptingConnect;    // to note that WIFI.begin has been started
 int NetworksFound;            // used for scan Networks result. Done at start up!
 WiFiUDP Udp;
 #define BufferLength 500
-char nmea_1[BufferLength];    //serial
+char nmea_1[BufferLength];    //serial 0183
 char nmea_U[BufferLength];    // NMEA buffer for UDP input port
 char nmea_EXT[BufferLength];  // buffer for ESP_now received data
-// some helpful defines for easier coding
+// N2K operates via interruts and there are no '0183 version of the N2K messages 
+
+bool EspNowIsRunning = false;
+char* pTOKEN;
+int StationsConnectedtomyAP;
+#define scansearchinterval 30000
+// assists for wifigfx interrupt  box that shows status..  to help turn it off after a time
+uint32_t WIFIGFXBoxstartedTime;
+bool WIFIGFXBoxdisplaystarted;
+
+
 
 //MAGIC TREK style File viewer see https://github.com/holgerlembke/
-
 #include <ESPFMfGK.h>  // the thing.
 const word filemanagerport = 8080;
 // we want a different port than the webserver
@@ -61,13 +70,13 @@ ESPFMfGK filemgr(filemanagerport);
 
 #include <FFat.h>  // plan to use FATFS for local files
 
-
+bool hasSD, hasFATS,Touch_available;
 
 
 // my sub files
 
-//#include "ESP_NOW_files.h"
-#include "OTA.h"
+#include "ESP_NOW_files.h"
+#include "OTA.h" // and root webpage
 extern bool HaltOtherOperations;
 
 #include "aux_functions.h"  //.cpp calls  #include "WAV_4inch_pins.h"
@@ -78,31 +87,12 @@ extern bool HaltOtherOperations;
 //*********** DISPLAY selector *************
 #include "WAV_4inch.h"
 
-
-//TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH, TOUCH_HEIGHT);
+    // Load the PCA9554 Library #include <PCA9554.h>     // Load the PCA9554 Library
+PCA9554 expander(0x20);  // Create an expander object at this expander address
+TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH, TOUCH_HEIGHT);
 
 // for victron display pages
-
 #include "VICTRONBLE.h"
-
-const char soft_version[] = "VERSION W.1";
-
-//********** All boat data (instrument readings) are stored as double in a single structure:
-_sBoatData BoatData;  // BoatData values, int double etc
-bool dataUpdated;     // flag that Nmea Data has been updated
-// _sWiFi_settings_Config (see structures.h) are the settings for the Display:
-// If the structure is changed, be sure to change the Key (first figure) so that new defaults and struct can be set.
-//
-/*int EpromKEY;  char ssid[25];  char password[25];  char UDP_PORT[5]; UDP_ON;Serial_on; ESP_NOW_ON;  N2K_ON;  Log_ON;
-  int log_interval_setting;   bool NMEA_log_ON;  bool BLE_enable;*/
-//Config.txt holds both Default and Display settings in one file
-const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
-_sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default
-_sDisplay_Config Display_Config;
-_sWiFi_settings_Config Saved_Settings;
-_sWiFi_settings_Config Current_Settings;
-_sWiFi_settings_Config Default_Settings_JSON = { 17, "GUESTBOAT", "12345678", "2002", false, false, true, true, false, 1000, false, false };
-
 int Num_Victron_Devices;
 int CommonDisplayWIdth;
 const char* VictronDevicesSetupfilename = "/vconfig.txt";  // <- SD library uses 8.3 filenames
@@ -113,24 +103,29 @@ char VictronBuffer[2000];  // way to transfer results in a way similar to NMEA t
 const char* ColorsFilename = "/colortest.txt";  // <- SD library uses 8.3 filenames?
 _MyColors ColorSettings;
 
+
+//********** All boat data (instrument readings) are stored as double in a single structure:
+_sBoatData BoatData;  // BoatData values, int double etc
+bool dataUpdated;     // flag that Nmea Data has been updated
+// _sWiFi_settings_Config (see structures.h) are the settings for the Display:
+// If the structure is changed, be sure to change the Key (first figure) so that new defaults and struct can be set.
+//
+//Config.txt holds both Default and Display settings in one file
+const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
+_sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default
+_sDisplay_Config Display_Config;
+_sWiFi_settings_Config Saved_Settings;
+_sWiFi_settings_Config Current_Settings;
+_sWiFi_settings_Config Default_Settings_JSON = { 17, "GUESTBOAT", "12345678", "2002", false, false, true, true, false, 1000, false, false };
+
+
+
 int MasterFont;                             //global for font! Idea is to use to reset font after 'temporary' seletion of another
 String Fontname;
 int text_height = 12;  //so we can get them if we change heights etc inside functions
 int text_offset = 12;  //offset is not equal to height, as subscripts print lower than 'height'
 int text_char_width = 12;
 int Display_Page;
-
-bool EspNowIsRunning = false;
-char* pTOKEN;
-int StationsConnectedtomyAP;
-
-bool hasSD, hasFATS;
-
-#define scansearchinterval 30000
-
-// assists for wifigfx interrupt  box that shows status..  to help turn it off after a time
-uint32_t WIFIGFXBoxstartedTime;
-bool WIFIGFXBoxdisplaystarted;
 
 
 //****  My displays are based on '_sButton' structures to define position, width height, borders and colours.
@@ -210,38 +205,48 @@ _sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // intefere
 
 
 
-#include <PCA9554.h>     // Load the PCA9554 Library
-PCA9554 expander(0x20);  // Create an expander object at this expander address
+
 //#include "esp_task_wdt.h"
 
+bool _debug;
+void setup2(){    // use this to sort out how to reliably (?) start the SD card 
+  _debug=true;
+  Serial.begin(115200);
+  Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
+    SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
+ delay(1000);
+}
 
 void setup() {
-
-  Setup_expander(ExpanderSCL, ExpanderSDA, EX106);
+  // the real setup  NOTE I had lots of trouble getting SD to initiate and find the SD card , so it is right at the start
+  _debug=false;
   Serial.begin(115200);
- // esp_task_wdt_init(10, true);  // 10 seconds timeout
- // esp_task_wdt_add(NULL);      // Add current task to WDT
-
-
+  Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
+  //FindI2CDevices( "LISTING I2C devices"); delay(500);
+  SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
+  delay(100);
+  Touch_available=Touchsetup();
   InitNMEA2000();
-  Serial.begin(115200);
   Serial.println("Starting NMEA Display ");
   Serial.println(soft_version);
   WiFi.softAPConfig(ap_ip, Null_ip, sub255);
-  ConnectWiFiusingCurrentSettings();
-  SetupWebstuff();
+  keyboard(-1);  //reset keyboard display update settings
+
   Init_GFX();
   Fatfs_Setup();  // set up FATFS
-//  SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
+  if(hasSD) {gfx->println(F("***  SD CARD found ***"));}else{gfx->println(F("***  NO SD CARD ***"));}
+  if(Touch_available) {gfx->println(F("***  Touch Sensor ON ***"));}else{gfx->println(F("***  NO Touch Sensor ***"));}
+  delay(100);
   if (LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings)) {
     Serial.println(" USING FATS JSON for wifi and display settings");
     Display_Page= Display_Config.Start_Page;
-    } else 
-    {
-      Display_Page = 4;  //set later by eeprom read etc  but here for clarity?
+    } 
+    else {
+      Display_Page = 4;  //here for clarity?
       Display_Config = Default_JSON;
       Current_Settings = Default_Settings_JSON;
-    Serial.println(" USING EEPROM data, display set to defaults");
+    Serial.println(" USING  defaults");
+    SaveConfiguration(1,Setupfilename, Default_JSON, Default_Settings_JSON);
    }
     if (LoadVictronConfiguration(1, VictronDevicesSetupfilename, victronDevices)) {
     Serial.println(" USING FATS JSON for Victron data settings");
@@ -257,14 +262,17 @@ void setup() {
     Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
     SaveDisplayConfiguration(1,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
   }
- //Start_ESP_EXT();  //  Sets esp_now links to the current WiFi.channel etc.
+  ConnectWiFiusingCurrentSettings();
+  SetupWebstuff();
+  Udp.begin(atoi(Current_Settings.UDP_PORT));
+  Start_ESP_EXT();  //  Sets esp_now links to the current WiFi.channel etc.
   BLEsetup();       // setup Victron BLE interface (does not do much!!)
+  
 
-
-  Display(true, Display_Page);
+  Display(true, Display_Page);  // does reset on Display 
   // once wifi working..
   setupFilemanager();
-  HaltOtherOperations=false;
+  HaltOtherOperations=false;  // token is set only during OTA to avoid other tasks causing problems 
  // esp_task_wdt_reset();  // Reset watchdog if loop completes
 }
 
@@ -272,6 +280,7 @@ void loop() {
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchInterval;
+    if (_debug) {delay(100); return;}
   // if(millis()>= DebugInterval){
 
   // Serial.printf("%4.2f FreeHeap: %d ",((float)millis())/1000, ESP.getFreeHeap());
@@ -279,13 +288,15 @@ void loop() {
   //  DebugInterval= millis()+1000;
   // }
   delay(1);
-  //SD_CS("LOW");
- 
-  server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?) 
-  //SD_CS("HIGH");
-
+   SD_CS("LOW");
+   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?) 
+ // SD_CS("HIGH");
   if (!HaltOtherOperations){ 
-    filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work
+    filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!! 
+    SD_CS("HIGH");
+    EXTHeartbeat();
+    if (Current_Settings.N2K_ON)  { NMEA2000.ParseMessages();} 
+    CheckAndUseInputs();
     Display(Display_Page);
 
   if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchInterval)) {  // repeat at intervals to check..
@@ -305,8 +316,7 @@ void loop() {
   ///  BLEloop DO not try to do N2000 interrupts and BLE interrupts at the same time
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
       BLEloop();} 
-      else 
-      {NMEA2000.ParseMessages();} 
+ 
   }
 
  // esp_task_wdt_reset();  // Reset watchdog if loop completes for testing 
@@ -400,6 +410,7 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
   int iHandler;                                  // enumerate handlers - how many do we have?
   bool known;
   known = false;
+  if (!Current_Settings.N2K_ON){return;}
   for (iHandler = 0; NMEA2000Handlers[iHandler].PGN != 0 && !(N2kMsg.PGN == NMEA2000Handlers[iHandler].PGN); iHandler++)
     ;
   // we now have the index (iHandler) for the handler matching the received PGN
@@ -407,7 +418,7 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
     NMEA2000Handlers[iHandler].Handler(N2kMsg);
     known = true;
   }
-   if ((Display_Page == -21 ) ||(Display_Page == -21 )){ // only do this terminal debug display if on the N2K viewing debug page! 
+   if ((Display_Page == -21 ) ||(Display_Page == -22 )){ // only do this terminal debug display if on the N2K viewing debug page! 
    char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode,35); // get the discription of the PGN from my string function, trucated to 35 char
     if(known) {UpdateLinef(BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s",N2kMsg.PGN,N2kMsg.Source, N2kMsg.PGN, decode);}
@@ -447,6 +458,8 @@ void Fatfs_Setup() {
 }
 //*********** EEPROM functions *********
 void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
+  SaveConfiguration(1, Setupfilename, B, A);
+  return;
   // save my current settings
   // ALWAYS Write the Default display page!  may change this later and save separately?!!
   Serial.printf("SAVING EEPROM\n key:%i \n", A.EpromKEY);
@@ -455,10 +468,12 @@ void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
   EEPROM.commit();
   delay(50);
   //NEW also save as a JSON on the SD card SD card will overwrite current settings on setup..
-  SaveConfiguration(1, Setupfilename, B, A);
+  
   // SaveVictronConfiguration(VictronDevicesSetupfilename,victronDevices); // should write a default file if it was missing?
 }
 void EEPROM_READ() {
+  LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings);
+  return;
   int key;
   EEPROM.begin(512);
   Serial.print("READING EEPROM ");
@@ -1258,23 +1273,24 @@ void ConnectWiFiusingCurrentSettings() {
 void Setup_expander(int SDA,int SCL, int beepPin){
  Wire.begin(SDA,SCL);
   expander.portMode(ALLOUTPUT);  //Set the port as all output
- // Serial.println("Confirm expander connected via  Beep ");
+  //Serial.println("Confirm expander connected via  Beep ");
   expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
-  delay(25);
+  delay(50);
   expander.digitalWrite(beepPin, LOW);  //Buzzer off!
   delay(150);
-    expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
-  delay(25);
+  expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
+  delay(50);
   expander.digitalWrite(beepPin, LOW);  //Buzzer off!
   delay(150);
 }
+
 void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
     hasSD = false;
-    Serial.println("SD Card START");
-    if (SPISDCS == -1) {SD_CS(HIGH);SD_CS(LOW);}
+    Serial.println("SD Card START..");
+    if (SPISDCS == -1) {Serial.println("   Using SD_CS");SD_CS(HIGH);SD_CS(LOW);}
     SPI.begin(SPISCK, SPIMISO, SPIMOSI);
     delay(10);
-    if(!SD.begin()){ Serial.println("Card Mount Failed");gfx->println("NO SD Card");hasSD = false;SD_CS(HIGH);return;}
+    if(!SD.begin()){ Serial.println("   Card Mount Failed");hasSD = false;SD_CS(HIGH);return;}
     else{ hasSD = true;  // picture will be  run in setup, after load config
       if (!filemgr.AddFS(SD, "SD-Card", false)) { Serial.println(F("Adding SD to file manager failed."));}
         else{ Serial.println(F("  Added SD to file manager"));} // add the SD file manager to the Trek style file display 
@@ -1286,25 +1302,18 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
       return;
     }
     Serial.print("  SD Card Type: ");
-    gfx->println(" ");  // or it starts outside text bound??
-    gfx->print("SD Card Type: ");
-    if (cardType == CARD_MMC) {
+      if (cardType == CARD_MMC) {
       Serial.print("MMC");
-      gfx->println("MMC");
-    } else if (cardType == CARD_SD) {
+        } else if (cardType == CARD_SD) {
       Serial.print("SDSC");
-      gfx->println("SCSC");
-    } else if (cardType == CARD_SDHC) {
+          } else if (cardType == CARD_SDHC) {
       Serial.print("SDHC");
-      gfx->println("SDHC");
-    } else {
+          } else {
       Serial.print("UNKNOWN");
-      gfx->println("Unknown");
-    }
+          }
     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
     Serial.printf("SD Card Size: %lluMB", cardSize);
-    gfx->printf("SD Card Size: %lluMB\n", cardSize);
-    // Serial.println("*** SD card contents  (to three levels) ***");
+       // Serial.println("*** SD card contents  (to three levels) ***");
     delay(500);
 }
 
@@ -1313,7 +1322,7 @@ void SD_CS( bool state){
   if (!hasSD) {return;}
   if (SDCS == -1){  //SDCS set -1 for Wavshare which uses using Expander for SD_CS .
   static bool laststate;
-  if (laststate != state) {expander.digitalWrite(EX104,state);}//Serial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  Serial.printf("  Setting SD_CS state: %i\n", state); }
+  if (laststate != state) {expander.digitalWrite(EX104,state);delay(1);}//Serial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  Serial.printf("  Setting SD_CS state: %i\n", state); }
   laststate=state;
   }
 
@@ -1331,3 +1340,206 @@ void timeupdate() {
     BoatData.LOCTime = BoatData.LOCTime + 1;
   }
 }
+void FindI2CDevices(String text){
+  Serial.println(text);
+  for (int i=0 ;i<256;i++) {
+  Wire.beginTransmission(i);
+  if (Wire.endTransmission() == 0) {
+     Serial.printf("Device detected at %x(hex)  %i(dec) ",i,i);Serial.println("");delay(10);
+    } 
+  }
+}
+bool Touchsetup(){ // look for 0x5d and setup 
+  bool result=false;
+  // is already started ! using Expander pin definition in setup() Wire.begin(TOUCH_SDA,TOUCH_SCL);                         // start the wire interface 
+  //FindI2CDevices("- List I2C DEVICES-");delay(200);// for development testing
+    //gt911 initialization, must be added, otherwise the touch screen will not be recognized  
+  //initialization begin
+  expander.digitalWrite(EX101,HIGH);expander.digitalWrite(EX102,HIGH);expander.digitalWrite(EX104,HIGH);
+  pinMode(TOUCH_INT, OUTPUT); //
+  digitalWrite(TOUCH_INT, LOW);                          // Step 1 LOW =set to  I2C address 0x5D
+  delay(100);
+  expander.digitalWrite(EX103,LOW);expander.digitalWrite(EX101,LOW);// Step 2: Pull RST LOW to begin reset
+  delay(100);
+  expander.digitalWrite(EX101,HIGH);expander.digitalWrite(EX103,HIGH);// Step 3: Release RST HIGH while keeping INT LOW
+    delayMicroseconds(100);  // ≥100 µs
+    pinMode(TOUCH_INT, INPUT);                             // Step 4: Float INT pin (input mode)
+  // Step 5: Wait for GT911 to boot
+    delay(100);  // 5–10 ms
+    //initialization end
+  Serial.print("\n Checking for Touch chip at I2C address 0x5D: ..");
+  Wire.beginTransmission(0x5D);
+  byte error = Wire.endTransmission();
+  if (error == 0) {result=true;
+    Serial.println("Device found!");
+  } else if (error == 2) {
+    Serial.println("Received NACK on transmit of address.");
+  } else if (error == 3) {
+    Serial.println("Received NACK on transmit of data.");
+  } else if (error == 4) {
+    Serial.println("Other error.");
+  } else {
+    Serial.println("No device found.");
+  }
+  delay(100); // allow time to print! 
+  // Optional: Check INT pin state
+  // if (digitalRead(TOUCH_INT) == LOW) {
+  //   Serial.println("GT911 ready (INT LOW)");
+  // } else {
+  //   Serial.println("GT911 not ready (INT HIGH)");
+  // }
+ if(result){
+    ts.begin();
+    ts.setRotation(ROTATION_INVERTED);
+ }
+
+  return result;
+}
+  void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi sources in sequence
+    static unsigned long MAXScanInterval;
+    MAXScanInterval = millis() + 500;
+    // Serial.printf(" C&U<%i>",millis()-Interval);Interval=millis();
+    if ((Current_Settings.ESP_NOW_ON)) {  // ESP_now can work even if not actually 'connected', so for now, do not risk the while loop!
+                                          // old.. only did one line of nmea_EXT..
+                                          // if (nmea_EXT[0] != 0) { UseNMEA(nmea_EXT, 3); }
+      while (Test_ESP_NOW() && (millis() <= MAXScanInterval)) {
+        UseNMEA(nmea_EXT, 3);
+        // runs multiple times to clear the buffer.. use delay to allow other things to work.. print to show if this is the cause of start delays while debugging!
+        //vTaskDelay(1);
+      }
+    }
+    // Serial.printf(" ca<%i>",millis()-Interval);Interval=millis();
+   //N2K is directly converted to display structures  only use for debugging
+   // if (Current_Settings.N2K_ON) {
+   //   if (NewN2Kdata()) { UseNMEA(nmea_N2K, 5); } // just for debug!! 
+   // }
+    // // Serial.printf(" cb<%i>",millis()-Interval);Interval=millis();
+    if (Current_Settings.UDP_ON) {
+      if (Test_U()) { UseNMEA(nmea_U, 2); }
+    }
+    //Serial.printf(" cd<%i>",millis()-Interval);Interval=millis();
+    if (Current_Settings.BLE_enable) {
+      if (VictronBuffer[0] != 0) { UseNMEA(VictronBuffer, 4); }
+    }
+    // Serial.printf(" ce<%i>\n",millis()-Interval);Interval=millis();
+  }
+
+  void UseNMEA(char* buf, int type) {
+    if (buf[0] != 0) {
+      // print serial version if on the wifi page terminal window page.
+      // data log raw NMEA and when and where it came from.
+      // type 4 is Victron data
+      /*TIME: %02i:%02i:%02i",
+                      int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60,*/
+      if (Current_Settings.NMEA_log_ON) {
+        if (BoatData.GPSTime != NMEA0183DoubleNA) {
+          if (type == 1) { NMEALOG(" %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+          if (type == 2) { NMEALOG(" %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+          if (type == 3) { NMEALOG(" %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+          if (type == 4) { NMEALOG("\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
+          
+
+        } else {
+
+          if (type == 1) { NMEALOG("%.3f SER:%s", float(millis()) / 1000, buf); }
+          if (type == 2) { NMEALOG("%.3f UDP:%s", float(millis()) / 1000, buf); }
+          if (type == 3) { NMEALOG("%.3f ESP:%s", float(millis()) / 1000, buf); }
+          if (type == 4) { NMEALOG("\n %.3f VIC:%s", float(millis()) / 1000, buf); }
+        }
+      }
+      // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
+      // 7 is smallest
+      // 0 is 8pt mono thin,
+      //3 is 8pt mono bold
+      if ((Display_Page == -86)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
+        if (type == 4) {
+          UpdateLinef(BLACK, 8, Terminal, "V_Debugmsg%s", buf);  //8 readable ! 7 small enough to avoid line wrap issue?
+        }
+      }
+
+      if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
+      //  if (type == 5) {  // done directly on data receipt!
+      //   UpdateLinef(BLACK, 8, Terminal, "N2K:%s", buf);  // 7 small enough to avoid line wrap issue?
+      // }
+        if (type == 4) {
+          UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);  // 7 small enough to avoid line wrap issue?
+        }
+
+        if (type == 2) {
+          UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);  // 7 small enough to avoid line wrap issue?
+        }
+        if (type == 3) {
+          UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);
+        }
+        if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf); }
+      }
+      // now decode it for the displays to use
+      if (type != 4) {
+        pTOKEN = buf;                                               // pToken is used in processPacket to separate out the Data Fields
+        if (processPacket(buf, BoatData)) { dataUpdated = true; };  // NOTE processPacket will search for CR! so do not remove it and then do page updates if true ?
+      }
+      /// WILL NEED new process packet equivalent to deal with VICTRON data
+      buf[0] = 0;  //clear buf  when finished!
+      return;
+    }
+  }
+    bool Test_Serial_1() {  // UART0 port P1
+    static bool LineReading_1 = false;
+    static int Skip_1 = 1;
+    static int i_1;
+    static bool line_1;  //has found a full line!
+    unsigned char b;
+    if (!line_1) {                  // ONLY get characters if we are NOT still processing the last line message!
+      while (Serial.available()) {  // get the character
+        b = Serial.read();
+        if (LineReading_1 == false) {
+          nmea_1[0] = b;
+          i_1 = 1;
+          LineReading_1 = true;
+        }  // Place first character of line in buffer location [0]
+        else {
+          nmea_1[i_1] = b;
+          i_1 = i_1 + 1;
+          if (b == 0x0A) {       //0A is LF
+            nmea_1[i_1] = 0x00;  // put end in buffer.
+            LineReading_1 = false;
+            line_1 = true;
+            return true;
+          }
+          if (i_1 > 150) {
+            LineReading_1 = false;
+            i_1 = 0;
+            line_1 = false;
+            return false;
+          }
+        }
+      }
+    }
+    line_1 = false;
+    return false;
+  }
+  bool Test_U() {  // check if udp packet (UDP is sent in lines..) has arrived
+    static int Skip_U = 1;
+    // if (!line_U) {  // only process if we have dealt with the last line.
+    nmea_U[0] = 0x00;
+    int packetSize = Udp.parsePacket();
+    if (packetSize) {  // Deal with UDP packet
+      if (packetSize >= (BufferLength)) {
+   #if ESP_ARDUINO_VERSION_MAJOR == 3
+        Udp.clear();
+   #else
+        Udp.flush();
+   #endif
+        return false;
+      }  // Simply discard if too long
+      int len = Udp.read(nmea_U, BufferLength);
+      unsigned char b = nmea_U[0];
+      nmea_U[len] = 0;
+      // nmea_UpacketSize = packetSize;
+      //Serial.print(nmea_U);
+      //line_U = true;
+      return true;
+    }  // udp PACKET DEALT WITH
+       // }
+    return false;
+  }
