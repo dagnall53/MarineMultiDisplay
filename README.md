@@ -22,12 +22,13 @@ This new editor is worth keeping and I may update the original NMEA display in t
 
 ## HOW TO INSTALL FIRST TIME
 (NOT TESTED YET for THIS VERSION) 
-First, plug your module into a com port on your PC and record which port it is using. 
+First, plug your module into a com port on your PC. 
+Switch the module on (press the PWRKEY) and record which port it is using. 
 If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
 Remember the port number!
 
 Click the link below to download the file "WebProgram.bat" from the github.
-<a href="Click to download/" download>https://dagnall53.github.io/MarineMultiDisplay/build/WebProgram.bat</a>"
+<a href='Click to download'>https://dagnall53.github.io/MarineMultiDisplay/build/WebProgram.bat</a>"
 Save this somewhere convenient such as downloads.
 Run the program .. 
 It will download the latest binaries to the directory where you saved it and program the hardware. 
