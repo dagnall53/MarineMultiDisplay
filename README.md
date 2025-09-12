@@ -22,18 +22,30 @@ This new editor is worth keeping and I may update the original NMEA display in t
 
 ## HOW TO INSTALL FIRST TIME
 (NOT TESTED YET for THIS VERSION) 
-First, plug your module into a com port on your PC and record which port it is using. 
+First, plug your module into a com port on your PC. 
+Switch the module on (press the PWRKEY) and record which port it is using. 
 If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
 Remember the port number!
 
 Click the link below to download the file "WebProgram.bat" from the github.
-<a href="Click to download/" download>https://dagnall53.github.io/MARINEMULTI/build/WebProgram.bat</a>
+<a href="https://dagnall53.github.io/MarineMultiDisplay/build/WebProgram.bat" download>Download WebProgram.bat</a>
+
 Save this somewhere convenient such as downloads.
 Run the program .. 
 It will download the latest binaries to the directory where you saved it and program the hardware. 
 It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat file. 
 
-I will try later to add a similar Bat file to copy the essential files for the SD card.
+##Changed FILE STRUCTURE
+The original program saved only the start page, WiFi details and source (UDP,ESPnow,Serial,N2K) switching. With the exception of the Start page, these could be set via the touch interface.
+Later versions added the ability to change what is shown on the "Quad Display" {the default 'page 4' start page}. This configuration is saved in config.txt along with the wifi etc details.
+Data to set up the victron displays is set in vconfig.txt and colortest.text.
+In the origial code, these were stored on SD and if the SD is not present, default versions will be set, but cannot be altered.
+In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and so the SD card is not required. 
+
+All config files are editable via the (new) editor.
+
+
+
 
 ## FATFS files 
 The root of the FATFS should have (at least) these files:
