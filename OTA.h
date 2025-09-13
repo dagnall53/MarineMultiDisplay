@@ -57,8 +57,8 @@ static bool NMEAINSTlogFileStarted = false;
 extern _sDisplay_Config Display_Config;
 
 extern const char *Setupfilename;
-extern bool LoadConfiguration(int FS, const char *filename, _sDisplay_Config &config, _sWiFi_settings_Config &settings);
-extern void SaveConfiguration(int FS, const char *filename, _sDisplay_Config &config, _sWiFi_settings_Config &settings);
+extern bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings);
+extern void SaveConfiguration(fs::FS &fs, const char *filename, _sDisplay_Config &config, _sWiFi_settings_Config &settings);
 extern _sWiFi_settings_Config Current_Settings;
 extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
 
@@ -66,11 +66,11 @@ extern void PrintJsonFile(const char *comment, const char *filename);
 extern const char *VictronDevicesSetupfilename;
 extern _sMyVictronDevices victronDevices;
 // nb if victron or display settings are missing, '/save' will create them
-extern bool LoadVictronConfiguration(int FS, const char *filename, _sMyVictronDevices &config);
-extern void SaveVictronConfiguration(int FS, const char *filename, _sMyVictronDevices &config);
+extern bool LoadVictronConfiguration(fs::FS &fs, const char *filename, _sMyVictronDevices &config);
+extern void SaveVictronConfiguration(fs::FS &fs, const char *filename, _sMyVictronDevices &config);
 
-extern bool LoadDisplayConfiguration(int FS, const char *filename, _MyColors &set);
-extern void SaveDisplayConfiguration(int FS, const char *filename, _MyColors &set);
+extern bool LoadDisplayConfiguration(fs::FS &fs, const char *filename, _MyColors &set);
+extern void SaveDisplayConfiguration(fs::FS &fs, const char *filename, _MyColors &set);
 
 extern const char *ColorsFilename;
 extern _MyColors ColorSettings;
@@ -301,7 +301,7 @@ void SetupWebstuff() {
   });
   server.on("/Reset", HTTP_GET, []() {
     handleRoot();
-    if (LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings)) { EEPROM_WRITE(Display_Config, Current_Settings); }  // stops overwrite with bad JSON data!!
+    if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) { EEPROM_WRITE(Display_Config, Current_Settings); }  // stops overwrite with bad JSON data!!
     // Victron is never set up by the touchscreen only via SD editor so NO SaveVictronConfiguration(VictronDevicesSetupfilename,victronDevices);// save config with bytes ??
     WifiGFXinterrupt(8, WifiStatus, "RESTARTING");
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
@@ -312,19 +312,19 @@ void SetupWebstuff() {
   });
   server.on("/Save", HTTP_GET, []() {
     handleRoot();
-    if (LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings)) {
+    if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) {
       Serial.println("***Updating EEPROM from ");
       EEPROM_WRITE(Display_Config, Current_Settings);
     }  // stops overwrite with bad JSON data!!
-    if (LoadVictronConfiguration(1,VictronDevicesSetupfilename, victronDevices)) {
+    if (LoadVictronConfiguration(FFat,VictronDevicesSetupfilename, victronDevices)) {
       PrintJsonFile(" Check Updated Victron settings after Web initiated SAVE ", VictronDevicesSetupfilename);
       Serial.println("***Updated Victron data settings");
     }
-    if (LoadDisplayConfiguration(1,ColorsFilename, ColorSettings)) {
+    if (LoadDisplayConfiguration(FFat,ColorsFilename, ColorSettings)) {
       Serial.println(" USING JSON for Colours data settings");
     } else {
       Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT and Making File on SD****\n\n");
-      SaveDisplayConfiguration(1,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+      SaveDisplayConfiguration(FFat,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
     }
     delay(50);
     Display(true, Display_Page);

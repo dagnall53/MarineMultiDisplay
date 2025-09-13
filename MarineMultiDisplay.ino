@@ -5,7 +5,7 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = "VERSION W.2";
+const char soft_version[] = "VERSION 0.02";
 
 
 #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare module boards!
@@ -31,8 +31,8 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <SD.h>       // was SD.h  // pins set in 4inch.h
-#include <PCA9554.h>  // Load the PCA9554 Library
-#include <Wire.h>     // Load the Wire Library
+
+
 #include <TAMC_GT911.h>
 
 // some wifi stuff
@@ -79,18 +79,23 @@ bool hasSD, hasFATS,Touch_available;
 #include "OTA.h" // and root webpage
 extern bool HaltOtherOperations;
 
-#include "aux_functions.h"  //.cpp calls  #include "WAV_4inch_pins.h"
+#include "aux_functions.h"  
 
 #include "Display.h"
 //*********** for keyboard*************
 #include "Keyboard.h"
 //*********** DISPLAY selector *************
-#include "WAV_4inch.h"
+#include "WAV_4inch.h"  // 
+//#include "GUIT_4inch.h"
 
-    // Load the PCA9554 Library #include <PCA9554.h>     // Load the PCA9554 Library
-PCA9554 expander(0x20);  // Create an expander object at this expander address
+    // Load the PCA9554 Library 
+#ifdef ExpanderSDA  
+  #include <Wire.h>     // Load the Wire Library
+  #include <PCA9554.h>     // Load the PCA9554 Library
+  PCA9554 expander(0x20);  // Create an expander object at this expander address
+#endif
+// touch sensor
 TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH, TOUCH_HEIGHT);
-
 // for victron display pages
 #include "VICTRONBLE.h"
 int Num_Victron_Devices;
@@ -212,64 +217,105 @@ bool _debug;
 void setup2(){    // use this to sort out how to reliably (?) start the SD card 
   _debug=true;
   Serial.begin(115200);
+ // Serial.begin(115200, SERIAL_8N1, USBRX_PIN, USBTX_PIN);
   Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
     SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
  delay(1000);
+}
+void beep(int num,int beepPin){
+  #ifdef ExpanderSDA
+  for (int i=1 ;i <= num ;i++){
+  expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
+  delay(50);
+  expander.digitalWrite(beepPin, LOW);  //Buzzer off!
+  delay(150);
+ }
+ delay(300); // allows cadence to differentiate beep4 from beep2 beep2 
+ #endif
+}
+
+
+#include "esp_partition.h"
+
+const esp_partition_t* ffat_partition = esp_partition_find_first(
+    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);
+
+bool TestFATSPartition(){
+if (ffat_partition) {
+    Serial.print("FFat partition found.");
+    Serial.printf(" Size: %d bytes\n", ffat_partition->size); return true;} 
+Serial.println("No FFat partition found.");
+    
+return false;
+}
+bool TestFATSFormatted(){
+  uint8_t sector[512];
+  esp_err_t err = esp_partition_read(ffat_partition, 0, sector, sizeof(sector));
+  if (err == ESP_OK && sector[510] == 0x55 && sector[511] == 0xAA) {
+    Serial.println(" and likely valid FAT filesystem present.");return true;} 
+  Serial.println("No valid FAT signature found.");
+  return false;
 }
 
 void setup() {
   // the real setup  NOTE I had lots of trouble getting SD to initiate and find the SD card , so it is right at the start
   _debug=false;
   Serial.begin(115200);
-  Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
-  //FindI2CDevices( "LISTING I2C devices"); delay(500);
-  SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
-  delay(100);
-  Touch_available=Touchsetup();
-  InitNMEA2000();
   Serial.println("Starting NMEA Display ");
   Serial.println(soft_version);
-  WiFi.softAPConfig(ap_ip, Null_ip, sub255);
-  keyboard(-1);  //reset keyboard display update settings
+    Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
+  //FindI2CDevices( "LISTING I2C devices"); delay(500);
+  SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
+  if (TestFATSPartition() && TestFATSFormatted()) {
+    Serial.println("FATFs should be ok");
+  Fatfs_Setup();}  // set up FATFS
 
-  Init_GFX();
-  Fatfs_Setup();  // set up FATFS
-  if(hasSD) {gfx->println(F("***  SD CARD found ***"));}else{gfx->println(F("***  NO SD CARD ***"));}
-  if(Touch_available) {gfx->println(F("***  Touch Sensor ON ***"));}else{gfx->println(F("***  NO Touch Sensor ***"));}
   delay(100);
-  if (LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings)) {
-    Serial.println(" USING FATS JSON for wifi and display settings");
+  Touch_available=Touchsetup();
+  delay(100);
+  InitNMEA2000();
+
+  WiFi.softAPConfig(ap_ip, Null_ip, sub255);
+  keyboard(-1);  //just reset keyboard's static variables
+  Init_GFX();
+  
+  if(hasFATS){gfx->println(F("***  FATFS setup ***"));beep(3,EX106);}else{gfx->println(F("***  NO FATFS ***"));}
+  if(hasSD) {gfx->println(F("***  SD CARD found ***"));beep(3,EX106);}else{gfx->println(F("***  NO SD CARD ***"));}
+  if(Touch_available) {gfx->println(F("***  Touch Sensor ON ***"));beep(4,EX106);}else{gfx->println(F("***  NO Touch Sensor ***"));}
+  delay(100);
+  bool FilesOK=true;
+  if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) {
+    Serial.println("USING FATS JSON for wifi and display settings");
     Display_Page= Display_Config.Start_Page;
     } 
-    else {
+    else { FilesOK=false;
       Display_Page = 4;  //here for clarity?
       Display_Config = Default_JSON;
       Current_Settings = Default_Settings_JSON;
-    Serial.println(" USING  defaults");
-    SaveConfiguration(1,Setupfilename, Default_JSON, Default_Settings_JSON);
+    Serial.println(" USING  defaults for wifi and display settings");
+    SaveConfiguration(FFat,Setupfilename, Default_JSON, Default_Settings_JSON);
    }
-    if (LoadVictronConfiguration(1, VictronDevicesSetupfilename, victronDevices)) {
-    Serial.println(" USING FATS JSON for Victron data settings");
-  } else {
+    if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
+    Serial.println("USING FATS JSON for Victron data settings");
+  } else {FilesOK=false;
     Serial.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");
     Num_Victron_Devices = 6;
     CommonDisplayWIdth = 150;
-    SaveVictronConfiguration(1,VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
+    SaveVictronConfiguration(FFat,VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
   }
-  if (LoadDisplayConfiguration(1,ColorsFilename, ColorSettings)) {
-    Serial.println(" USING FATS JSON for Colours data settings");
-  } else {
+  if (LoadDisplayConfiguration(FFat,ColorsFilename, ColorSettings)) {
+    Serial.println("USING FATS JSON for Colours data settings");
+  } else {FilesOK=false;
     Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
-    SaveDisplayConfiguration(1,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+    SaveDisplayConfiguration(FFat,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
   }
+  if (!FilesOK) {beep(1,EX106); Serial.println("Sound to indicate a JSON settings to default ");  }
   ConnectWiFiusingCurrentSettings();
   SetupWebstuff();
   Udp.begin(atoi(Current_Settings.UDP_PORT));
   Start_ESP_EXT();  //  Sets esp_now links to the current WiFi.channel etc.
   BLEsetup();       // setup Victron BLE interface (does not do much!!)
-  
-
-  Display(true, Display_Page);  // does reset on Display 
+   Display(true, Display_Page);  // does reset on Display 
   // once wifi working..
   setupFilemanager();
   HaltOtherOperations=false;  // token is set only during OTA to avoid other tasks causing problems 
@@ -323,14 +369,14 @@ void loop() {
 
 }
 
-void wifiSetup() {
-  WiFi.softAPConfig(ap_ip, Null_ip, sub255);
-  ConnectWiFiusingCurrentSettings();
-  //SetupWebstuff();
+// void wifiSetup() {
+//   WiFi.softAPConfig(ap_ip, Null_ip, sub255);
+//   ConnectWiFiusingCurrentSettings();
+//   //SetupWebstuff();
 
-  keyboard(-1);  //reset keyboard display update settings
-  Udp.begin(atoi(Current_Settings.UDP_PORT));
-}
+//   keyboard(-1);  //reset keyboard display update settings
+//   Udp.begin(atoi(Current_Settings.UDP_PORT));
+// }
 
 // Can place functions after Setup and Loop only in ino
 
@@ -349,7 +395,10 @@ void Init_GFX() {
   gfx->setTextColor(WHITE);
   setFont(4);
   gfx->setCursor(40, 20);
+  gfx->println(F("*********************"));
   gfx->println(F("***Display Started***"));
+  gfx->println(F("*********************"));
+  gfx->println(F(""));
 }
 
 void InitNMEA2000() {  // make it display device Info on start up..
@@ -436,16 +485,13 @@ void Fatfs_Setup() {
   Serial.println("FFAT  START");
   if (FFat.begin(true)) {
     hasFATS = true;
-    gfx->print("FFAT initiated  ");
     /*size_t totalBytes();
     size_t usedBytes();
     size_t freeBytes();*/
     uint64_t cardSize = FFat.totalBytes() / (1024 * 1024);
     Serial.printf("  FFat Size: %lluMB\n", cardSize);
-    gfx->printf("FFat  Size: %lluMB ", cardSize);
     uint64_t FreeSize = FFat.freeBytes() / (1024 * 1024);
     Serial.printf("FFat freeBytes: %lluMB\n", FreeSize);
-    gfx->printf("FFat  freeBytes: %lluMB\n", FreeSize);
     delay(1500);
     if (!filemgr.AddFS(FFat, "Flash/FFat", false)) {
       Serial.println(F("Adding FFAT to Filemanager failed."));
@@ -458,7 +504,7 @@ void Fatfs_Setup() {
 }
 //*********** EEPROM functions *********
 void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
-  SaveConfiguration(1, Setupfilename, B, A);
+  SaveConfiguration(FFat, Setupfilename, B, A);
   return;
   // save my current settings
   // ALWAYS Write the Default display page!  may change this later and save separately?!!
@@ -472,7 +518,7 @@ void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
   // SaveVictronConfiguration(VictronDevicesSetupfilename,victronDevices); // should write a default file if it was missing?
 }
 void EEPROM_READ() {
-  LoadConfiguration(1,Setupfilename, Display_Config, Current_Settings);
+  LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings);
   return;
   int key;
   EEPROM.begin(512);
@@ -492,22 +538,13 @@ void EEPROM_READ() {
   }
 }
 
-bool LoadVictronConfiguration(int FS,  const char* filename, _sMyVictronDevices& config) {
+bool LoadVictronConfiguration(fs::FS &fs,  const char* filename, _sMyVictronDevices& config) {
   // Open SD file for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
   File file;
-  if(FS==0){if (!hasSD){return false;}
-    SD_CS(LOW);
-    if (!SDexists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
-    file = SD.open(filename, FILE_READ);
-  }
-   if(FS==1){if (!hasFATS){return false;}
-    if (!FFat.exists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
-    file = FFat.open(filename, FILE_READ);
-   }
-  
+     if (&fs == &SD) { SD_CS(LOW); }
+  file = fs.open(filename, FILE_READ);
   if (!file) {Serial.println(F("**Failed to read Victron JSON file"));fault = true;}
-  
   // Allocate a temporary JsonDocument
   char temp[15];
   JsonDocument doc;
@@ -532,29 +569,19 @@ bool LoadVictronConfiguration(int FS,  const char* filename, _sMyVictronDevices&
   // Close the file (Curiously, File's destructor doesn't close the file)
 
   file.close();
-  if(FS==0){SD_CS(HIGH);}
+  if(&fs == &SD){SD_CS(HIGH);}
   return !fault;  // report success
 }
-void SaveVictronConfiguration(int FS, const char* filename, _sMyVictronDevices& config) {
+void SaveVictronConfiguration(fs::FS &fs, const char* filename, _sMyVictronDevices& config) {
   // USED for adding extra devices or for creating a new file if missing
   //Delete existing file, otherwise the configuration is appended to the file
   File file;
   char buff[15];
-  if (FS==0) {if (!hasSD){SD_CS(HIGH);return;}
-    SD_CS(LOW);
-    SD.remove(filename);
-    // Open file for writing
-    file = SD.open(filename, FILE_WRITE);
-  }
-  if (FS==1) {if (!hasFATS) {return;}
-  FFat.remove(filename);
+  if (&fs == &SD) { SD_CS(LOW); }
+  fs.remove(filename);
   // Open file for writing
-  file = FFat.open(filename, FILE_WRITE);
- }
-  if (!file) {
-    Serial.println(F("JSON: Victron: Failed to create SD file"));
-    return;
-  }
+  file = fs.open(filename, FILE_WRITE);
+  if (!file) { Serial.println(F("JSON: Victron: Failed to create file"));if (&fs == &SD) { SD_CS(HIGH); } return;}
   Serial.printf(" We expect %i Victron devices", Num_Victron_Devices);
   // Allocate a temporary JsonDocument
   JsonDocument doc;
@@ -585,31 +612,24 @@ void SaveVictronConfiguration(int FS, const char* filename, _sMyVictronDevices& 
 
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
-    Serial.println(F("JSON: Failed to write to Victron SD file"));
+    Serial.println(F("JSON: Failed to write to Victron file"));
   }
   // Close the file, //but print serial as a check
   file.close();
-  if (FS==0){SD_CS(HIGH);}
+ if (&fs == &SD) { SD_CS(HIGH); }
   PrintJsonFile("Check after Saving configuration ", filename);
 }
-void SaveDisplayConfiguration(int FS, const char* filename, _MyColors& set) {
+void SaveDisplayConfiguration(fs::FS &fs, const char* filename, _MyColors& set) {
   // Delete existing file, otherwise the configuration is appended to the file
   //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   char buff[15];
   File file;
-  if (FS==0) {if (!hasSD){SD_CS(HIGH);return;}
-  SD_CS(LOW);
-  SD.remove(filename);
+  if (&fs == &SD) { SD_CS(LOW); }
+  fs.remove(filename);
     // Open file for writing
-  file = SD.open(filename, FILE_WRITE);
- }
-  if (FS==1) {
-    if (!hasFATS) {return;}
-  FFat.remove(filename);
-  // Open file for writing
-  file = FFat.open(filename, FILE_WRITE);
- }
-  if (!file) { Serial.println(F("JSON: Failed to create SD file"));SD_CS(HIGH);return;}
+  file = fs.open(filename, FILE_WRITE);
+
+  if (!file) { Serial.println(F("JSON: Failed to create file"));if (&fs == &SD) { SD_CS(HIGH); }return;}
 
   // Allocate a temporary JsonDocument
   JsonDocument doc;
@@ -637,38 +657,26 @@ void SaveDisplayConfiguration(int FS, const char* filename, _MyColors& set) {
   doc["Frame"] = set.Frame True_False;
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
-    Serial.println(F("JSON: Failed to write to SD file"));
+    Serial.println(F("JSON: Failed to write to file"));
   }
   // Close the file, but print serial as a check
   file.close();
-  if (FS==0){SD_CS(HIGH);}
+  if (&fs == &SD) { SD_CS(HIGH); }
   PrintJsonFile("Check after Saving configuration ", filename);
 }
-bool LoadDisplayConfiguration(int FS,const char* filename, _MyColors& set) {
+bool LoadDisplayConfiguration(fs::FS &fs,const char* filename, _MyColors& set) {
   // Openfile for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
   File file;
-  if(FS==0){if (!hasSD){return false;}
-    SD_CS(LOW);
-    if (!SDexists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
-    file = SD.open(filename, FILE_READ);
-  }
-   if(FS==1){if (!hasFATS){return false;}
-    if (!FFat.exists(filename)) {Serial.printf(" Json Victron file %s did not exist\n Using defaults\n", filename);fault = true;}
-    file = FFat.open(filename, FILE_READ);
-   }
-  
-  if (!file) {
-    Serial.println(F("**Failed to read JSON file"));
-  }
+  if (&fs == &SD) { SD_CS(LOW); }
+  file = fs.open(filename, FILE_READ);
+  if (!file) {Serial.println(F("**Failed to read JSON file"));fault = true; }
   // Allocate a temporary JsonDocument
   char temp[15];
   JsonDocument doc;
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
-  if (error) {
-    Serial.println(F("**Failed to deserialise JSON file"));
-  }
+  if (error) {Serial.println(F("**Failed to deserialise JSON file"));fault = true;}
   // gett here means we can set defaults, regardless!
 
   set.TextColor = doc["TextColor"] | BLACK;
@@ -691,49 +699,24 @@ bool LoadDisplayConfiguration(int FS,const char* filename, _MyColors& set) {
   set.ShowRawDecryptedDataFor = doc["ShowRawDecryptedDataFor"] | 1;
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
-  SD_CS(HIGH);
-  if (!error) { return true; }
-  return false;
+  if (&fs == &SD) { SD_CS(HIGH); }
+  return !fault;
 }
 
-bool LoadConfiguration(int FS,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
-  // Open SD file for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
+bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
+  // Open file from fs for reading  //Active filesystems are:  SD: SD-Card  FFat: Flash/FFat .
   // Allocate a temporary JsonDocument
+  bool fault = false;
   char temp[15];
   JsonDocument doc;
   File file;
-  if(FS==0){ SD_CS(LOW);
-    if (!SDexists(filename)) { Serial.printf("**JSON file %s did not exist on FATS\n Using defaults\n", filename);
-        SD_CS(HIGH); return false;
-     }
-    file = SD.open(filename, FILE_READ);
-    if (!file) {
-     Serial.println(F("**Failed to read JSON file"));
-     SD_CS(HIGH);
-      return false;
-    }
-      
-    }
-  if(FS==1){
-    if (!FFat.exists(filename)) {
-     Serial.printf("**JSON file %s did not exist on FATS\n Using defaults\n", filename);
-     return false;
-    }
-  file = FFat.open(filename, FILE_READ);
-    if (!file) {
-     Serial.println(F("**Failed to read JSON file"));
-     return false;
-    }
-  }
+  if (&fs == &SD) { SD_CS(LOW); }
+  file = fs.open(filename, FILE_READ);
+  if (!file) {Serial.println(F("**Failed to read CONFIGURATION JSON file"));fault = true;}
   DeserializationError error = deserializeJson(doc, file);
-  if (error) {
-    Serial.println(F("**Failed to deserialise JSON file"));
-    return false;
-    }
-
-
+  if (error) {Serial.println(F("**Failed to deserialise JSON file"));fault=true;}
   // Copy values (or defaults) from the JsonDocument to the config / settings
-  if (doc["Start_Page"] == 0) { return false; }  //secondary backup in case the file is present (passes error) but zeroed!
+  //if (doc["Start_Page"] == 0) { return false; }  //secondary backup in case the file is present (passes error) but zeroed!
   config.LocalTimeOffset = doc["LocalTimeOffset"] | 0;
   config.Start_Page = doc["Start_Page"] | 4;  // 4 is default page int - no problem...
   strlcpy(temp, doc["Mag_Var"] | "1.15", sizeof(temp));
@@ -750,9 +733,7 @@ bool LoadConfiguration(int FS,const char* filename, _sDisplay_Config& config, _s
           doc["APpassword"] | "12345678",  // <- and default in case Json is corrupt / missing !
           sizeof(config.APpassword));
 
-  // only change settings if we have read the file! else we will use the EEPROM settings
-  if (!error) {
-    strlcpy(settings.ssid,                 // <- destination
+  strlcpy(settings.ssid,                 // <- destination
             doc["ssid"] | "GuestBoat",     // <- source and default in case Json is corrupt!
             sizeof(settings.ssid));        // <- destination's capacity
     strlcpy(settings.password,             // <- destination
@@ -776,94 +757,76 @@ bool LoadConfiguration(int FS,const char* filename, _sDisplay_Config& config, _s
     strlcpy(temp, doc["NMEALOG"] | "false", sizeof(temp));
     settings.NMEA_log_ON = (strcmp(temp, "false"));
     settings.log_interval_setting = doc["LogInterval"] | 60;
-  }
-
+  
   strlcpy(temp, doc["BLE_enable"] | "false", sizeof(temp));
   settings.BLE_enable = (strcmp(temp, "false"));
-
-
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
-  if(FS==0){SD_CS(HIGH);}
-  if (!error) { return true; }
-  return false;
+   if (&fs == &SD) { SD_CS(HIGH); }
+  //if (!error) { return true; }
+  return !fault;
 }
-void SaveConfiguration(int FS, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
-  // Delete existing file, otherwise the configuration is appended to the file
-  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
+void SaveConfiguration(fs::FS &fs, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
+  // Save  file to fs   //Active filesystems are:  SD: SD-Card  FFat: Flash/FFat .
+ // need to work with SD some time 
+ //if (((&fs == &SD)&&(hasSD)) || ((&fs == &FFat)&&(hasFATS))) {
   char buff[15];
   File file;
-  if (FS == 0) {
-    if (!hasSD) {
-      SD_CS(HIGH);
-      return;
-    }
-    SD_CS(LOW);
-    SD.remove(filename);
+    if (&fs == &SD) { SD_CS(LOW); }
+    fs.remove(filename);
     // Open file for writing
-    file = SD.open(filename, FILE_WRITE);
-  }
-  if (FS == 1) {
-    if (!hasFATS) { return; }
-    FFat.remove(filename);
-    // Open file for writing
-    file = FFat.open(filename, FILE_WRITE);
-  }
-  if (!file) {
-    Serial.println(F("JSON: Failed to create SD file"));
-    if (FS == 0) { SD_CS(HIGH); }
-    return;
-  }
+    file = fs.open(filename, FILE_WRITE);
+
+  if (!file) { Serial.println(F("JSON: Failed to create file")); if (&fs == &SD) { SD_CS(HIGH); } return; }
   // Allocate a temporary JsonDocument
   JsonDocument doc;
   // Set the values in the JSON file.. // NOT ALL ARE read yet!!
-  //modify how the display works
-  doc["Start_Page"] = config.Start_Page;
-  doc["LocalTimeOffset"] = config.LocalTimeOffset;
-  Serial.print("save magvar:");
-  Serial.printf("%5.3f", BoatData.Variation);
-  snprintf(buff, sizeof(buff), "%5.3f", BoatData.Variation);
-  doc["Mag_Var"] = buff;
-  doc["PanelName"] = config.PanelName;
-  doc["APpassword"] = config.APpassword;
-
-
-
-  //now the settings WIFI etc..
+    //now the settings WIFI etc..
+  doc["WIFI"] = "WIFI  settings and sources";
   doc["ssid"] = settings.ssid;
   doc["password"] = settings.password;
   doc["UDP_PORT"] = settings.UDP_PORT;
+  doc["PanelName"] = config.PanelName;
+  doc["APpassword"] = config.APpassword;
   doc["Serial"] = settings.Serial_on True_False;
   doc["UDP"] = settings.UDP_ON True_False;
   doc["ESP"] = settings.ESP_NOW_ON True_False;
   doc["N2K"] = settings.N2K_ON True_False;
-  doc["LogComments0"] = "LOG saves read data in file with date as name- BUT only when GPS date has been seen!";
+  Serial.print("save magvar:");
+  Serial.printf("%5.3f", BoatData.Variation);
+  snprintf(buff, sizeof(buff), "%5.3f", BoatData.Variation);
+  doc["Mag_Var"] = buff;
+  //modify how the display works
+  doc["Display Set"] = "set Default Start Page and (if 4) what is shown on the 'quad' display";
+  doc["Start_Page"] = config.Start_Page;
+  doc["LocalTimeOffset"] = config.LocalTimeOffset;
+  doc["Options "] = "options are : SOG SOGGRAPH STW STWGRAPH GPS DEPTH DGRAPH DGRAPH2 ";
+  doc["options cont."] = "DGRAPH  and DGRAPH2 display 10 and 30 m ranges respectively";
+  doc["FourWayBR"] = config.FourWayBR;
+  doc["FourWayBL"] = config.FourWayBL;
+  doc["time display option"] = "Top row right can be WIND or TIME (UTC) or TIMEL (LOCAL)";
+  doc["FourWayTR"] = config.FourWayTR;
+  doc["FourWayTL"] = config.FourWayTL;
+
+  doc["LogComments0"] = "LOG saves read data in SD file with date as name- BUT only when GPS date has been seen!";
   doc["LogComments1"] = "NMEALOG saves every message. Use NMEALOG only for debugging!";
   doc["LogComments2"] = "or the NMEALOG files will become huge";
   doc["LOG"] = settings.Log_ON True_False;
   doc["LogInterval"] = settings.log_interval_setting;
   doc["NMEALOG"] = settings.NMEA_log_ON True_False;
-  doc["DisplayComment1"] = "These settings allow modification of the bottom two 'quad' displays";
-  doc["DisplayComment2"] = "options are : SOG SOGGRAPH STW STWGRAPH GPS DEPTH DGRAPH DGRAPH2 ";
-  doc["DisplayComment3"] = "DGRAPH  and DGRAPH2 display 10 and 30 m ranges respectively";
-  doc["FourWayBR"] = config.FourWayBR;
-  doc["FourWayBL"] = config.FourWayBL;
-  doc["DisplayComment4"] = "Top row right can be WIND or TIME (UTC) or TIMEL (LOCAL)";
-  doc["FourWayTR"] = config.FourWayTR;
-  doc["FourWayTL"] = config.FourWayTL;
 
-  doc["_comment_"] = "These settings below apply only to Victron display pages";
+  doc["BLE - Victron _comment_"] = "These settings below apply only to Victron display pages (-87,-86)";
   doc["BLE_enable"] = settings.BLE_enable True_False;
 
 
 
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
-    Serial.println(F("JSON: Failed to write to SD file"));
+    Serial.println(F("JSON: Failed to write to file"));
   }
   // Close the file, but print serial as a check
   file.close();
-  if (FS == 0) { SD_CS(HIGH); }
+  if (&fs == &SD) { SD_CS(HIGH); }
   PrintJsonFile("Check after Saving configuration ", filename);
 }
 
@@ -1271,17 +1234,13 @@ void ConnectWiFiusingCurrentSettings() {
   // all Serial prints etc are now inside ScanAndConnect 'TRUE' will display them.
 }
 void Setup_expander(int SDA,int SCL, int beepPin){
+  #ifdef ExpanderSDA
  Wire.begin(SDA,SCL);
   expander.portMode(ALLOUTPUT);  //Set the port as all output
-  //Serial.println("Confirm expander connected via  Beep ");
-  expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
-  delay(50);
-  expander.digitalWrite(beepPin, LOW);  //Buzzer off!
-  delay(150);
-  expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
-  delay(50);
-  expander.digitalWrite(beepPin, LOW);  //Buzzer off!
-  delay(150);
+  Serial.println("Confirm expander connected via double Beep ");
+  beep(2, beepPin);
+  #endif
+
 }
 
 void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
@@ -1319,12 +1278,14 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
 
 
 void SD_CS( bool state){
+  #ifdef ExpanderSDA
   if (!hasSD) {return;}
   if (SDCS == -1){  //SDCS set -1 for Wavshare which uses using Expander for SD_CS .
   static bool laststate;
   if (laststate != state) {expander.digitalWrite(EX104,state);delay(1);}//Serial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  Serial.printf("  Setting SD_CS state: %i\n", state); }
   laststate=state;
   }
+  #endif
 
 }
 bool SDexists(const char* path) {  //SD_CS to be done before this is called ! (equivalent to SD_MMC . Exists() function )
@@ -1341,6 +1302,7 @@ void timeupdate() {
   }
 }
 void FindI2CDevices(String text){
+  #ifdef ExpanderSDA
   Serial.println(text);
   for (int i=0 ;i<256;i++) {
   Wire.beginTransmission(i);
@@ -1348,6 +1310,7 @@ void FindI2CDevices(String text){
      Serial.printf("Device detected at %x(hex)  %i(dec) ",i,i);Serial.println("");delay(10);
     } 
   }
+  #endif
 }
 bool Touchsetup(){ // look for 0x5d and setup 
   bool result=false;
@@ -1355,6 +1318,7 @@ bool Touchsetup(){ // look for 0x5d and setup
   //FindI2CDevices("- List I2C DEVICES-");delay(200);// for development testing
     //gt911 initialization, must be added, otherwise the touch screen will not be recognized  
   //initialization begin
+  #ifdef ExpanderSDA
   expander.digitalWrite(EX101,HIGH);expander.digitalWrite(EX102,HIGH);expander.digitalWrite(EX104,HIGH);
   pinMode(TOUCH_INT, OUTPUT); //
   digitalWrite(TOUCH_INT, LOW);                          // Step 1 LOW =set to  I2C address 0x5D
@@ -1366,8 +1330,9 @@ bool Touchsetup(){ // look for 0x5d and setup
     pinMode(TOUCH_INT, INPUT);                             // Step 4: Float INT pin (input mode)
   // Step 5: Wait for GT911 to boot
     delay(100);  // 5–10 ms
+  #endif  
     //initialization end
-  Serial.print("\n Checking for Touch chip at I2C address 0x5D: ..");
+  Serial.print("Checking for Touch chip at I2C address 0x5D: ");
   Wire.beginTransmission(0x5D);
   byte error = Wire.endTransmission();
   if (error == 0) {result=true;
@@ -1392,8 +1357,7 @@ bool Touchsetup(){ // look for 0x5d and setup
     ts.begin();
     ts.setRotation(ROTATION_INVERTED);
  }
-
-  return result;
+ return result;
 }
   void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi sources in sequence
     static unsigned long MAXScanInterval;

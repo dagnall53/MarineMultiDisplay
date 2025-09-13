@@ -145,7 +145,7 @@ void keyboard(int type) {
  static int lasttype;
  int oldsize;
  //Serial.printf(" setup keyboard %i  was%i \n",type,lasttype);
-  if (type == -1){lasttype=6; return;} // silly number to reset things
+  if (type == -1){lasttype=6; return;} // silly number to just reset static lasttype variable
   if (lasttype == type) {return;} // redraws only if keys change
   caps=type;
   Serial.printf("\n*** Start keyboard type %i  last type%i \n",type,lasttype);

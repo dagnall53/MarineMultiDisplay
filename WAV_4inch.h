@@ -88,7 +88,7 @@ to get serial.print working
 #define SDCS  -1 // NOTE not SD_CS, which is a function! is port ex104  ?? Not called up?? 
 
 //** 12/08/2025 ... not working!! touch interface **************************
-//#include <TAMC_GT911.h>
+
 
 #define TOUCH_INT 16          // 16
 #define TOUCH_RST -1          // EX101 will reset it at the start ?
