@@ -10,7 +10,7 @@ powershell -Command "(New-Object Net.WebClient).DownloadFile('https://dagnall53.
 
 powershell -Command "(New-Object Net.WebClient).DownloadFile('https://dagnall53.github.io/MarineMultiDisplay/build/esp32.esp32.esp32s3/MarineMultiDisplay.ino.bin', 'MarineMultiDisplay.ino.bin')"
 
-esptool.exe --chip esp32s3 --port COM%NUM% --baud 921600  --before default_reset --after hard_reset write_flash  -z --flash_mode dio --flash_freq 80m --flash_size 16MB 0x0 MarineMultiDisplay.ino.bootloader.bin 0x8000 MarineMultiDisplay.ino.partitions.bin 0xe000 boot_app0.bin 0x10000 MarineMultiDisplay.ino.bin  
+esptool.exe --chip esp32s3 --port COM%NUM% --baud 921600  --before default_reset --after hard_reset write_flash -e -z --flash_mode dio --flash_freq 80m --flash_size 16MB 0x0 MarineMultiDisplay.ino.bootloader.bin 0x8000 MarineMultiDisplay.ino.partitions.bin 0xe000 boot_app0.bin 0x10000 MarineMultiDisplay.ino.bin  
 
 echo " I will now delete all files copied here for the programming"
 del  MarineMultiDisplay.ino.bootloader.bin  >nul 2>&1

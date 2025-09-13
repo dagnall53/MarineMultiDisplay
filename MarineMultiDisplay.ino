@@ -5,13 +5,22 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = "VERSION 0.02";
+const char soft_version[] = "VERSION 0.03";
 
 
-#define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare module boards!
-#define ESP32_CAN_RX_PIN GPIO_NUM_0  // for the waveshare module boards!
-// #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on 8 way connector boards!
-// #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on 8 way connector boards!
+
+
+#define WAVSHARE
+
+
+// must be before NmeA2000 library initiates!
+#ifdef WAVSHARE 
+  #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare module boards!
+  #define ESP32_CAN_RX_PIN GPIO_NUM_0  // for the waveshare module boards!
+#else
+ #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
+ #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
+#endif
 
 #include "N2kMsg.h"
 #include "NMEA2000.h"
@@ -24,7 +33,7 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 //Include libraries..
 #include <WiFi.h>
 #include <WiFiUdp.h>
-
+#include <Wire.h>     // Load the Wire Library
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation'
@@ -32,6 +41,12 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 #include <ArduinoJson.h>
 #include <SD.h>       // was SD.h  // pins set in 4inch.h
 
+//*********** DISPLAY selector *************
+#ifdef WAVSHARE 
+  #include "WAV_4inch.h"  
+#else
+  #include "GUIT_4inch.h"
+#endif
 
 #include <TAMC_GT911.h>
 
@@ -84,13 +99,12 @@ extern bool HaltOtherOperations;
 #include "Display.h"
 //*********** for keyboard*************
 #include "Keyboard.h"
-//*********** DISPLAY selector *************
-#include "WAV_4inch.h"  // 
-//#include "GUIT_4inch.h"
+
+
 
     // Load the PCA9554 Library 
 #ifdef ExpanderSDA  
-  #include <Wire.h>     // Load the Wire Library
+
   #include <PCA9554.h>     // Load the PCA9554 Library
   PCA9554 expander(0x20);  // Create an expander object at this expander address
 #endif
@@ -263,11 +277,12 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting NMEA Display ");
   Serial.println(soft_version);
-    Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
+  Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
   //FindI2CDevices( "LISTING I2C devices"); delay(500);
   SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
-  if (TestFATSPartition() && TestFATSFormatted()) {
-    Serial.println("FATFs should be ok");
+  if (TestFATSPartition() ) {
+    TestFATSFormatted();
+    //Serial.println("FATFs should be ok");
   Fatfs_Setup();}  // set up FATFS
 
   delay(100);
@@ -1234,8 +1249,8 @@ void ConnectWiFiusingCurrentSettings() {
   // all Serial prints etc are now inside ScanAndConnect 'TRUE' will display them.
 }
 void Setup_expander(int SDA,int SCL, int beepPin){
+  Wire.begin(SDA,SCL);
   #ifdef ExpanderSDA
- Wire.begin(SDA,SCL);
   expander.portMode(ALLOUTPUT);  //Set the port as all output
   Serial.println("Confirm expander connected via double Beep ");
   beep(2, beepPin);
@@ -1302,15 +1317,12 @@ void timeupdate() {
   }
 }
 void FindI2CDevices(String text){
-  #ifdef ExpanderSDA
-  Serial.println(text);
+   Serial.println(text);
   for (int i=0 ;i<256;i++) {
   Wire.beginTransmission(i);
   if (Wire.endTransmission() == 0) {
-     Serial.printf("Device detected at %x(hex)  %i(dec) ",i,i);Serial.println("");delay(10);
+     Serial.printf("Device detected at %x(hex)  %i(dec) \n",i,i);delay(10);
     } 
-  }
-  #endif
 }
 bool Touchsetup(){ // look for 0x5d and setup 
   bool result=false;
@@ -1318,7 +1330,9 @@ bool Touchsetup(){ // look for 0x5d and setup
   //FindI2CDevices("- List I2C DEVICES-");delay(200);// for development testing
     //gt911 initialization, must be added, otherwise the touch screen will not be recognized  
   //initialization begin
+  Serial.println("Setting up Touch device ");
   #ifdef ExpanderSDA
+  Serial.println("Using Expander Port Reset sequence");
   expander.digitalWrite(EX101,HIGH);expander.digitalWrite(EX102,HIGH);expander.digitalWrite(EX104,HIGH);
   pinMode(TOUCH_INT, OUTPUT); //
   digitalWrite(TOUCH_INT, LOW);                          // Step 1 LOW =set to  I2C address 0x5D
