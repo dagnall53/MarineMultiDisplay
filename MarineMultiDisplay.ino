@@ -1323,10 +1323,11 @@ void FindI2CDevices(String text){
   if (Wire.endTransmission() == 0) {
      Serial.printf("Device detected at %x(hex)  %i(dec) \n",i,i);delay(10);
     } 
+  }
 }
 bool Touchsetup(){ // look for 0x5d and setup 
   bool result=false;
-  // is already started ! using Expander pin definition in setup() Wire.begin(TOUCH_SDA,TOUCH_SCL);                         // start the wire interface 
+  //// start the wire interface  //is already started ! using Expander pin definition in setup() Wire.begin(TOUCH_SDA,TOUCH_SCL);                         
   //FindI2CDevices("- List I2C DEVICES-");delay(200);// for development testing
     //gt911 initialization, must be added, otherwise the touch screen will not be recognized  
   //initialization begin
