@@ -20,18 +20,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-  Have a FAT Formatted SD Card connected to the SPI port of the ESP8266
-  The web root is the SD Card root folder
-  File extensions with more than 3 charecters are not supported by the SD Library
-  File Names longer than 8 charecters will be truncated by the SD library, so keep filenames shorter
-  index.htm is the default index (works on subfolders as well)
-
-  upload the contents of SdRoot to the root of the SD.card and access the editor by going to 
-  http://nmeadisplay.local/edit
-  To retrieve the contents of SD.card, visit http://nmeadisplay.local/list?dir=/
-      dir is the argument that needs to be passed to the function PrintDirectory via HTTP Get request.
-  NB  in my version nmeadisplay is settable in the config.txt, so you may need to access 192.168.4.1 if accessing the AP.. 
-
+  
 */
 
 
@@ -189,7 +178,24 @@ String html_startws() {
   st += String(Display_Config.PanelName);
   st += ".local:8080'> File Editor</a></h1><br>"
         "<div class='version'>Saved Log files on SD </div>";
-  
+        SD_CS(LOW);
+  File dir = SD.open("/logs");
+  for (int cnt = 0; true; ++cnt) {
+    File entry = dir.openNextFile();
+    Serial.println(entry.path());
+    if (!entry) { break; }
+    filename = String(entry.path());
+    st += "<h1 ><a class='button-linkSmall' href='http://";
+    st += String(Display_Config.PanelName);
+    st += ".local";
+    st += filename;
+    st += "'> ";
+    st += " View ";
+    st += filename;
+    st += "</a></h1>";
+    entry.close();
+  }
+  SD_CS(HIGH);
   st += "</body></html> ";
   return st;
 }

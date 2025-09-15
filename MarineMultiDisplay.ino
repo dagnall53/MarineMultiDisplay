@@ -5,7 +5,7 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = "MMD WAVSHARE 4' V0.04";
+const char soft_version[] = "MMD WAVSHARE 4' V0.05";
 
 
 
@@ -252,32 +252,6 @@ void SDList(char* msg){
 }
 
 
-// bool _debug;
-// void setup2() {  // use this while sorting out any changes to setup - order etc. eg how to reliably (?) start the SD card etc
-//   Init_GFX(); //MUST BE BEFORE SD SETUPS ! Somehow corrupts them 
-//   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
-//   SD_Setup(SD_SCK, SD_MISO, SD_MOSI, SDCS);  // set up SD card (for logs etc)
-//   Fatfs_Setup();
-//   listDir(FFat, "/", 1);
-
-//   if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
-//     DEBUG_PORT.println("USING FATS JSON for config settings");}else {
-//     DEBUG_PORT.println("SAVING DEFAULT config on FATFS ");
-//     SaveConfiguration(FFat, Setupfilename, Default_JSON, Default_Settings_JSON);
-//   }
-//   ConnectWiFiusingCurrentSettings();
-//   SetupWebstuff();
-//   setupFilemanager();
-//   delay(100);
-//   Touch_available = Touchsetup();if (Touch_available) { DEBUG_PORT.println("TOUCH setup OK");}else{DEBUG_PORT.println("* NO TOUCH");}
-//  // delay(100);
-//   InitNMEA2000();
-//   keyboard(-1);  //just reset keyboard's static variables
-
-
-//   SDList("Last in setup()");
-//   delay(1000);
-// }
 
 void setup() {
   // the real setup  NOTE I had lots of trouble getting SD and serial to work 
@@ -289,18 +263,15 @@ void setup() {
 
   DEBUG_PORT.print("Starting NMEA Display");
   DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
+  Serial.println(F(" Using Serial.print "));
   Serial0.println(F(" Using Serial0.print "));
   DEBUG_PORT.println(soft_version);
-  Init_GFX(); // must be before SD setup 
+  Init_GFX(); // must be before SD setup (at least for Guitron) 
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
-  //FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices scanI2CMatrix();
+  if (TestFATSPartition()) {// TestFATSFormatted();//DEBUG_PORT.println("FATFs should be ok");
+    Fatfs_Setup(); }  // set up FATFS
   SD_Setup(SD_SCK, SD_MISO, SD_MOSI, SDCS);  // NOTE SDCS not SD_CS, which is a function! set up SD card (for logs etc)
-  //listDir(SD, "/", 1);
-  if (TestFATSPartition()) {
-    TestFATSFormatted();
-    //DEBUG_PORT.println("FATFs should be ok");
-    Fatfs_Setup();
-  }  // set up FATFS
+    // FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices   scanI2CMatrix();
   delay(10);
   Touch_available = Touchsetup();if (Touch_available) { DEBUG_PORT.println("TOUCH setup OK");}else{DEBUG_PORT.println("* NO TOUCH");}
   delay(10);
@@ -374,37 +345,14 @@ void loop() {
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchTimer;
-  // if (_debug) {
-  //   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
-  //   filemgr.handleClient();
-  //   if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  // repeat trying to start WIfi connections at intervals to check..
-  //     SSIDSearchTimer = millis() + scansearchinterval;                          //
-  //     if (StationsConnectedtomyAP == 0) {                                       // avoid scanning if we have someone connected to AP as it will/may disconnect!
-  //       ScanAndConnect(true);}  // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared 
-  //    }
-  //   delay(1);
-  //   // if(Touch_available){ts.read();
-  //   //   if ((ts.isTouched)) {DEBUG_PORT.printf(" Pressure test %i  %i %i \n",ts.points[0].size,ts.points[0].x, ts.points[0].y);
-  //   //   SDList("In loop ()");}
-  //   //   //else {DEBUG_PORT.printf("."); }
-  //   //   }
-  //      if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }
-  //   Display(Display_Page);
-  //   return;
-  // }
 
-  // if(millis()>= DebugInterval){
-  // DEBUG_PORT.printf("%4.2f FreeHeap: %d ",((float)millis())/1000, ESP.getFreeHeap());
-  // DEBUG_PORT.printf("StackHWM: %d\n", uxTaskGetStackHighWaterMark(NULL));
-  //  DebugInterval= millis()+1000;
-  // }
   delay(1);
-  SD_CS("LOW");
+  //SD_CS("LOW");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
                           // SD_CS("HIGH");
   if (!HaltOtherOperations) {
     filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
-    SD_CS("HIGH");
+//    SD_CS("HIGH");
     if(Touch_available){ts.read();}
     EXTHeartbeat();
     CheckAndUseInputs();
@@ -437,10 +385,19 @@ void loop() {
 // Can place functions after Setup and Loop only in ino
 
 void Init_GFX() {
-#ifndef WAVSHARE
- pinMode(GFX_BL, OUTPUT);DEBUG_PORT.println("GFX_BL setting");
- digitalWrite(GFX_BL, HIGH);
-#endif
+  DEBUG_PORT.println("Graphics Initialization ...");
+  #ifdef WAVSHARE
+  DEBUG_PORT.println("Using Expander Port Reset sequence");
+  expander.digitalWrite(EX103, LOW);
+  delay(100);
+   expander.digitalWrite(EX103, HIGH);  // Step 3: Release RST HIGH while keeping INT LOW
+  delay(1);             
+  #endif
+
+ #ifdef GFX_BL
+  pinMode(GFX_BL, OUTPUT);DEBUG_PORT.println("GFX_BL setting");
+  digitalWrite(GFX_BL, HIGH);
+ #endif
   // Init Display
   gfx->begin();
   //if GFX> 1.3.1 try and do this as the invert colours write 21h or 20h to 0Dh has been lost from the structure!
@@ -1338,7 +1295,7 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
   SPI.begin(SPISCK, SPIMISO, SPIMOSI);
   #ifdef WAVSHARE
   DEBUG_PORT.println("SD Card START.. Wavshare with expander CS");
-    SD_CS(LOW);
+    SD_CS(HIGH);SD_CS(LOW);delay(10);
     if (!SD.begin()) {
     DEBUG_PORT.println("   Card Mount Failed");
     hasSD = false;
@@ -1469,11 +1426,11 @@ bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
   pinMode(TOUCH_INT, OUTPUT);    //
   digitalWrite(TOUCH_INT, LOW);  // Step 1 LOW =set to  I2C address 0x5D
   delay(100);
-  expander.digitalWrite(EX103, LOW);
+ // expander.digitalWrite(EX103, LOW);
   expander.digitalWrite(EX101, LOW);  // Step 2: Pull RST LOW to begin reset
   delay(100);
   expander.digitalWrite(EX101, HIGH);
-  expander.digitalWrite(EX103, HIGH);  // Step 3: Release RST HIGH while keeping INT LOW
+ // expander.digitalWrite(EX103, HIGH);  // Step 3: Release RST HIGH while keeping INT LOW
   delayMicroseconds(100);              // ≥100 µs
   pinMode(TOUCH_INT, INPUT);           // Step 4: Float INT pin (input mode)
                                        // Step 5: Wait for GT911 to boot
@@ -1660,15 +1617,24 @@ bool Test_U() {  // check if udp packet (UDP is sent in lines..) has arrived
 
 //*************** list dir..
 void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+  #ifdef WAVSHARE
+  SD_CS(LOW);
+  #endif
     DEBUG_PORT.printf("Listing directory: %s\n", dirname);
 
     File root = fs.open(dirname);
     if(!root){
         DEBUG_PORT.println("Failed to open directory");
+  #ifdef WAVSHARE
+  SD_CS(HIGH);
+  #endif
         return;
     }
     if(!root.isDirectory()){
         DEBUG_PORT.println("Not a directory");
+  #ifdef WAVSHARE
+  SD_CS(HIGH);
+  #endif
         return;
     }
 
@@ -1688,6 +1654,9 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
         }
         file = root.openNextFile();
     }
+  #ifdef WAVSHARE
+  SD_CS(HIGH);
+  #endif
 }
 
 void beep(int num, int beepPin) {
