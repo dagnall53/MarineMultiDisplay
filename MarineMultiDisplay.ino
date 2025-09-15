@@ -5,7 +5,7 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = "VERSION 0.03";
+const char soft_version[] = "MMD WAVSHARE 4' V0.04";
 
 
 
@@ -22,6 +22,17 @@ const char soft_version[] = "VERSION 0.03";
  #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
 #endif
 
+#include "debug_port.h"
+
+// Serial port is differently exposed on the two boards, making serial. print not compatible, and debug hard!
+// #ifdef WAVSHARE
+// #define DEBUG_PORT Serial
+// #else
+// #define DEBUG_PORT Serial0
+// #endif
+
+
+
 #include "N2kMsg.h"
 #include "NMEA2000.h"
 #include <NMEA2000_esp32xx.h>
@@ -33,28 +44,33 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 //Include libraries..
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <Wire.h>     // Load the Wire Library
+#include <Wire.h>  // Load the Wire Library
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation'
 #include <EEPROM.h>
 #include <ArduinoJson.h>
-#include <SD.h>       // was SD.h  // pins set in 4inch.h
+#include <SD.h>  // was SD.h  // pins set in 4inch.h
 
 //*********** DISPLAY selector *************
-#ifdef WAVSHARE 
-  #include "WAV_4inch.h"  
+#ifdef WAVSHARE
+#include "WAV_4inch.h"
 #else
-  #include "GUIT_4inch.h"
+#include "GUIT_4inch.h"
 #endif
+
 
 #include <TAMC_GT911.h>
 
 // some wifi stuff
-IPAddress gateway(0, 0, 0, 0);             // the IP address for Gateway in Station mode
-IPAddress subnet(0, 0, 0, 0);              // the SubNet Mask in Station mode
-IPAddress Null_ip(0, 0, 0, 0);             //  A null IP address for the gateway
-IPAddress ap_ip(192, 168, 4, 1);           // the IP address in AP mode. Default and can be changed!
+IPAddress gateway(0, 0, 0, 0);    // the IP address for Gateway in Station mode
+IPAddress subnet(0, 0, 0, 0);     // the SubNet Mask in Station mode
+IPAddress Null_ip(0, 0, 0, 0);    //  A null IP address for the gateway
+IPAddress ap_ip(192, 168, 4, 1);  // the IP address in AP mode. Default and can be changed!
+//These added in part to try and send data UDP when Serial is not working, for debug
+IPAddress udp_ap(0, 0, 0, 0);  // the IP address to send UDP data (AP mode)
+IPAddress udp_st(0, 0, 0, 0);  // the IP address to send UDP data (station mode)
+
 const IPAddress sub255(255, 255, 255, 0);  // the default Subnet Mask in in SoftAP mode
 
 boolean IsConnected = false;  // may be used in AP_AND_STA to flag connection success (got IP)
@@ -65,7 +81,7 @@ WiFiUDP Udp;
 char nmea_1[BufferLength];    //serial 0183
 char nmea_U[BufferLength];    // NMEA buffer for UDP input port
 char nmea_EXT[BufferLength];  // buffer for ESP_now received data
-// N2K operates via interruts and there are no '0183 version of the N2K messages 
+// N2K operates via interruts and there are no '0183 version of the N2K messages
 
 bool EspNowIsRunning = false;
 char* pTOKEN;
@@ -84,17 +100,19 @@ const word filemanagerport = 8080;
 ESPFMfGK filemgr(filemanagerport);
 
 #include <FFat.h>  // plan to use FATFS for local files
+const esp_partition_t* ffat_partition = esp_partition_find_first(
+  ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);// helps find if we have a fats 
 
-bool hasSD, hasFATS,Touch_available;
+bool hasSD, hasFATS, Touch_available;
 
 
 // my sub files
 
 #include "ESP_NOW_files.h"
-#include "OTA.h" // and root webpage
+#include "OTA.h"  // and root webpage
 extern bool HaltOtherOperations;
 
-#include "aux_functions.h"  
+#include "aux_functions.h"
 
 #include "Display.h"
 //*********** for keyboard*************
@@ -102,11 +120,11 @@ extern bool HaltOtherOperations;
 
 
 
-    // Load the PCA9554 Library 
-#ifdef ExpanderSDA  
+// Load the PCA9554 Library
+#ifdef WAVSHARE
 
-  #include <PCA9554.h>     // Load the PCA9554 Library
-  PCA9554 expander(0x20);  // Create an expander object at this expander address
+#include <PCA9554.h>     // Load the PCA9554 Library
+PCA9554 expander(0x20);  // Create an expander object at this expander address
 #endif
 // touch sensor
 TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WIDTH, TOUCH_HEIGHT);
@@ -132,6 +150,7 @@ bool dataUpdated;     // flag that Nmea Data has been updated
 //Config.txt holds both Default and Display settings in one file
 const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
 _sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default
+_sDisplay_Config Saved_Display_Config;
 _sDisplay_Config Display_Config;
 _sWiFi_settings_Config Saved_Settings;
 _sWiFi_settings_Config Current_Settings;
@@ -194,7 +213,7 @@ _sButton ThirdRowButton = { 20, 100, 430, 35, 5, WHITE, BLACK, BLUE };
 _sButton FourthRowButton = { 20, 140, 430, 35, 5, WHITE, BLACK, BLUE };
 _sButton FifthRowButton = { 20, 180, 430, 35, 5, WHITE, BLACK, BLUE };
 
-#define sw_width 55
+#define sw_width 65
 //switches at line 180
 _sButton Switch1 = { 20, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
 _sButton Switch2 = { 100, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
@@ -202,12 +221,12 @@ _sButton Switch3 = { 180, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
 _sButton Switch5 = { 260, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
 _sButton Switch4 = { 345, 180, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
 //switches at line 60
-_sButton Switch6 = { 20, 60, sw_width, 35, 5, WHITE, BLACK, BLACK };
-_sButton Switch7 = { 100, 60, sw_width, 35, 5, WHITE, BLACK, BLACK };
-_sButton Switch8 = { 180, 60, sw_width, 35, 5, WHITE, BLACK, BLACK };
-_sButton Switch9 = { 260, 60, sw_width, 35, 5, WHITE, BLACK, BLACK };
-_sButton Switch10 = { 340, 60, sw_width, 35, 5, WHITE, BLACK, BLACK };
-_sButton Switch11 = { 420, 60, sw_width, 35, 5, WHITE, BLACK, BLACK };
+_sButton Switch6 = { 20, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+_sButton Switch7 = { 100, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+_sButton Switch8 = { 180, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+_sButton Switch9 = { 260, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+_sButton Switch10 = { 340, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+_sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
 
 
 _sButton Terminal = { 0, 100, 480, 330, 2, WHITE, BLACK, BLUE };
@@ -226,181 +245,202 @@ _sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // intefere
 
 
 //#include "esp_task_wdt.h"
-
-bool _debug;
-void setup2(){    // use this to sort out how to reliably (?) start the SD card 
-  _debug=true;
-  Serial.begin(115200);
- // Serial.begin(115200, SERIAL_8N1, USBRX_PIN, USBTX_PIN);
-  Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
-    SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
- delay(1000);
-}
-void beep(int num,int beepPin){
-  #ifdef ExpanderSDA
-  for (int i=1 ;i <= num ;i++){
-  expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
-  delay(50);
-  expander.digitalWrite(beepPin, LOW);  //Buzzer off!
-  delay(150);
- }
- delay(300); // allows cadence to differentiate beep4 from beep2 beep2 
- #endif
-}
-
-
 #include "esp_partition.h"
-
-const esp_partition_t* ffat_partition = esp_partition_find_first(
-    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);
-
-bool TestFATSPartition(){
-if (ffat_partition) {
-    Serial.print("FFat partition found.");
-    Serial.printf(" Size: %d bytes\n", ffat_partition->size); return true;} 
-Serial.println("No FFat partition found.");
-    
-return false;
+void SDList(char* msg){
+  DEBUG_PORT.println(msg);
+  listDir(SD, "/", 1);
 }
-bool TestFATSFormatted(){
-  uint8_t sector[512];
-  esp_err_t err = esp_partition_read(ffat_partition, 0, sector, sizeof(sector));
-  if (err == ESP_OK && sector[510] == 0x55 && sector[511] == 0xAA) {
-    Serial.println(" and likely valid FAT filesystem present.");return true;} 
-  Serial.println("No valid FAT signature found.");
-  return false;
-}
+
+
+// bool _debug;
+// void setup2() {  // use this while sorting out any changes to setup - order etc. eg how to reliably (?) start the SD card etc
+//   Init_GFX(); //MUST BE BEFORE SD SETUPS ! Somehow corrupts them 
+//   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
+//   SD_Setup(SD_SCK, SD_MISO, SD_MOSI, SDCS);  // set up SD card (for logs etc)
+//   Fatfs_Setup();
+//   listDir(FFat, "/", 1);
+
+//   if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
+//     DEBUG_PORT.println("USING FATS JSON for config settings");}else {
+//     DEBUG_PORT.println("SAVING DEFAULT config on FATFS ");
+//     SaveConfiguration(FFat, Setupfilename, Default_JSON, Default_Settings_JSON);
+//   }
+//   ConnectWiFiusingCurrentSettings();
+//   SetupWebstuff();
+//   setupFilemanager();
+//   delay(100);
+//   Touch_available = Touchsetup();if (Touch_available) { DEBUG_PORT.println("TOUCH setup OK");}else{DEBUG_PORT.println("* NO TOUCH");}
+//  // delay(100);
+//   InitNMEA2000();
+//   keyboard(-1);  //just reset keyboard's static variables
+
+
+//   SDList("Last in setup()");
+//   delay(1000);
+// }
 
 void setup() {
-  // the real setup  NOTE I had lots of trouble getting SD to initiate and find the SD card , so it is right at the start
-  _debug=false;
+  // the real setup  NOTE I had lots of trouble getting SD and serial to work 
+ // _debug = false;
+  delay(100);
   Serial.begin(115200);
-  Serial.println("Starting NMEA Display ");
-  Serial.println(soft_version);
-  Setup_expander(TOUCH_SDA, TOUCH_SCL, EX106); 
-  //FindI2CDevices( "LISTING I2C devices"); delay(500);
-  SD_Setup(SD_SCK,SD_MISO,SD_MOSI, SDCS);     // set up SD card (for logs etc)
-  if (TestFATSPartition() ) {
+  Serial0.begin(115200);  // If available
+//  if (_debug) {  DEBUG_PORT.print("Using DEBUG (small) startup NMEA Display");   setup2();    return;  }  // break here to try simpler setups
+
+  DEBUG_PORT.print("Starting NMEA Display");
+  DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
+  Serial0.println(F(" Using Serial0.print "));
+  DEBUG_PORT.println(soft_version);
+  Init_GFX(); // must be before SD setup 
+  Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
+  //FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices scanI2CMatrix();
+  SD_Setup(SD_SCK, SD_MISO, SD_MOSI, SDCS);  // NOTE SDCS not SD_CS, which is a function! set up SD card (for logs etc)
+  //listDir(SD, "/", 1);
+  if (TestFATSPartition()) {
     TestFATSFormatted();
-    //Serial.println("FATFs should be ok");
-  Fatfs_Setup();}  // set up FATFS
-
-  delay(100);
-  Touch_available=Touchsetup();
-  delay(100);
+    //DEBUG_PORT.println("FATFs should be ok");
+    Fatfs_Setup();
+  }  // set up FATFS
+  delay(10);
+  Touch_available = Touchsetup();if (Touch_available) { DEBUG_PORT.println("TOUCH setup OK");}else{DEBUG_PORT.println("* NO TOUCH");}
+  delay(10);
   InitNMEA2000();
-
-  WiFi.softAPConfig(ap_ip, Null_ip, sub255);
   keyboard(-1);  //just reset keyboard's static variables
-  Init_GFX();
-  
-  if(hasFATS){gfx->println(F("***  FATFS setup ***"));beep(3,EX106);}else{gfx->println(F("***  NO FATFS ***"));}
-  if(hasSD) {gfx->println(F("***  SD CARD found ***"));beep(3,EX106);}else{gfx->println(F("***  NO SD CARD ***"));}
-  if(Touch_available) {gfx->println(F("***  Touch Sensor ON ***"));beep(4,EX106);}else{gfx->println(F("***  NO Touch Sensor ***"));}
+  if (hasFATS) {
+    gfx->println(F("***  FATFS setup ***"));
+    beep(3, EX106);
+  } else {
+    gfx->println(F("***  NO FATFS ***"));
+  }
+  if (hasSD) {
+    gfx->println(F("***  SD CARD found ***"));
+    beep(3, EX106);
+  } else {
+    gfx->println(F("***  NO SD CARD ***"));
+  }
+  if (Touch_available) {
+    gfx->println(F("***  Touch Sensor ON ***"));
+    beep(4, EX106);
+  } else {
+    gfx->println(F("***  NO Touch Sensor ***"));
+  }
   delay(100);
-  bool FilesOK=true;
-  if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) {
-    Serial.println("USING FATS JSON for wifi and display settings");
-    Display_Page= Display_Config.Start_Page;
-    } 
-    else { FilesOK=false;
-      Display_Page = 4;  //here for clarity?
-      Display_Config = Default_JSON;
-      Current_Settings = Default_Settings_JSON;
-    Serial.println(" USING  defaults for wifi and display settings");
-    SaveConfiguration(FFat,Setupfilename, Default_JSON, Default_Settings_JSON);
-   }
-    if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
-    Serial.println("USING FATS JSON for Victron data settings");
-  } else {FilesOK=false;
-    Serial.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");
+  bool FilesOK = true;
+  if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
+    DEBUG_PORT.println("USING FATS JSON for wifi and display settings");
+    Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
+    Display_Page = Display_Config.Start_Page;
+   } else {
+    FilesOK = false;
+    Display_Page = 4;  //here for clarity?
+    Display_Config = Default_JSON;
+    Current_Settings = Default_Settings_JSON;
+    DEBUG_PORT.println(" USING  defaults for wifi and display settings");
+    SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings);
+  }
+  if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
+    DEBUG_PORT.println("USING FATS JSON for Victron data settings");
+  } else {
+    FilesOK = false;
+    DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");
     Num_Victron_Devices = 6;
     CommonDisplayWIdth = 150;
-    SaveVictronConfiguration(FFat,VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
+    SaveVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
   }
-  if (LoadDisplayConfiguration(FFat,ColorsFilename, ColorSettings)) {
-    Serial.println("USING FATS JSON for Colours data settings");
-  } else {FilesOK=false;
-    Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
-    SaveDisplayConfiguration(FFat,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+  if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
+    DEBUG_PORT.println("USING FATS JSON for Colours data settings");
+  } else {
+    FilesOK = false;
+    DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
+    SaveDisplayConfiguration(FFat, ColorsFilename, ColorSettings);  // should write a default file if it was missing?
   }
-  if (!FilesOK) {beep(1,EX106); Serial.println("Sound to indicate a JSON settings to default ");  }
+  if (!FilesOK) {
+    beep(1, EX106);
+    DEBUG_PORT.println("Sound to indicate a JSON settings to default ");
+  }
   ConnectWiFiusingCurrentSettings();
   SetupWebstuff();
   Udp.begin(atoi(Current_Settings.UDP_PORT));
-  Start_ESP_EXT();  //  Sets esp_now links to the current WiFi.channel etc.
-  BLEsetup();       // setup Victron BLE interface (does not do much!!)
-   Display(true, Display_Page);  // does reset on Display 
+  Start_ESP_EXT();              //  Sets esp_now links to the current WiFi.channel etc.
+  BLEsetup();                   // setup Victron BLE interface (does not do much!!)
+  Display(true, Display_Page);  // does reset on Display
   // once wifi working..
   setupFilemanager();
-  HaltOtherOperations=false;  // token is set only during OTA to avoid other tasks causing problems 
- // esp_task_wdt_reset();  // Reset watchdog if loop completes
+  HaltOtherOperations = false;  // token is set only during OTA to avoid other tasks causing problems
+                                // esp_task_wdt_reset();  // Reset watchdog if loop completes
 }
 
 void loop() {
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
-  static unsigned long SSIDSearchInterval;
-    if (_debug) {delay(100); return;}
-  // if(millis()>= DebugInterval){
+  static unsigned long SSIDSearchTimer;
+  // if (_debug) {
+  //   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
+  //   filemgr.handleClient();
+  //   if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  // repeat trying to start WIfi connections at intervals to check..
+  //     SSIDSearchTimer = millis() + scansearchinterval;                          //
+  //     if (StationsConnectedtomyAP == 0) {                                       // avoid scanning if we have someone connected to AP as it will/may disconnect!
+  //       ScanAndConnect(true);}  // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared 
+  //    }
+  //   delay(1);
+  //   // if(Touch_available){ts.read();
+  //   //   if ((ts.isTouched)) {DEBUG_PORT.printf(" Pressure test %i  %i %i \n",ts.points[0].size,ts.points[0].x, ts.points[0].y);
+  //   //   SDList("In loop ()");}
+  //   //   //else {DEBUG_PORT.printf("."); }
+  //   //   }
+  //      if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }
+  //   Display(Display_Page);
+  //   return;
+  // }
 
-  // Serial.printf("%4.2f FreeHeap: %d ",((float)millis())/1000, ESP.getFreeHeap());
-  // Serial.printf("StackHWM: %d\n", uxTaskGetStackHighWaterMark(NULL));
+  // if(millis()>= DebugInterval){
+  // DEBUG_PORT.printf("%4.2f FreeHeap: %d ",((float)millis())/1000, ESP.getFreeHeap());
+  // DEBUG_PORT.printf("StackHWM: %d\n", uxTaskGetStackHighWaterMark(NULL));
   //  DebugInterval= millis()+1000;
   // }
   delay(1);
-   SD_CS("LOW");
-   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?) 
- // SD_CS("HIGH");
-  if (!HaltOtherOperations){ 
-    filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!! 
+  SD_CS("LOW");
+  server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
+                          // SD_CS("HIGH");
+  if (!HaltOtherOperations) {
+    filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
     SD_CS("HIGH");
+    if(Touch_available){ts.read();}
     EXTHeartbeat();
-    if (Current_Settings.N2K_ON)  { NMEA2000.ParseMessages();} 
     CheckAndUseInputs();
     Display(Display_Page);
+    if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  // repeat at intervals to connect to station.
+      SSIDSearchTimer = millis() + scansearchinterval;                          //
+      if (StationsConnectedtomyAP == 0) {                                          // avoid scanning if we have someone connected to AP as it will/may disconnect!
+        ScanAndConnect(true);
+      }  // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
+    }
 
-  if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchInterval)) {  // repeat at intervals to check..
-    SSIDSearchInterval = millis() + scansearchinterval;                          //
-    if (StationsConnectedtomyAP == 0) {                                          // avoid scanning if we have someone connected to AP as it will/may disconnect!
-      ScanAndConnect(true);
-    }  // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
-  }
-  // switch off WIFIGFXBox after timed interval
-  if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
-    WIFIGFXBoxdisplaystarted = false;
- // for now - see OTA    WebServerActive = false;
-    Display(true, Display_Page);
-    delay(50);  // change page back, having set zero above which alows the graphics to reset up the boxes etc.
-  }
+    // switch off WIFIGFXBox after timed interval
+    if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
+      WIFIGFXBoxdisplaystarted = false;
+      // - see OTA    WebServerActive = false;
+      Display(true, Display_Page);
+      delay(50);  // change page back, having set zero above which alows the graphics to reset up the boxes etc.
+    }
 
-  ///  BLEloop DO not try to do N2000 interrupts and BLE interrupts at the same time
+    ///  BLEloop DO not try to do N2000 interrupts and BLE interrupts at the same time ?
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
-      BLEloop();} 
- 
+      BLEloop();
+    }
+    else
+    {if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
   }
-
- // esp_task_wdt_reset();  // Reset watchdog if loop completes for testing 
-
 }
 
-// void wifiSetup() {
-//   WiFi.softAPConfig(ap_ip, Null_ip, sub255);
-//   ConnectWiFiusingCurrentSettings();
-//   //SetupWebstuff();
-
-//   keyboard(-1);  //reset keyboard display update settings
-//   Udp.begin(atoi(Current_Settings.UDP_PORT));
-// }
 
 // Can place functions after Setup and Loop only in ino
 
 void Init_GFX() {
-  Serial.println("GFX_BL setting");
-  #ifdef GFX_BL
-  pinMode(GFX_BL, OUTPUT);
-  digitalWrite(GFX_BL, HIGH);
-  #endif
+#ifndef WAVSHARE
+ pinMode(GFX_BL, OUTPUT);DEBUG_PORT.println("GFX_BL setting");
+ digitalWrite(GFX_BL, HIGH);
+#endif
   // Init Display
   gfx->begin();
   //if GFX> 1.3.1 try and do this as the invert colours write 21h or 20h to 0Dh has been lost from the structure!
@@ -409,7 +449,7 @@ void Init_GFX() {
   gfx->setTextBound(0, 0, 480, 480);
   gfx->setTextColor(WHITE);
   setFont(4);
-  gfx->setCursor(40, 20);
+  gfx->setCursor(0, 20);
   gfx->println(F("*********************"));
   gfx->println(F("***Display Started***"));
   gfx->println(F("*********************"));
@@ -424,8 +464,8 @@ void InitNMEA2000() {  // make it display device Info on start up..
   uint32_t SerialNumber;
   SerialNumber = 9999;
   snprintf(SnoStr, 32, "%lu", SerialNumber);
-  Serial.println("NMEA2000 Initialization ...");
-  Serial.printf("   Unique ID: <%i> \r\n", SerialNumber);
+  DEBUG_PORT.println("NMEA2000 Initialization ...");
+  DEBUG_PORT.printf("   Unique ID: <%i> \r\n", SerialNumber);
   NMEA2000.SetDeviceInformation(SerialNumber,  // Unique number. Use e.g. Serial number.
                                 130,           // Device function=Display. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
                                 120,           // Device class=Display Device.
@@ -448,14 +488,13 @@ void InitNMEA2000() {  // make it display device Info on start up..
   NMEA2000.Open();
 }
 
- //******* Define a handler for the interrupt to work *******
- #include "N2KDataRX.h"  // where the handler functions actually are !!
+//******* Define a handler for the interrupt to work *******
+#include "N2KDataRX.h"  // where the handler functions actually are !!
 
 typedef struct {
   unsigned long PGN;
   void (*Handler)(const tN2kMsg& N2kMsg);
 } tNMEA2000Handler;
-
 //  This selects which function the handler will call, depending on PGN  (actual functions are in N2kDataRx files)
 tNMEA2000Handler NMEA2000Handlers[] = {
   { 129029l, &HandleGNSS },
@@ -474,7 +513,7 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
   int iHandler;                                  // enumerate handlers - how many do we have?
   bool known;
   known = false;
-  if (!Current_Settings.N2K_ON){return;}
+  if (!Current_Settings.N2K_ON) { return; }
   for (iHandler = 0; NMEA2000Handlers[iHandler].PGN != 0 && !(N2kMsg.PGN == NMEA2000Handlers[iHandler].PGN); iHandler++)
     ;
   // we now have the index (iHandler) for the handler matching the received PGN
@@ -482,91 +521,99 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
     NMEA2000Handlers[iHandler].Handler(N2kMsg);
     known = true;
   }
-   if ((Display_Page == -21 ) ||(Display_Page == -22 )){ // only do this terminal debug display if on the N2K viewing debug page! 
-   char decode[40];
-    PGNDecode(N2kMsg.PGN).toCharArray(decode,35); // get the discription of the PGN from my string function, trucated to 35 char
-    if(known) {UpdateLinef(BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s",N2kMsg.PGN,N2kMsg.Source, N2kMsg.PGN, decode);}
-    else{UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s",N2kMsg.PGN,N2kMsg.Source, N2kMsg.PGN, decode);}
+  if ((Display_Page == -21) || (Display_Page == -22)) {  // only do this terminal debug display if on the N2K viewing debug page!
+    char decode[40];
+    PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
+    if (known) {
+      UpdateLinef(BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+    } else {
+      UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+    }
     //52685 is light gray in RBG565 light gray for pgns we do not decode. (based on handler setup)
   }
-  // Serial.print(" N2K :Pgn");
-  // Serial.println(N2kMsg.PGN);
+  // DEBUG_PORT.print(" N2K :Pgn");
+  // DEBUG_PORT.printlnN2kMsg.PGN);
 }
 
-
-
+//**********  Drivers 
 void Fatfs_Setup() {
   hasFATS = false;
-  Serial.println("FFAT  START");
+  DEBUG_PORT.println("FFAT  START");
   if (FFat.begin(true)) {
     hasFATS = true;
     /*size_t totalBytes();
     size_t usedBytes();
     size_t freeBytes();*/
     uint64_t cardSize = FFat.totalBytes() / (1024 * 1024);
-    Serial.printf("  FFat Size: %lluMB\n", cardSize);
+    DEBUG_PORT.printf("  FFat Size: %lluMB\n", cardSize);
     uint64_t FreeSize = FFat.freeBytes() / (1024 * 1024);
-    Serial.printf("FFat freeBytes: %lluMB\n", FreeSize);
+    DEBUG_PORT.printf("FFat freeBytes: %lluMB\n", FreeSize);
     delay(1500);
     if (!filemgr.AddFS(FFat, "Flash/FFat", false)) {
-      Serial.println(F("Adding FFAT to Filemanager failed."));
+      DEBUG_PORT.println(F("Adding FFAT to Filemanager failed."));
     } else {
-      Serial.println(F("  Adding FFAT to Filemanager"));
+      DEBUG_PORT.println(F("  Adding FFAT to Filemanager"));
     }
   } else {
-    Serial.println(F("FFat File System not initiated."));
+    DEBUG_PORT.println(F("FFat File System not initiated."));
   }
 }
 //*********** EEPROM functions *********
 void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
+  DEBUG_PORT.printf("SAVING CONFIG\n");
   SaveConfiguration(FFat, Setupfilename, B, A);
+ // Saved_Display_Config=B;Saved_Settings=A; (in saveConfig now)
+ // LoadConfiguration(FFat, Setupfilename, Saved_Display_Config, Saved_Settings);
   return;
   // save my current settings
   // ALWAYS Write the Default display page!  may change this later and save separately?!!
-  Serial.printf("SAVING EEPROM\n key:%i \n", A.EpromKEY);
-  EEPROM.put(1, A.EpromKEY);  // separate and duplicated so it can be checked by itsself first in case structures change
-  EEPROM.put(10, A);
-  EEPROM.commit();
-  delay(50);
+  // DEBUG_PORT.printf("SAVING EEPROM\n key:%i \n", A.EpromKEY);
+  // EEPROM.put(1, A.EpromKEY);  // separate and duplicated so it can be checked by itsself first in case structures change
+  // EEPROM.put(10, A);
+  // EEPROM.commit();
+  // delay(50);
   //NEW also save as a JSON on the SD card SD card will overwrite current settings on setup..
-  
+
   // SaveVictronConfiguration(VictronDevicesSetupfilename,victronDevices); // should write a default file if it was missing?
 }
-void EEPROM_READ() {
-  LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings);
+void EEPROM_READ(_sDisplay_Config B, _sWiFi_settings_Config A) {
+  LoadConfiguration(FFat, Setupfilename, B, A);
   return;
-  int key;
-  EEPROM.begin(512);
-  Serial.print("READING EEPROM ");
-  gfx->println(" EEPROM READING ");
-  EEPROM.get(1, key);
-  // Serial.printf(" read %i  default %i \n", key, Default_Settings.EpromKEY);
-  if (key == Default_Settings_JSON.EpromKEY) {
-    EEPROM.get(10, Saved_Settings);
-    Serial.println("- Key OK");
-    gfx->println(" Key OK");
-  } else {
-    Saved_Settings = Default_Settings_JSON;
-    gfx->println("Using DEFAULTS");
-    Serial.println("Using DEFAULTS");
-    EEPROM_WRITE(Default_JSON, Default_Settings_JSON);
-  }
+  // int key;
+  // EEPROM.begin(512);
+  // DEBUG_PORT.print("READING EEPROM ");
+  // gfx->println(" EEPROM READING ");
+  // EEPROM.get(1, key);
+  // // DEBUG_PORT.printf(" read %i  default %i \n", key, Default_Settings.EpromKEY);
+  // if (key == Default_Settings_JSON.EpromKEY) {
+  //   EEPROM.get(10, Saved_Settings);
+  //   DEBUG_PORT.println("- Key OK");
+  //   gfx->println(" Key OK");
+  // } else {
+  //   Saved_Settings = Default_Settings_JSON;
+  //   gfx->println("Using DEFAULTS");
+  //   DEBUG_PORT.println("Using DEFAULTS");
+  //   EEPROM_WRITE(Default_JSON, Default_Settings_JSON);
+  // }
 }
-
-bool LoadVictronConfiguration(fs::FS &fs,  const char* filename, _sMyVictronDevices& config) {
+//***********  JSON for configurations ****************
+bool LoadVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevices& config) {
   // Open SD file for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
   File file;
-     if (&fs == &SD) { SD_CS(LOW); }
+  if (&fs == &SD) { SD_CS(LOW); }
   file = fs.open(filename, FILE_READ);
-  if (!file) {Serial.println(F("**Failed to read Victron JSON file"));fault = true;}
+  if (!file) {
+    DEBUG_PORT.println(F("**Failed to read Victron JSON file"));
+    fault = true;
+  }
   // Allocate a temporary JsonDocument
   char temp[15];
   JsonDocument doc;
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    Serial.println(F("**Failed to deserialise victron JSON file"));
+    DEBUG_PORT.println(F("**Failed to deserialise victron JSON file"));
     fault = true;
   }
   Num_Victron_Devices = doc["Num_Devices"] | 4;
@@ -584,10 +631,10 @@ bool LoadVictronConfiguration(fs::FS &fs,  const char* filename, _sMyVictronDevi
   // Close the file (Curiously, File's destructor doesn't close the file)
 
   file.close();
-  if(&fs == &SD){SD_CS(HIGH);}
+  if (&fs == &SD) { SD_CS(HIGH); }
   return !fault;  // report success
 }
-void SaveVictronConfiguration(fs::FS &fs, const char* filename, _sMyVictronDevices& config) {
+void SaveVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevices& config) {
   // USED for adding extra devices or for creating a new file if missing
   //Delete existing file, otherwise the configuration is appended to the file
   File file;
@@ -596,8 +643,12 @@ void SaveVictronConfiguration(fs::FS &fs, const char* filename, _sMyVictronDevic
   fs.remove(filename);
   // Open file for writing
   file = fs.open(filename, FILE_WRITE);
-  if (!file) { Serial.println(F("JSON: Victron: Failed to create file"));if (&fs == &SD) { SD_CS(HIGH); } return;}
-  Serial.printf(" We expect %i Victron devices", Num_Victron_Devices);
+  if (!file) {
+    DEBUG_PORT.println(F("JSON: Victron: Failed to create file"));
+    if (&fs == &SD) { SD_CS(HIGH); }
+    return;
+  }
+  DEBUG_PORT.printf(" We expect %i Victron devices", Num_Victron_Devices);
   // Allocate a temporary JsonDocument
   JsonDocument doc;
   doc[" Comment"] = " DisplayShow Options: 'P' Power 'V' Battery Volts 'I' Battery Current";
@@ -627,24 +678,28 @@ void SaveVictronConfiguration(fs::FS &fs, const char* filename, _sMyVictronDevic
 
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
-    Serial.println(F("JSON: Failed to write to Victron file"));
+    DEBUG_PORT.println(F("JSON: Failed to write to Victron file"));
   }
   // Close the file, //but print serial as a check
   file.close();
- if (&fs == &SD) { SD_CS(HIGH); }
+  if (&fs == &SD) { SD_CS(HIGH); }
   PrintJsonFile("Check after Saving configuration ", filename);
 }
-void SaveDisplayConfiguration(fs::FS &fs, const char* filename, _MyColors& set) {
+void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) {
   // Delete existing file, otherwise the configuration is appended to the file
   //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   char buff[15];
   File file;
   if (&fs == &SD) { SD_CS(LOW); }
   fs.remove(filename);
-    // Open file for writing
+  // Open file for writing
   file = fs.open(filename, FILE_WRITE);
 
-  if (!file) { Serial.println(F("JSON: Failed to create file"));if (&fs == &SD) { SD_CS(HIGH); }return;}
+  if (!file) {
+    DEBUG_PORT.println(F("JSON: Failed to create file"));
+    if (&fs == &SD) { SD_CS(HIGH); }
+    return;
+  }
 
   // Allocate a temporary JsonDocument
   JsonDocument doc;
@@ -661,8 +716,8 @@ void SaveDisplayConfiguration(fs::FS &fs, const char* filename, _MyColors& set) 
   doc["BackColor"] = set.BackColor;
   doc["BorderColor"] = set.BorderColor;
   doc["_comments_"] = "These sizes below are for some font tests in victron display!";
- // doc["BoxH"] = set.BoxH;
- // doc["BoxW"] = set.BoxW;
+  // doc["BoxH"] = set.BoxH;
+  // doc["BoxW"] = set.BoxW;
   doc["FontH"] = set.FontH;
   doc["FontS"] = set.FontS;
   doc["Simulate"] = set.Simulate True_False;
@@ -672,33 +727,39 @@ void SaveDisplayConfiguration(fs::FS &fs, const char* filename, _MyColors& set) 
   doc["Frame"] = set.Frame True_False;
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
-    Serial.println(F("JSON: Failed to write to file"));
+    DEBUG_PORT.println(F("JSON: Failed to write to file"));
   }
   // Close the file, but print serial as a check
   file.close();
   if (&fs == &SD) { SD_CS(HIGH); }
   PrintJsonFile("Check after Saving configuration ", filename);
 }
-bool LoadDisplayConfiguration(fs::FS &fs,const char* filename, _MyColors& set) {
+bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) {
   // Openfile for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
   File file;
   if (&fs == &SD) { SD_CS(LOW); }
   file = fs.open(filename, FILE_READ);
-  if (!file) {Serial.println(F("**Failed to read JSON file"));fault = true; }
+  if (!file) {
+    DEBUG_PORT.println(F("**Failed to read JSON file"));
+    fault = true;
+  }
   // Allocate a temporary JsonDocument
   char temp[15];
   JsonDocument doc;
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
-  if (error) {Serial.println(F("**Failed to deserialise JSON file"));fault = true;}
+  if (error) {
+    DEBUG_PORT.println(F("**Failed to deserialise JSON file"));
+    fault = true;
+  }
   // gett here means we can set defaults, regardless!
 
   set.TextColor = doc["TextColor"] | BLACK;
   set.BackColor = doc["BackColor"] | WHITE;
   set.BorderColor = doc["BorderColor"] | BLUE;
- // set.BoxW = doc["BoxW"] | 46;
- // set.BoxH = doc["BoxH"] | 100;
+  // set.BoxW = doc["BoxW"] | 46;
+  // set.BoxH = doc["BoxH"] | 100;
 
   set.FontH = doc["FontH"] | WHITE;
   set.FontS = doc["FontS"] | WHITE;
@@ -718,7 +779,7 @@ bool LoadDisplayConfiguration(fs::FS &fs,const char* filename, _MyColors& set) {
   return !fault;
 }
 
-bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
+bool LoadConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Open file from fs for reading  //Active filesystems are:  SD: SD-Card  FFat: Flash/FFat .
   // Allocate a temporary JsonDocument
   bool fault = false;
@@ -727,9 +788,15 @@ bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config
   File file;
   if (&fs == &SD) { SD_CS(LOW); }
   file = fs.open(filename, FILE_READ);
-  if (!file) {Serial.println(F("**Failed to read CONFIGURATION JSON file"));fault = true;}
+  if (!file) {
+    DEBUG_PORT.println(F("**Failed to read CONFIGURATION JSON file"));
+    fault = true;
+  }
   DeserializationError error = deserializeJson(doc, file);
-  if (error) {Serial.println(F("**Failed to deserialise JSON file"));fault=true;}
+  if (error) {
+    DEBUG_PORT.println(F("**Failed to deserialise JSON file"));
+    fault = true;
+  }
   // Copy values (or defaults) from the JsonDocument to the config / settings
   //if (doc["Start_Page"] == 0) { return false; }  //secondary backup in case the file is present (passes error) but zeroed!
   config.LocalTimeOffset = doc["LocalTimeOffset"] | 0;
@@ -749,54 +816,58 @@ bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config
           sizeof(config.APpassword));
 
   strlcpy(settings.ssid,                 // <- destination
-            doc["ssid"] | "GuestBoat",     // <- source and default in case Json is corrupt!
-            sizeof(settings.ssid));        // <- destination's capacity
-    strlcpy(settings.password,             // <- destination
-            doc["password"] | "12345678",  // <- source and default
-            sizeof(settings.password));    // <- destination's capacity
-    strlcpy(settings.UDP_PORT,             // <- destination
-            doc["UDP_PORT"] | "2003",      // <- source and default.
-            sizeof(settings.UDP_PORT));    // <- destination's capacity
+          doc["ssid"] | "GUESTBOAT",     // <- source and default in case Json is corrupt!
+          sizeof(settings.ssid));        // <- destination's capacity
+  strlcpy(settings.password,             // <- destination
+          doc["password"] | "12345678",  // <- source and default
+          sizeof(settings.password));    // <- destination's capacity
+  strlcpy(settings.UDP_PORT,             // <- destination
+          doc["UDP_PORT"] | "2003",      // <- source and default.
+          sizeof(settings.UDP_PORT));    // <- destination's capacity
 
-    strlcpy(temp, doc["Serial"] | "false", sizeof(temp));
-    settings.Serial_on = (strcmp(temp, "false"));
+  strlcpy(temp, doc["Serial"] | "false", sizeof(temp));
+  settings.Serial_on = (strcmp(temp, "false"));
 
-    strlcpy(temp, doc["UDP"] | "true", sizeof(temp));
-    settings.UDP_ON = (strcmp(temp, "false"));
-    strlcpy(temp, doc["ESP"] | "false", sizeof(temp));
-    settings.ESP_NOW_ON = (strcmp(temp, "false"));
-    strlcpy(temp, doc["N2K"] | "false", sizeof(temp));
-    settings.N2K_ON = (strcmp(temp, "false"));
-    strlcpy(temp, doc["LOG"] | "false", sizeof(temp));
-    settings.Log_ON = (strcmp(temp, "false"));
-    strlcpy(temp, doc["NMEALOG"] | "false", sizeof(temp));
-    settings.NMEA_log_ON = (strcmp(temp, "false"));
-    settings.log_interval_setting = doc["LogInterval"] | 60;
-  
+  strlcpy(temp, doc["UDP"] | "true", sizeof(temp));
+  settings.UDP_ON = (strcmp(temp, "false"));
+  strlcpy(temp, doc["ESP"] | "false", sizeof(temp));
+  settings.ESP_NOW_ON = (strcmp(temp, "false"));
+  strlcpy(temp, doc["N2K"] | "false", sizeof(temp));
+  settings.N2K_ON = (strcmp(temp, "false"));
+  strlcpy(temp, doc["LOG"] | "false", sizeof(temp));
+  settings.Log_ON = (strcmp(temp, "false"));
+  strlcpy(temp, doc["NMEALOG"] | "false", sizeof(temp));
+  settings.NMEA_log_ON = (strcmp(temp, "false"));
+  settings.log_interval_setting = doc["LogInterval"] | 60;
+
   strlcpy(temp, doc["BLE_enable"] | "false", sizeof(temp));
   settings.BLE_enable = (strcmp(temp, "false"));
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
-   if (&fs == &SD) { SD_CS(HIGH); }
+  if (&fs == &SD) { SD_CS(HIGH); }
   //if (!error) { return true; }
   return !fault;
 }
-void SaveConfiguration(fs::FS &fs, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
+void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Save  file to fs   //Active filesystems are:  SD: SD-Card  FFat: Flash/FFat .
- // need to work with SD some time 
- //if (((&fs == &SD)&&(hasSD)) || ((&fs == &FFat)&&(hasFATS))) {
+  // need to work with SD some time
+  //if (((&fs == &SD)&&(hasSD)) || ((&fs == &FFat)&&(hasFATS))) {
   char buff[15];
   File file;
-    if (&fs == &SD) { SD_CS(LOW); }
-    fs.remove(filename);
-    // Open file for writing
-    file = fs.open(filename, FILE_WRITE);
+  if (&fs == &SD) { SD_CS(LOW); }
+  fs.remove(filename);
+  // Open file for writing
+  file = fs.open(filename, FILE_WRITE);
 
-  if (!file) { Serial.println(F("JSON: Failed to create file")); if (&fs == &SD) { SD_CS(HIGH); } return; }
+  if (!file) {
+    DEBUG_PORT.println(F("JSON: Failed to create file"));
+    if (&fs == &SD) { SD_CS(HIGH); }
+    return;
+  }
   // Allocate a temporary JsonDocument
   JsonDocument doc;
   // Set the values in the JSON file.. // NOT ALL ARE read yet!!
-    //now the settings WIFI etc..
+  //now the settings WIFI etc..
   doc["WIFI"] = "WIFI  settings and sources";
   doc["ssid"] = settings.ssid;
   doc["password"] = settings.password;
@@ -807,8 +878,8 @@ void SaveConfiguration(fs::FS &fs, const char* filename, _sDisplay_Config& confi
   doc["UDP"] = settings.UDP_ON True_False;
   doc["ESP"] = settings.ESP_NOW_ON True_False;
   doc["N2K"] = settings.N2K_ON True_False;
-  Serial.print("save magvar:");
-  Serial.printf("%5.3f", BoatData.Variation);
+ // DEBUG_PORT.print("save magvar:");
+ // DEBUG_PORT.printf("%5.3f", BoatData.Variation);
   snprintf(buff, sizeof(buff), "%5.3f", BoatData.Variation);
   doc["Mag_Var"] = buff;
   //modify how the display works
@@ -837,30 +908,31 @@ void SaveConfiguration(fs::FS &fs, const char* filename, _sDisplay_Config& confi
 
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
-    Serial.println(F("JSON: Failed to write to file"));
+    DEBUG_PORT.println(F("JSON: Failed to write to file"));
   }
-  // Close the file, but print serial as a check
+  // Close the file, but can print serial as a check in de
   file.close();
   if (&fs == &SD) { SD_CS(HIGH); }
-  PrintJsonFile("Check after Saving configuration ", filename);
+  Saved_Display_Config=config;Saved_Settings=settings;
+ // PrintJsonFile("Check after Saving configuration ", filename);
 }
 
 void PrintJsonFile(const char* comment, const char* filename) {
   // Open file for reading
   SD_CS(LOW);
   File file = SD.open(filename, FILE_READ);
-  Serial.printf(" %s JSON FILE %s is.", comment, filename);
+  DEBUG_PORT.printf(" %s JSON FILE %s is.", comment, filename);
   if (!file) {
-    Serial.println(F("Failed to read file"));
+    DEBUG_PORT.println(F("Failed to read file"));
     SD_CS(HIGH);
     return;
   }
-  Serial.println();
+  DEBUG_PORT.println();
   // Extract each characters by one by one
   while (file.available()) {
-    Serial.print((char)file.read());
+    DEBUG_PORT.print((char)file.read());
   }
-  Serial.println();
+  DEBUG_PORT.println();
   // Close the file
   file.close();
   SD_CS(HIGH);
@@ -897,13 +969,13 @@ boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B) {  // Doe
   if (A.Log_ON != B.Log_ON) { same = false; }
   if (A.NMEA_log_ON != B.NMEA_log_ON) { same = false; }
 
-  //Serial.print(" DEBUG ");Serial.print(A.ssid); Serial.print(" and ");Serial.println(B.ssid);
+  //DEBUG_PORT.print(" DEBUG ");DEBUG_PORT.print(A.ssid); DEBUG_PORT.print(" and ");DEBUG_PORT.println(B.ssid);
   // these are char strings, so need strcmp to compare ...if strcmp==0 they are equal
   if (strcmp(A.UDP_PORT, B.UDP_PORT) != 0) { same = false; }
   if (strcmp(A.ssid, B.ssid) != 0) { same = false; }
   if (strcmp(A.password, B.password) != 0) { same = false; }
 
-  //Serial.print("Result same = ");Serial.println(same);
+  //DEBUG_PORT.print("Result same = ");DEBUG_PORT.println(same);
   return same;
 }
 //****************  GRAPHICS etc STUFF ************************
@@ -934,7 +1006,7 @@ char* LongtoString(double data) {
 
 // Draw the compass pointer at an angle in degrees
 void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
-  // Serial.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
+  // DEBUG_PORT.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
   bool recent = (Wind.updated >= millis() - 3000);
   if (!Wind.graphed) {  //EventTiming("START");
     WindArrowSub(button, Speed, Wind);
@@ -946,7 +1018,7 @@ void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
 }
 
 void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
-  //Serial.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
+  //DEBUG_PORT.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
   bool recent = (wind.updated >= millis() - 3000);
   Phv center;
   int rad, outer, inner;
@@ -1032,34 +1104,34 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 
   switch (event) {
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-      Serial.println("WiFi connected");
+      DEBUG_PORT.println("WiFi connected");
       //  gfx->println(" Connected ! ");
-      Serial.print("** Connected to : ");
+      DEBUG_PORT.print("** Connected to : ");
       IsConnected = true;
       AttemptingConnect = false;
       //  gfx->println(" Using :");
       //  gfx->println(WiFi.SSID());
-      Serial.print(WiFi.SSID());
-      Serial.println(">");
-    //  WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>", WiFi.SSID());
-      MDNS_START(); //(includes advice above)
+      DEBUG_PORT.print(WiFi.SSID());
+      DEBUG_PORT.println(">");
+      //  WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>", WiFi.SSID());
+      MDNS_START();  //(includes advice above)
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
       // take care with printf. It can quickly crash if it gets stuff it cannot deal with.
-      //  Serial.printf(" Disconnected.reason %s  isConnected%s   attemptingConnect%s  \n",disconnectreason(info.wifi_sta_disconnected.reason).c_str(),IsConnected On_Off,AttemptingConnect On_Off);
+      //  DEBUG_PORT.printf(" Disconnected.reason %s  isConnected%s   attemptingConnect%s  \n",disconnectreason(info.wifi_sta_disconnected.reason).c_str(),IsConnected On_Off,AttemptingConnect On_Off);
       if (!IsConnected) {
         if (AttemptingConnect) { return; }
-        Serial.println("WiFi disconnected");
-        Serial.print("WiFi lost reason: ");
-        Serial.println(disconnectreason(info.wifi_sta_disconnected.reason));
+        DEBUG_PORT.println("WiFi disconnected");
+        DEBUG_PORT.print("WiFi lost reason: ");
+        DEBUG_PORT.println(disconnectreason(info.wifi_sta_disconnected.reason));
         if (ScanAndConnect(true)) {  // is the required SSID to be found?
           WifiGFXinterrupt(8, WifiStatus, "Attempting Reconnect to\n<%s>", Current_Settings.ssid);
-          Serial.println("Attempting Reconnect");
+          DEBUG_PORT.println("Attempting Reconnect");
         }
       } else {
-        Serial.println("WiFi Disconnected");
-        Serial.print("WiFi Lost Reason: ");
-        Serial.println(disconnectreason(info.wifi_sta_disconnected.reason));
+        DEBUG_PORT.println("WiFi Disconnected");
+        DEBUG_PORT.print("WiFi Lost Reason: ");
+        DEBUG_PORT.println(disconnectreason(info.wifi_sta_disconnected.reason));
         WiFi.disconnect(false);     // changed to false.. Revise?? so that it does this only if no one is connected to the AP ??
         AttemptingConnect = false;  // so that ScanandConnect can do a full scan next time..
         WifiGFXinterrupt(8, WifiStatus, "Disconnected \n REASON:%s\n Retrying:<%s>", disconnectreason(info.wifi_sta_disconnected.reason).c_str(), Current_Settings.ssid);
@@ -1068,15 +1140,16 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       break;
 
     case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-      Serial.print("The ESP32 has received IP address :");
-      Serial.println(WiFi.localIP());
+      DEBUG_PORT.print("The ESP32 has received IP address :");
+      DEBUG_PORT.println(WiFi.localIP());
+      udp_st = Get_UDP_IP(WiFi.localIP(), subnet);
       WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>\nIP:%i.%i.%i.%i\n", WiFi.SSID(),
                        WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
       break;
 
     case ARDUINO_EVENT_WIFI_AP_START:
       WifiGFXinterrupt(8, WifiStatus, "Soft-AP started\n%s ", WiFi.softAPSSID());
-      Serial.println("   10 ESP32 soft-AP start");
+      DEBUG_PORT.println("   10 ESP32 soft-AP start");
       break;
 
 
@@ -1092,8 +1165,8 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       break;
     case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:  //14 ESP32 soft-AP assign an IP to a connected station
       WifiGFXinterrupt(8, WifiStatus, "Station Connected\nTo AP\nNow has Assigned IP");
-      Serial.print("   AP IP address: ");
-      Serial.println(WiFi.softAPIP());
+      DEBUG_PORT.print("   AP IP address: ");
+      DEBUG_PORT.println(WiFi.softAPIP());
       break;
   }
 }
@@ -1168,9 +1241,9 @@ bool ScanAndConnect(bool display) {
     found = false;
     NetworksFound = WiFi.scanNetworks(false, false, true, 250, 0, nullptr, nullptr);
     delay(100);
-    Serial.printf(" Scan found <%i> networks:\n", NetworksFound);
+    DEBUG_PORT.printf(" Scan found <%i> networks:\n", NetworksFound);
   } else {
-    Serial.printf(" Using saved Scan of <%i> networks:\n", NetworksFound);
+    DEBUG_PORT.printf(" Using saved Scan of <%i> networks:\n", NetworksFound);
   }
 
   WiFi.disconnect(false);  // Do NOT turn off wifi if the network disconnects
@@ -1178,21 +1251,21 @@ bool ScanAndConnect(bool display) {
   long rssiValue;
   for (int i = 0; i < NetworksFound; ++i) {
     if (WiFi.SSID(i).length() <= 25) {
-      Serial.printf(" <%s> ", WiFi.SSID(i));
+      DEBUG_PORT.printf(" <%s> ", WiFi.SSID(i));
     } else {
-      Serial.printf(" <name too long> ");
+      DEBUG_PORT.printf(" <name too long> ");
     }
     if (WiFi.SSID(i) == Current_Settings.ssid) {
       found = true;
       channel = i;
       rssiValue = WiFi.RSSI(i);
     }
-    Serial.printf("CH:%i signal:%i \n", WiFi.channel(i), WiFi.RSSI(i));
+    DEBUG_PORT.printf("CH:%i signal:%i \n", WiFi.channel(i), WiFi.RSSI(i));
   }
   if (found) {
     if (display) { WifiGFXinterrupt(8, WifiStatus, "WIFI scan found <%i> networks\n Connecting to <%s> signal:%i\nplease wait", NetworksFound, Current_Settings.ssid, rssiValue); }
-    Serial.printf(" Scan found <%s> \n", Current_Settings.ssid);  //gfx->printf("Found <%s> network!\n", Current_Settings.ssid);
-    ConnectTimeout = millis() + 3000; // three second connect timeout limit 
+    DEBUG_PORT.printf(" Scan found <%s> \n", Current_Settings.ssid);        //gfx->printf("Found <%s> network!\n", Current_Settings.ssid);
+    ConnectTimeout = millis() + 3000;                                       // three second connect timeout limit
     WiFi.begin(Current_Settings.ssid, Current_Settings.password, channel);  // faster if we pre-set it the channel??
     IsConnected = false;
     AttemptingConnect = true;
@@ -1201,10 +1274,10 @@ bool ScanAndConnect(bool display) {
     gfx->setTextWrap(true);
     while ((WiFi.status() != WL_CONNECTED) && (millis() <= ConnectTimeout)) {
       gfx->print('.');
-      Serial.print('.');
+      DEBUG_PORT.print('.');
       delay(1000);
     }
-    if (WiFi.status() != WL_CONNECTED) { WifiGFXinterrupt(8, WifiStatus,"Timeout - will try later"); }
+    if (WiFi.status() != WL_CONNECTED) { WifiGFXinterrupt(8, WifiStatus, "Timeout - will try later"); }
     gfx->setTextBound(0, 0, 480, 480);
   } else {
     AttemptingConnect = false;
@@ -1216,6 +1289,7 @@ void ConnectWiFiusingCurrentSettings() {
   bool result;
   uint32_t StartTime = millis();
   // superceded by WIFI box display "setting up AP" gfx->println("Setting up WiFi");
+  WiFi.softAPConfig(ap_ip, Null_ip, sub255);
   WiFi.disconnect(false, true);  // clean the persistent memory in case someone else set it !! eg ESPHOME!!
   delay(10);
   WiFi.persistent(false);
@@ -1230,84 +1304,109 @@ void ConnectWiFiusingCurrentSettings() {
   }
   delay(5);
   if (result == true) {
-    Serial.println("Soft-AP creation success!");
-    Serial.print("   ssidAP: ");
+    DEBUG_PORT.println("Soft-AP creation success!");
+    DEBUG_PORT.print("   ssidAP: ");
 
-    Serial.println(WiFi.softAPSSID());
-    Serial.print("   passAP: ");
-    Serial.println(Display_Config.APpassword);
-    Serial.print("   AP IP address: ");
-    Serial.println(WiFi.softAPIP());
+    DEBUG_PORT.println(WiFi.softAPSSID());
+    DEBUG_PORT.print("   passAP: ");
+    DEBUG_PORT.println(Display_Config.APpassword);
+    DEBUG_PORT.print("   AP IP address: ");
+    DEBUG_PORT.println(WiFi.softAPIP());
+    udp_ap = WiFi.softAPIP();
+    udp_ap[3] = 255;  //broadcast
   } else {
-    Serial.println("Soft-AP creation failed! set this up..");
-    Serial.print("   ssidAP: ");
-    Serial.println(WiFi.softAPSSID());
-    Serial.print("   AP IP address: ");
-    Serial.println(WiFi.softAPIP());
+    DEBUG_PORT.println("Soft-AP creation failed! set this up..");
+    DEBUG_PORT.print("   ssidAP: ");
+    DEBUG_PORT.println(WiFi.softAPSSID());
+    DEBUG_PORT.print("   AP IP address: ");
+    DEBUG_PORT.println(WiFi.softAPIP());
   }
   WiFi.mode(WIFI_AP_STA);
   // all Serial prints etc are now inside ScanAndConnect 'TRUE' will display them.
 }
-void Setup_expander(int SDA,int SCL, int beepPin){
-  Wire.begin(SDA,SCL);
-  #ifdef ExpanderSDA
+void Setup_Wire_Expander(int SDA, int SCL, int beepPin) {
+  Wire.begin(SDA, SCL);
+  #ifdef WAVSHARE
   expander.portMode(ALLOUTPUT);  //Set the port as all output
-  Serial.println("Confirm expander connected via double Beep ");
+  DEBUG_PORT.println("Confirm expander connected via double Beep ");
   beep(2, beepPin);
   #endif
-
 }
 
 void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
+  hasSD = true;
+  SPI.begin(SPISCK, SPIMISO, SPIMOSI);
+  #ifdef WAVSHARE
+  DEBUG_PORT.println("SD Card START.. Wavshare with expander CS");
+    SD_CS(LOW);
+    if (!SD.begin()) {
+    DEBUG_PORT.println("   Card Mount Failed");
     hasSD = false;
-    Serial.println("SD Card START..");
-    if (SPISDCS == -1) {Serial.println("   Using SD_CS");SD_CS(HIGH);SD_CS(LOW);}
-    SPI.begin(SPISCK, SPIMISO, SPIMOSI);
-    delay(10);
-    if(!SD.begin()){ Serial.println("   Card Mount Failed");hasSD = false;SD_CS(HIGH);return;}
-    else{ hasSD = true;  // picture will be  run in setup, after load config
-      if (!filemgr.AddFS(SD, "SD-Card", false)) { Serial.println(F("Adding SD to file manager failed."));}
-        else{ Serial.println(F("  Added SD to file manager"));} // add the SD file manager to the Trek style file display 
-    }
-    uint8_t cardType = SD.cardType();
-  
-    if (cardType == CARD_NONE) {
-      Serial.println("No SD card attached");hasSD = false;SD_CS(HIGH);
-      return;
-    }
-    Serial.print("  SD Card Type: ");
-      if (cardType == CARD_MMC) {
-      Serial.print("MMC");
-        } else if (cardType == CARD_SD) {
-      Serial.print("SDSC");
-          } else if (cardType == CARD_SDHC) {
-      Serial.print("SDHC");
-          } else {
-      Serial.print("UNKNOWN");
-          }
-    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("SD Card Size: %lluMB", cardSize);
-       // Serial.println("*** SD card contents  (to three levels) ***");
-    delay(500);
-}
-
-
-void SD_CS( bool state){
-  #ifdef ExpanderSDA
-  if (!hasSD) {return;}
-  if (SDCS == -1){  //SDCS set -1 for Wavshare which uses using Expander for SD_CS .
-  static bool laststate;
-  if (laststate != state) {expander.digitalWrite(EX104,state);delay(1);}//Serial.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  Serial.printf("  Setting SD_CS state: %i\n", state); }
-  laststate=state;
+    SD_CS(HIGH);
+    return;
+  }
+  #else
+  DEBUG_PORT.println("SD Card START.. Guitron with hard wired CS ");
+    if (!SD.begin(SPISDCS)) {
+    DEBUG_PORT.println("Card Mount Failed");
+    gfx->println("NO SD Card");
+    hasSD = false;
+    return;
   }
   #endif
+  delay(10);
+    //hasSD = true;  // set above .. but 
 
+  uint8_t cardType = SD.cardType();
+  if (cardType == CARD_NONE) {
+    DEBUG_PORT.println("No SD card attached");
+    hasSD = false;
+    #ifdef WAVSHARE
+    SD_CS(HIGH);
+    #endif
+    return;
+  }
+  DEBUG_PORT.print("  SD Card Type: ");
+  if (cardType == CARD_MMC) {
+    DEBUG_PORT.print("MMC");
+  } else if (cardType == CARD_SD) {
+    DEBUG_PORT.print("SDSC");
+  } else if (cardType == CARD_SDHC) {
+    DEBUG_PORT.print("SDHC");
+  } else {
+    DEBUG_PORT.print("UNKNOWN");
+  }
+  uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+  DEBUG_PORT.printf("SD Card Size: %lluMB\n", cardSize);
+  if (!filemgr.AddFS(SD, "SD-Card", false)) {// add the SD file manager to the Trek style file display
+      DEBUG_PORT.println(F("Adding SD to file manager failed."));
+    } else {
+      DEBUG_PORT.println(F("  Added SD to file manager"));
+    } 
+  #ifdef WAVSHARE
+    SD_CS(HIGH);
+  #endif   
+  delay(500);
+}
+
+void SD_CS(bool state) {
+#ifdef WAVSHARE
+  static bool laststate;
+    if (laststate != state) {
+      expander.digitalWrite(EX104, state);
+      delay(1);
+    }  //DEBUG_PORT.printf("+++ Setting SD_CD %s +++\n", state? "Deselected":"Enabled");    }  // true:false  DEBUG_PORT.printf("  Setting SD_CS state: %i\n", state); }
+    laststate = state;
+#endif
 }
 bool SDexists(const char* path) {  //SD_CS to be done before this is called ! (equivalent to SD_MMC . Exists() function )
-  if (!hasSD) {return false;}
+  if (!hasSD) { return false; }
   File file = SD.open(path);
-  if (file) { file.close(); return true;}
-    return false;
+  if (file) {
+    file.close();
+    return true;
+  }
+  return false;
 }
 void timeupdate() {
   static unsigned long tick;
@@ -1316,209 +1415,357 @@ void timeupdate() {
     BoatData.LOCTime = BoatData.LOCTime + 1;
   }
 }
-void FindI2CDevices(String text){
-   Serial.println(text);
-  for (int i=0 ;i<256;i++) {
-  Wire.beginTransmission(i);
-  if (Wire.endTransmission() == 0) {
-     Serial.printf("Device detected at %x(hex)  %i(dec) \n",i,i);delay(10);
-    } 
+void FindI2CDevices(String text) {
+  DEBUG_PORT.println(text);
+  for (int i = 0; i < 256; i++) {
+    Wire.beginTransmission(i);
+    if (Wire.endTransmission() == 0) {
+      DEBUG_PORT.printf("Device detected at %x(hex)  %i(dec) \n", i, i);
+      delay(10);
+    }
   }
 }
-bool Touchsetup(){ // look for 0x5d and setup 
-  bool result=false;
-  //// start the wire interface  //is already started ! using Expander pin definition in setup() Wire.begin(TOUCH_SDA,TOUCH_SCL);                         
+
+void scanI2CMatrix() {
+  DEBUG_PORT.println("\nScanning I2C bus...\n");
+  // Header row
+  DEBUG_PORT.print("    ");
+  for (uint8_t col = 0; col < 16; col++) {
+    DEBUG_PORT.printf("%02X ", col);
+  }
+  DEBUG_PORT.println();
+  // Address matrix
+  for (uint8_t row = 0; row < 8; row++) {
+    DEBUG_PORT.printf("%02X: ", row << 4);
+    for (uint8_t col = 0; col < 16; col++) {
+      uint8_t addr = (row << 4) | col;
+      Wire.beginTransmission(addr);
+      uint8_t error = Wire.endTransmission();
+      if (error == 0) {
+        DEBUG_PORT.print("██ ");  // Device found
+      } else if (error == 4) {
+        DEBUG_PORT.print("?? ");  // Unknown error
+      } else {
+        DEBUG_PORT.print("-- ");  // No device
+      }
+    }
+    DEBUG_PORT.println();
+  }
+  DEBUG_PORT.println("\nScan complete.");
+}
+
+bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
+  bool result = false;
+  // is already started ! using Expander pin definition in setup() Wire.begin(TOUCH_SDA,TOUCH_SCL);                         // start the wire interface
   //FindI2CDevices("- List I2C DEVICES-");delay(200);// for development testing
-    //gt911 initialization, must be added, otherwise the touch screen will not be recognized  
+  //gt911 initialization, must be added, otherwise the touch screen will not be recognized
   //initialization begin
-  Serial.println("Setting up Touch device ");
-  #ifdef ExpanderSDA
-  Serial.println("Using Expander Port Reset sequence");
-  expander.digitalWrite(EX101,HIGH);expander.digitalWrite(EX102,HIGH);expander.digitalWrite(EX104,HIGH);
-  pinMode(TOUCH_INT, OUTPUT); //
-  digitalWrite(TOUCH_INT, LOW);                          // Step 1 LOW =set to  I2C address 0x5D
+  DEBUG_PORT.println("Setting up Touch device ");
+#ifdef WAVSHARE
+  DEBUG_PORT.println("Using Expander Port Reset sequence");
+  expander.digitalWrite(EX101, HIGH);
+  expander.digitalWrite(EX102, HIGH);
+  expander.digitalWrite(EX104, HIGH);
+  pinMode(TOUCH_INT, OUTPUT);    //
+  digitalWrite(TOUCH_INT, LOW);  // Step 1 LOW =set to  I2C address 0x5D
   delay(100);
-  expander.digitalWrite(EX103,LOW);expander.digitalWrite(EX101,LOW);// Step 2: Pull RST LOW to begin reset
+  expander.digitalWrite(EX103, LOW);
+  expander.digitalWrite(EX101, LOW);  // Step 2: Pull RST LOW to begin reset
   delay(100);
-  expander.digitalWrite(EX101,HIGH);expander.digitalWrite(EX103,HIGH);// Step 3: Release RST HIGH while keeping INT LOW
-    delayMicroseconds(100);  // ≥100 µs
-    pinMode(TOUCH_INT, INPUT);                             // Step 4: Float INT pin (input mode)
-  // Step 5: Wait for GT911 to boot
-    delay(100);  // 5–10 ms
-  #endif  
-    //initialization end
-  Serial.print("Checking for Touch chip at I2C address 0x5D: ");
-  Wire.beginTransmission(0x5D);
+  expander.digitalWrite(EX101, HIGH);
+  expander.digitalWrite(EX103, HIGH);  // Step 3: Release RST HIGH while keeping INT LOW
+  delayMicroseconds(100);              // ≥100 µs
+  pinMode(TOUCH_INT, INPUT);           // Step 4: Float INT pin (input mode)
+                                       // Step 5: Wait for GT911 to boot
+  delay(100);                          // 5–10 ms
+#endif
+  //initialization end
+  DEBUG_PORT.printf("Checking for Touch chip at I2C address:%X ",GT911_ADDR1);
+  Wire.beginTransmission(GT911_ADDR1);
   byte error = Wire.endTransmission();
-  if (error == 0) {result=true;
-    Serial.println("Device found!");
+  if (error == 0) {
+    result = true;
+    // prints later!
   } else if (error == 2) {
-    Serial.println("Received NACK on transmit of address.");
+    DEBUG_PORT.println("Received NACK on transmit of address.");
   } else if (error == 3) {
-    Serial.println("Received NACK on transmit of data.");
+    DEBUG_PORT.println("Received NACK on transmit of data.");
   } else if (error == 4) {
-    Serial.println("Other error.");
+    DEBUG_PORT.println("Other error.");
   } else {
-    Serial.println("No device found.");
+    DEBUG_PORT.println("No device found.");
   }
-  delay(100); // allow time to print! 
-  // Optional: Check INT pin state
-  // if (digitalRead(TOUCH_INT) == LOW) {
-  //   Serial.println("GT911 ready (INT LOW)");
-  // } else {
-  //   Serial.println("GT911 not ready (INT HIGH)");
-  // }
- if(result){
-    ts.begin();
+  delay(10);  // allow time to print!
+               // Optional: Check INT pin state
+               // if (digitalRead(TOUCH_INT) == LOW) {
+               //   DEBUG_PORT.println("GT911 ready (INT LOW)");
+               // } else {
+               //   DEBUG_PORT.println("GT911 not ready (INT HIGH)");
+               // }
+  if (result) {
+    DEBUG_PORT.println("Device found: begin");
+    ts.begin(GT911_ADDR1);
     ts.setRotation(ROTATION_INVERTED);
- }
- return result;
+  }
+  return result;
 }
-  void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi sources in sequence
-    static unsigned long MAXScanInterval;
-    MAXScanInterval = millis() + 500;
-    // Serial.printf(" C&U<%i>",millis()-Interval);Interval=millis();
-    if ((Current_Settings.ESP_NOW_ON)) {  // ESP_now can work even if not actually 'connected', so for now, do not risk the while loop!
-                                          // old.. only did one line of nmea_EXT..
-                                          // if (nmea_EXT[0] != 0) { UseNMEA(nmea_EXT, 3); }
-      while (Test_ESP_NOW() && (millis() <= MAXScanInterval)) {
-        UseNMEA(nmea_EXT, 3);
-        // runs multiple times to clear the buffer.. use delay to allow other things to work.. print to show if this is the cause of start delays while debugging!
-        //vTaskDelay(1);
-      }
+void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi sources in sequence
+  static unsigned long MAXScanInterval;
+  MAXScanInterval = millis() + 500;
+  // DEBUG_PORT.printf(" C&U<%i>",millis()-Interval);Interval=millis();
+  if ((Current_Settings.ESP_NOW_ON)) {  // ESP_now can work even if not actually 'connected', so for now, do not risk the while loop!
+                                        // old.. only did one line of nmea_EXT..
+                                        // if (nmea_EXT[0] != 0) { UseNMEA(nmea_EXT, 3); }
+    while (Test_ESP_NOW() && (millis() <= MAXScanInterval)) {
+      UseNMEA(nmea_EXT, 3);
+      // runs multiple times to clear the buffer.. use delay to allow other things to work.. print to show if this is the cause of start delays while debugging!
+      vTaskDelay(1);
     }
-    // Serial.printf(" ca<%i>",millis()-Interval);Interval=millis();
-   //N2K is directly converted to display structures  only use for debugging
-   // if (Current_Settings.N2K_ON) {
-   //   if (NewN2Kdata()) { UseNMEA(nmea_N2K, 5); } // just for debug!! 
-   // }
-    // // Serial.printf(" cb<%i>",millis()-Interval);Interval=millis();
-    if (Current_Settings.UDP_ON) {
-      if (Test_U()) { UseNMEA(nmea_U, 2); }
-    }
-    //Serial.printf(" cd<%i>",millis()-Interval);Interval=millis();
-    if (Current_Settings.BLE_enable) {
-      if (VictronBuffer[0] != 0) { UseNMEA(VictronBuffer, 4); }
-    }
-    // Serial.printf(" ce<%i>\n",millis()-Interval);Interval=millis();
   }
+  // DEBUG_PORT.printf(" ca<%i>",millis()-Interval);Interval=millis();
+  //N2K is directly converted to display structures  only use for debugging
+  // if (Current_Settings.N2K_ON) {
+  //   if (NewN2Kdata()) { UseNMEA(nmea_N2K, 5); } // just for debug!!
+  // }
+  // // DEBUG_PORT.printf(" cb<%i>",millis()-Interval);Interval=millis();
+  if (Current_Settings.UDP_ON) {
+    if (Test_U()) { UseNMEA(nmea_U, 2); }
+  }
+  //DEBUG_PORT.printf(" cd<%i>",millis()-Interval);Interval=millis();
+  if (Current_Settings.BLE_enable) {
+    if (VictronBuffer[0] != 0) { UseNMEA(VictronBuffer, 4); }
+  }
+  // DEBUG_PORT.printf(" ce<%i>\n",millis()-Interval);Interval=millis();
+}
 
-  void UseNMEA(char* buf, int type) {
-    if (buf[0] != 0) {
-      // print serial version if on the wifi page terminal window page.
-      // data log raw NMEA and when and where it came from.
-      // type 4 is Victron data
-      /*TIME: %02i:%02i:%02i",
+void UseNMEA(char* buf, int type) {
+  if (buf[0] != 0) {
+    // print serial version if on the wifi page terminal window page.
+    // data log raw NMEA and when and where it came from.
+    // type 4 is Victron data
+    /*TIME: %02i:%02i:%02i",
                       int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60,*/
-      if (Current_Settings.NMEA_log_ON) {
-        if (BoatData.GPSTime != NMEA0183DoubleNA) {
-          if (type == 1) { NMEALOG(" %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-          if (type == 2) { NMEALOG(" %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-          if (type == 3) { NMEALOG(" %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-          if (type == 4) { NMEALOG("\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
-          
+    if (Current_Settings.NMEA_log_ON) {
+      if (BoatData.GPSTime != NMEA0183DoubleNA) {
+        if (type == 1) { NMEALOG(" %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 2) { NMEALOG(" %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 3) { NMEALOG(" %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 4) { NMEALOG("\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
 
+
+      } else {
+
+        if (type == 1) { NMEALOG("%.3f SER:%s", float(millis()) / 1000, buf); }
+        if (type == 2) { NMEALOG("%.3f UDP:%s", float(millis()) / 1000, buf); }
+        if (type == 3) { NMEALOG("%.3f ESP:%s", float(millis()) / 1000, buf); }
+        if (type == 4) { NMEALOG("\n %.3f VIC:%s", float(millis()) / 1000, buf); }
+      }
+    }
+    // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
+    // 7 is smallest
+    // 0 is 8pt mono thin,
+    //3 is 8pt mono bold
+    if ((Display_Page == -86)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
+      if (type == 4) {
+        UpdateLinef(BLACK, 8, Terminal, "V_Debugmsg%s", buf);  //8 readable ! 7 small enough to avoid line wrap issue?
+      }
+    }
+
+    if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
+                                  //  if (type == 5) {  // done directly on data receipt!
+                                  //   UpdateLinef(BLACK, 8, Terminal, "N2K:%s", buf);  // 7 small enough to avoid line wrap issue?
+                                  // }
+      if (type == 4) {
+        UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);  // 7 small enough to avoid line wrap issue?
+      }
+
+      if (type == 2) {
+        UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);  // 7 small enough to avoid line wrap issue?
+      }
+      if (type == 3) {
+        UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);
+      }
+      if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf); }
+    }
+    // now decode it for the displays to use
+    if (type != 4) {
+      pTOKEN = buf;                                               // pToken is used in processPacket to separate out the Data Fields
+      if (processPacket(buf, BoatData)) { dataUpdated = true; };  // NOTE processPacket will search for CR! so do not remove it and then do page updates if true ?
+    }
+    /// WILL NEED new process packet equivalent to deal with VICTRON data
+    buf[0] = 0;  //clear buf  when finished!
+    return;
+  }
+}
+bool Test_Serial_1() {  // UART0 port P1
+  static bool LineReading_1 = false;
+  static int Skip_1 = 1;
+  static int i_1;
+  static bool line_1;  //has found a full line!
+  unsigned char b;
+  if (!line_1) {                  // ONLY get characters if we are NOT still processing the last line message!
+    while (Serial.available()) {  // get the character
+      b = Serial.read();
+      if (LineReading_1 == false) {
+        nmea_1[0] = b;
+        i_1 = 1;
+        LineReading_1 = true;
+      }  // Place first character of line in buffer location [0]
+      else {
+        nmea_1[i_1] = b;
+        i_1 = i_1 + 1;
+        if (b == 0x0A) {       //0A is LF
+          nmea_1[i_1] = 0x00;  // put end in buffer.
+          LineReading_1 = false;
+          line_1 = true;
+          return true;
+        }
+        if (i_1 > 150) {
+          LineReading_1 = false;
+          i_1 = 0;
+          line_1 = false;
+          return false;
+        }
+      }
+    }
+  }
+  line_1 = false;
+  return false;
+}
+bool Test_U() {  // check if udp packet (UDP is sent in lines..) has arrived
+  static int Skip_U = 1;
+  // if (!line_U) {  // only process if we have dealt with the last line.
+  nmea_U[0] = 0x00;
+  int packetSize = Udp.parsePacket();
+  if (packetSize) {  // Deal with UDP packet
+    if (packetSize >= (BufferLength)) {
+#if ESP_ARDUINO_VERSION_MAJOR == 3
+      Udp.clear();
+#else
+      Udp.flush();
+#endif
+      return false;
+    }  // Simply discard if too long
+    int len = Udp.read(nmea_U, BufferLength);
+    unsigned char b = nmea_U[0];
+    nmea_U[len] = 0;
+    // nmea_UpacketSize = packetSize;
+    //DEBUG_PORT.print(nmea_U);
+    //line_U = true;
+    return true;
+  }  // udp PACKET DEALT WITH
+     // }
+  return false;
+}
+
+//*************** list dir..
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+    DEBUG_PORT.printf("Listing directory: %s\n", dirname);
+
+    File root = fs.open(dirname);
+    if(!root){
+        DEBUG_PORT.println("Failed to open directory");
+        return;
+    }
+    if(!root.isDirectory()){
+        DEBUG_PORT.println("Not a directory");
+        return;
+    }
+
+    File file = root.openNextFile();
+    while(file){
+        if(file.isDirectory()){
+            DEBUG_PORT.print("  DIR : ");
+            DEBUG_PORT.println(file.name());
+            if(levels){
+                listDir(fs, file.path(), levels -1);
+            }
         } else {
-
-          if (type == 1) { NMEALOG("%.3f SER:%s", float(millis()) / 1000, buf); }
-          if (type == 2) { NMEALOG("%.3f UDP:%s", float(millis()) / 1000, buf); }
-          if (type == 3) { NMEALOG("%.3f ESP:%s", float(millis()) / 1000, buf); }
-          if (type == 4) { NMEALOG("\n %.3f VIC:%s", float(millis()) / 1000, buf); }
+            DEBUG_PORT.print("  FILE: ");
+            DEBUG_PORT.print(file.name());
+            DEBUG_PORT.print("  SIZE: ");
+            DEBUG_PORT.println(file.size());
         }
-      }
-      // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
-      // 7 is smallest
-      // 0 is 8pt mono thin,
-      //3 is 8pt mono bold
-      if ((Display_Page == -86)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-        if (type == 4) {
-          UpdateLinef(BLACK, 8, Terminal, "V_Debugmsg%s", buf);  //8 readable ! 7 small enough to avoid line wrap issue?
-        }
-      }
-
-      if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-      //  if (type == 5) {  // done directly on data receipt!
-      //   UpdateLinef(BLACK, 8, Terminal, "N2K:%s", buf);  // 7 small enough to avoid line wrap issue?
-      // }
-        if (type == 4) {
-          UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);  // 7 small enough to avoid line wrap issue?
-        }
-
-        if (type == 2) {
-          UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);  // 7 small enough to avoid line wrap issue?
-        }
-        if (type == 3) {
-          UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);
-        }
-        if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf); }
-      }
-      // now decode it for the displays to use
-      if (type != 4) {
-        pTOKEN = buf;                                               // pToken is used in processPacket to separate out the Data Fields
-        if (processPacket(buf, BoatData)) { dataUpdated = true; };  // NOTE processPacket will search for CR! so do not remove it and then do page updates if true ?
-      }
-      /// WILL NEED new process packet equivalent to deal with VICTRON data
-      buf[0] = 0;  //clear buf  when finished!
-      return;
+        file = root.openNextFile();
     }
+}
+
+void beep(int num, int beepPin) {
+#ifdef WAVSHARE
+  for (int i = 1; i <= num; i++) {
+    expander.digitalWrite(beepPin, HIGH);  //Buzzer ON! (confirms Expander is set up)
+    delay(50);
+    expander.digitalWrite(beepPin, LOW);  //Buzzer off!
+    delay(150);
   }
-    bool Test_Serial_1() {  // UART0 port P1
-    static bool LineReading_1 = false;
-    static int Skip_1 = 1;
-    static int i_1;
-    static bool line_1;  //has found a full line!
-    unsigned char b;
-    if (!line_1) {                  // ONLY get characters if we are NOT still processing the last line message!
-      while (Serial.available()) {  // get the character
-        b = Serial.read();
-        if (LineReading_1 == false) {
-          nmea_1[0] = b;
-          i_1 = 1;
-          LineReading_1 = true;
-        }  // Place first character of line in buffer location [0]
-        else {
-          nmea_1[i_1] = b;
-          i_1 = i_1 + 1;
-          if (b == 0x0A) {       //0A is LF
-            nmea_1[i_1] = 0x00;  // put end in buffer.
-            LineReading_1 = false;
-            line_1 = true;
-            return true;
-          }
-          if (i_1 > 150) {
-            LineReading_1 = false;
-            i_1 = 0;
-            line_1 = false;
-            return false;
-          }
-        }
-      }
-    }
-    line_1 = false;
-    return false;
+  delay(300);  // allows cadence to differentiate beep4 from beep2 beep2
+#endif
+}
+
+
+
+bool TestFATSPartition() {
+  if (ffat_partition) {
+    DEBUG_PORT.print("FFat partition found.");
+    DEBUG_PORT.printf(" Size: %d bytes\n", ffat_partition->size);
+    return true;
   }
-  bool Test_U() {  // check if udp packet (UDP is sent in lines..) has arrived
-    static int Skip_U = 1;
-    // if (!line_U) {  // only process if we have dealt with the last line.
-    nmea_U[0] = 0x00;
-    int packetSize = Udp.parsePacket();
-    if (packetSize) {  // Deal with UDP packet
-      if (packetSize >= (BufferLength)) {
-   #if ESP_ARDUINO_VERSION_MAJOR == 3
-        Udp.clear();
-   #else
-        Udp.flush();
-   #endif
-        return false;
-      }  // Simply discard if too long
-      int len = Udp.read(nmea_U, BufferLength);
-      unsigned char b = nmea_U[0];
-      nmea_U[len] = 0;
-      // nmea_UpacketSize = packetSize;
-      //Serial.print(nmea_U);
-      //line_U = true;
-      return true;
-    }  // udp PACKET DEALT WITH
-       // }
-    return false;
+  DEBUG_PORT.println("No FFat partition found.");
+
+  return false;
+}
+bool TestFATSFormatted() {
+  uint8_t sector[512];
+  esp_err_t err = esp_partition_read(ffat_partition, 0, sector, sizeof(sector));
+  if (err == ESP_OK && sector[510] == 0x55 && sector[511] == 0xAA) {
+    DEBUG_PORT.println(" and likely valid FAT filesystem present.");
+    return true;
   }
+  DEBUG_PORT.println("No valid FAT signature found.");
+  return false;
+}
+
+
+//***************** Functions added to try and explore why the Serial port is not active sometimes should send on UDP -when connected!
+
+void UDPSEND(const char* buf) {  // Send UDP on AP and ST (if connected) the one that saves repetitious code!
+  if (IsConnected) {
+    Udp.beginPacket(udp_st, atoi(Current_Settings.UDP_PORT));
+    Udp.print(buf);
+    Udp.endPacket();
+  }
+  Udp.beginPacket(udp_ap, atoi(Current_Settings.UDP_PORT));
+  Udp.print(buf);
+  Udp.endPacket();
+}
+
+void Debugf(const char* fmt, ...) {  //complete object type suitable for holding the information needed by the macros va_start, va_copy, va_arg, and va_end.
+  if (!EspNowIsRunning) { return; }
+  static char msg[BufferLength] = { '\0' };  // used in message buildup
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(msg, 128, fmt, args);
+  va_end(args);
+  // add checksum?
+  int len = strlen(msg);
+  UDPSEND(msg);
+}
+
+IPAddress Get_UDP_IP(IPAddress ip, IPAddress mk) {
+  uint16_t ip_h = ((ip[0] << 8) | ip[1]);  // high 2 bytes
+  uint16_t ip_l = ((ip[2] << 8) | ip[3]);  // low 2 bytes
+  uint16_t mk_h = ((mk[0] << 8) | mk[1]);  // high 2 bytes
+  uint16_t mk_l = ((mk[2] << 8) | mk[3]);  // low 2 bytes
+  // reverse the mask
+  mk_h = ~mk_h;
+  mk_l = ~mk_l;
+  // bitwise OR the net IP with the reversed mask
+  ip_h = ip_h | mk_h;
+  ip_l = ip_l | mk_l;
+  // ip to return the result
+  ip[0] = highByte(ip_h);
+  ip[1] = lowByte(ip_h);
+  ip[2] = highByte(ip_l);
+  ip[3] = lowByte(ip_l);
+  return ip;
+}

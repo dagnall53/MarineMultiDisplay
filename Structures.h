@@ -20,7 +20,7 @@ struct _sDisplay_Config {  // will be Display_Config for the JSON set Defaults a
   char FourWayTL[10] ;
 };
 
-
+//  .ssid[25].password[25].UDP_PORT[5].UDP_ON .Serial_on .ESP_NOW_ON. N2K_ON .Log_ON. log_interval_setting. NMEA_log_ON. BLE_enable
 struct _sWiFi_settings_Config {  // MAINLY WIFI AND DATA LOGGING key,ssid,PW,udpport, UDP,serial,Espnow
   int EpromKEY;      // Key is changed to allow check for clean EEprom and no data stored change in the default will result in eeprom being reset
                      //  int DisplayPage;   // start page after defaults
@@ -78,7 +78,8 @@ struct _sBoatData {
 
 };
 
-struct _sButton {
+//BUTTON(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor;
+struct _sButton { 
   int h, v, width, height, bordersize;
   uint16_t BackColor, TextColor, BorderColor;
   int Font;                  //-1 == not forced (not used?)

@@ -12,7 +12,7 @@ Arduino_DataBus *bus = new Arduino_SWSPI(
   39 /* CS */,                // Chip Select pin
   48 /* SCK */,               // Clock pin
   47 /* SDA ? */,             // Master Out Slave In pin
-  GFX_NOT_DEFINED /* MISO */  // Master In Slave Out pin (not used)
+  41 /*GFX_NOT_DEFINED /* MISO */  // Master In Slave Out pin (not used)
 );
 
 Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(  // MY BOARD modified pin numbers
@@ -91,7 +91,7 @@ using //(deleted), 00 60 Good results == type9 default
 
 
 // for ease of code compatibility with Wavshare that has Expander  
-#define EX106 -1 //pins on expander   BUT DO NOT define EXPANDERsda  settings as I use that as a   #ifdef ExpanderSDA selector 
+#define EX106 -1 //pins on expander   
 #define EX104 -1 
 #define EX103 -1 
 #define EX102 -1

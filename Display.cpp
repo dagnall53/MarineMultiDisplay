@@ -1,21 +1,26 @@
 #include "Display.h"
 #include "aux_functions.h"
 #include <WiFi.h>
-#include <Arduino_GFX_Library.h> // defines colours BLUE etc
-#include <FFat.h>  // defines FATFS functions for local files 
-#include <N2kMessages.h> // isNKNA 
-#include "Keyboard.h" // for keyboard functions
+#include <Arduino_GFX_Library.h>  // defines colours BLUE etc
+#include <FFat.h>                 // defines FATFS functions for local files
+#include <N2kMessages.h>          // isNKNA
+#include "Keyboard.h"             // for keyboard functions
 #include "JpegFunc.h"
 #include "VICTRONBLE.h"  //sets #ifndef Victronble_h
 
-extern bool WIFIGFXBoxdisplaystarted;
-extern  _sWiFi_settings_Config Current_Settings;
-extern  _sDisplay_Config Display_Config;
-extern  _sWiFi_settings_Config Saved_Settings;
-extern _sBoatData BoatData;  // BoatData values, int double etc
+#include "debug_port.h"
 
-extern void  EEPROM_READ();
-extern void  EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
+
+
+extern bool WIFIGFXBoxdisplaystarted;
+extern _sWiFi_settings_Config Current_Settings;
+extern _sDisplay_Config Display_Config;
+extern _sWiFi_settings_Config Saved_Settings;
+extern _sBoatData BoatData;  // BoatData values, int double etc
+extern const char* Setupfilename;
+extern void EEPROM_READ(_sDisplay_Config B, _sWiFi_settings_Config A);
+extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
+
 
 extern void ShowToplinesettings(String Text);
 extern void ShowToplinesettings(_sWiFi_settings_Config A, String Text);
@@ -27,9 +32,9 @@ extern char* LongtoString(double data);
 extern char* LattoString(double data);
 
 extern boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B);
-extern boolean IsConnected;    // may be used in AP_AND_STA to flag connection success (got IP)
-extern boolean AttemptingConnect;      // to note that WIFI.begin has been started
-extern int NetworksFound; 
+extern boolean IsConnected;        // may be used in AP_AND_STA to flag connection success (got IP)
+extern boolean AttemptingConnect;  // to note that WIFI.begin has been started
+extern int NetworksFound;
 
 #include <TAMC_GT911.h>
 extern TAMC_GT911 ts;
@@ -108,7 +113,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         GFXBorderBoxPrintf(Full2Center, "logo1.jpg");
         GFXBorderBoxPrintf(Full3Center, "logo2.jpg");
         GFXBorderBoxPrintf(Full4Center, "logo4.jpg");
-        GFXBorderBoxPrintf(Full5Center, "logo4.jpg");
+        GFXBorderBoxPrintf(Full5Center, "logo5.jpg");
       }
 
       if (CheckButton(Full0Center)) { Display_Page = 0; }
@@ -133,9 +138,9 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         GFXBorderBoxPrintf(Full0Center, "logo4");
       }
       if (CheckButton(Full5Center)) {
-        jpegDraw("/logo4.jpg", jpegDrawCallback, true /* useBigEndian */,
+        jpegDraw("/logo5.jpg", jpegDrawCallback, true /* useBigEndian */,
                  0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        GFXBorderBoxPrintf(Full0Center, "logo4");
+        GFXBorderBoxPrintf(Full0Center, "logo5");
       }
 
       break;
@@ -153,33 +158,32 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
 
       if (millis() >= slowdown + 10000) {
         slowdown = millis();
-        switch (fontlocal){
-        case 1:
-        WifiStatus.BackColor=WHITE;
-        GFXBorderBoxPrintf(WifiStatus, "White ");
-        GFXBorderBoxPrintf(CurrentSettingsBox, "White ");
-        break;
-                case 2:
-        WifiStatus.BackColor=BLACK;
-        GFXBorderBoxPrintf(WifiStatus, "BLACK ");
-        GFXBorderBoxPrintf(CurrentSettingsBox, "BLACK");
-        break;
-                       case 3:
-        WifiStatus.BackColor=BLUE;
-        GFXBorderBoxPrintf(WifiStatus, "BLUE");
-        GFXBorderBoxPrintf(CurrentSettingsBox, "BLUE ");
-        break;
-                       case 4:
-        WifiStatus.BackColor=RED;
-        GFXBorderBoxPrintf(WifiStatus, "RED ");
-        GFXBorderBoxPrintf(CurrentSettingsBox, "RED ");
-        break;
-                       case 5:
-        WifiStatus.BackColor=GREEN;
-        GFXBorderBoxPrintf(WifiStatus, "GREEN ");
-        GFXBorderBoxPrintf(CurrentSettingsBox, "GREEN ");
-        break;
-
+        switch (fontlocal) {
+          case 1:
+            WifiStatus.BackColor = WHITE;
+            GFXBorderBoxPrintf(WifiStatus, "White ");
+            GFXBorderBoxPrintf(CurrentSettingsBox, "White ");
+            break;
+          case 2:
+            WifiStatus.BackColor = BLACK;
+            GFXBorderBoxPrintf(WifiStatus, "BLACK ");
+            GFXBorderBoxPrintf(CurrentSettingsBox, "BLACK");
+            break;
+          case 3:
+            WifiStatus.BackColor = BLUE;
+            GFXBorderBoxPrintf(WifiStatus, "BLUE");
+            GFXBorderBoxPrintf(CurrentSettingsBox, "BLUE ");
+            break;
+          case 4:
+            WifiStatus.BackColor = RED;
+            GFXBorderBoxPrintf(WifiStatus, "RED ");
+            GFXBorderBoxPrintf(CurrentSettingsBox, "RED ");
+            break;
+          case 5:
+            WifiStatus.BackColor = GREEN;
+            GFXBorderBoxPrintf(WifiStatus, "GREEN ");
+            GFXBorderBoxPrintf(CurrentSettingsBox, "GREEN ");
+            break;
         }
         
 
@@ -234,7 +238,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
     case -22:                                              //  "EXPERIMENT in N2K data"
       if (RunSetup) { GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        EEPROM_READ();  // makes sure eeprom update data is latest and synchronised! 
+        //EEPROM_READ(Display_Config, Current_Settings);  // makes sure eeprom update data is latest and synchronised! 
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
@@ -257,8 +261,6 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
           AddTitleBorderBox(0, Terminal, "-paused-");
         }
       }
-   
-
       // if (CheckButton(Switch9)) {
       //   Current_Settings.ESP_NOW_ON = !Current_Settings.ESP_NOW_ON;
       //   DataChanged = true;
@@ -277,7 +279,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         setFont(3);
         setFont(3);
         GFXBorderBoxPrintf(Full0Center, "-Test JPegs-");
-        GFXBorderBoxPrintf(Full1Center, "Check SD /Audio");
+        GFXBorderBoxPrintf(Full1Center, "Check Touch crosshairs");
         GFXBorderBoxPrintf(Full2Center, "Check Fonts");
         GFXBorderBoxPrintf(Full3Center, "VICTRON devices");
         // GFXBorderBoxPrintf(Full3Center, "See NMEA");
@@ -295,26 +297,25 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (CheckButton(Full5Center)) { Display_Page = 0; }
       break;
 
-    case -21:                                              //  "Log and debug "
-      if (RunSetup) {Terminal.debugpause=false; GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
+    case -21:  //  "Log and debug "
+      if (RunSetup) {
+        Terminal.debugpause = false;
+        GFXBorderBoxPrintf(Terminal, "");
+      }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        EEPROM_READ();  // makes sure eeprom update data is latest and synchronised! 
+        //EEPROM_READ((Display_Config, Current_Settings); // makes sure eeprom update data is latest and synchronised!
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
         // GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
         // AddTitleBorderBox(0, Switch6, "B LOG");
         // GFXBorderBoxPrintf(Switch7, Current_Settings.NMEA_log_ON On_Off);
         // AddTitleBorderBox(0, Switch7, "N LOG");
-        GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON ? Current_Settings.UDP_PORT :"OFF");
+        GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON On_Off);
         AddTitleBorderBox(0, Switch8, "UDP");
         GFXBorderBoxPrintf(Switch9, Current_Settings.ESP_NOW_ON On_Off);
         AddTitleBorderBox(0, Switch9, "ESP-N");
         GFXBorderBoxPrintf(Switch10, Current_Settings.N2K_ON On_Off);
         AddTitleBorderBox(0, Switch10, "N2K");
-
-        GFXBorderBoxPrintf(Switch11, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        AddTitleBorderBox(0, Switch11, "FLASH");
-
         if (!Terminal.debugpause) {
           AddTitleBorderBox(0, Terminal, "TERMINAL");
         } else {
@@ -322,9 +323,11 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         }
         DataChanged = false;
       }
-      // if (millis() > slowdown + 500) {
-      //   slowdown = millis();
-      // }
+      if (millis() > slowdown + 1000) {
+        slowdown = millis();
+        GFXBorderBoxPrintf(Switch11, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE?");
+        AddTitleBorderBox(0, Switch11, "FLASH");
+      }
       if (CheckButton(FullTopCenter)) { Display_Page = 0; }
       if (CheckButton(Terminal)) {
         Terminal.debugpause = !Terminal.debugpause;
@@ -355,7 +358,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         Current_Settings.ESP_NOW_ON = !Current_Settings.ESP_NOW_ON;
         DataChanged = true;
       };
-            if (CheckButton(Switch10)) {
+      if (CheckButton(Switch10)) {
         Current_Settings.N2K_ON = !Current_Settings.N2K_ON;
         DataChanged = true;
       };
@@ -412,7 +415,22 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         DataChanged = true;
       }
       break;
-
+    case -9:  ///Touchscreen pointer tests
+      if (RunSetup || DataChanged) {
+        setFont(4);
+        DataChanged = false;
+      }
+      if (millis() > slowdown + 1000) {
+        slowdown = millis();
+        //other timed stuff?
+      }
+      if (Touch_available) {
+        if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
+          TouchCrosshair(10);
+          // DEBUG_PORT.printf(" Pressure test %i  %i %i \n",ts.points[0].size,ts.points[0].x, ts.points[0].y);
+        }
+      }
+      break;
 
     case -5:  ///Wifiscan
 
@@ -439,8 +457,8 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
             gfx->print(i + 1);
             gfx->print(": ");
             //if (WiFi.SSID(i).length() > 20) { gfx->print("..(toolong).."); }
-           // gfx->print(WiFi.SSID(i).substring(0, 20));
-           // if (WiFi.SSID(i).length() > 20) { gfx->print(".."); }
+            // gfx->print(WiFi.SSID(i).substring(0, 20));
+            // if (WiFi.SSID(i).length() > 20) { gfx->print(".."); }
             // Serial.print(WiFi.SSID(i));
             // Serial.println(WiFi.channel(i));
             // gfx->print(" (");
@@ -462,37 +480,37 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         slowdown = millis();
         //other stuff?
       }
-if(Touch_available){
-      if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
-        //TouchCrosshair(1);
-        wifissidpointer = ((ts.points[0].y - 200) / text_height) - 1;
-        int str_len = WiFi.SSID(wifissidpointer).length() + 1;
-        char result[str_len];
-        //  Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
-        //  Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
-        if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
-          WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
-          if (str_len == 1) {
-            GFXBorderBoxPrintf(SecondRowButton, "Set via Keyboard?");
+      if (Touch_available) {
+        if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
+          //TouchCrosshair(1);
+          wifissidpointer = ((ts.points[0].y - 200) / text_height) - 1;
+          int str_len = WiFi.SSID(wifissidpointer).length() + 1;
+          char result[str_len];
+          //  Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
+          //  Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
+          if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
+            WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
+            if (str_len == 1) {
+              GFXBorderBoxPrintf(SecondRowButton, "Set via Keyboard?");
+            } else {
+              GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);
+            }
           } else {
-            GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);
+            GFXBorderBoxPrintf(SecondRowButton, "ssid too long ");
           }
-        } else {
-          GFXBorderBoxPrintf(SecondRowButton, "ssid too long ");
         }
       }
-}
       if (CheckButton(TopRightbutton)) {
         GFXBorderBoxPrintf(SecondRowButton, " Starting WiFi re-SCAN / reconnect ");
         AttemptingConnect = false;  // so that Scan can do a full scan..
-       // ScanAndConnect(false);
+                                    // ScanAndConnect(false);
         DataChanged = true;
       }  // do the scan again
       if (CheckButton(SecondRowButton)) {
         // Serial.printf(" * Debug wifissidpointer=%i \n",wifissidpointer);
         if ((NetworksFound >= 1) && (wifissidpointer <= NetworksFound)) {
-       //   WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
-       //   Serial.printf("Update ssid to <%s> \n", Current_Settings.ssid);
+          //   WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
+          //   Serial.printf("Update ssid to <%s> \n", Current_Settings.ssid);
           Display_Page = -1;
         } else {
           Serial.println("Update ssid via keyboard");
@@ -552,7 +570,7 @@ if(Touch_available){
         gfx->fillScreen(BLACK);
         gfx->setTextColor(BLACK);
         gfx->setTextSize(1);
-        EEPROM_READ();
+        //EEPROM_READ((Display_Config, Current_Settings);
         ShowToplinesettings(Saved_Settings, "EEPROM");
         setFont(4);
         GFXBorderBoxPrintf(SecondRowButton, "SSID <%s>", Current_Settings.ssid);
@@ -619,7 +637,7 @@ if(Touch_available){
         GFXBorderBoxPrintf(Full2Center, "NMEA DISPLAY");
         GFXBorderBoxPrintf(Full3Center, "Debug + LOG");
         GFXBorderBoxPrintf(Full4Center, "GPS Display");
-        GFXBorderBoxPrintf(Full5Center, "Victron Display");
+        GFXBorderBoxPrintf(Full5Center, "Victron Data Display");
         GFXBorderBoxPrintf(Full6Center, "Save / Reset ");
       }
       if (millis() > slowdown + 500) {
@@ -630,29 +648,29 @@ if(Touch_available){
       if (CheckButton(Full2Center)) { Display_Page = 4; }
       if (CheckButton(Full3Center)) { Display_Page = -21; }
       if (CheckButton(Full4Center)) { Display_Page = 9; }
-      if (CheckButton(Full5Center)) { Display_Page = -87; }
+      if (CheckButton(Full5Center)) { Display_Page = -86; }
       if (CheckButton(Full6Center)) {
         //Display_Page = 4;
         EEPROM_WRITE(Display_Config, Current_Settings);
         delay(50);
-    //    WiFi.disconnect();
+        //    WiFi.disconnect();
         ESP.restart();
       }
       break;
 
     case 4:  // Quad display
-        if (RunSetup) {
+      if (RunSetup) {
         setFont(10);
         gfx->fillScreen(BLACK);
         if (String(Display_Config.FourWayTR) == "WIND") {
-          DrawCompass(topRightquarter); // only draw the compass once!
+          DrawCompass(topRightquarter);  // only draw the compass once!
           AddTitleInsideBox(8, 3, topRightquarter, "WIND APP ");
         }
-     //   GFXBorderBoxPrintf(topLeftquarter, "");
-       // AddTitleInsideBox(9, 3, topLeftquarter, "STW ");
+        //   GFXBorderBoxPrintf(topLeftquarter, "");
+        // AddTitleInsideBox(9, 3, topLeftquarter, "STW ");
         //AddTitleInsideBox(9, 2, topLeftquarter, " Kts");  //font,position
         setFont(10);
-        //SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); 
+        //SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m");
       }
       if (millis() > slowdown + 1000) {
         slowdown = millis();  //only make/update copies every second!  else undisplayed copies will be redrawn!
@@ -678,7 +696,7 @@ if(Touch_available){
 
 
       //seeing if JSON setting of (bottom two sides of) quad is useful.. TROUBLE with two scrollGraphss so there is now extra 'instances' settings allowing two to run simultaneously!! ?
-       if (String(Display_Config.FourWayTL) == "DEPTH") { UpdateDataTwoSize(RunSetup, "DEPTH", " M", true, true, 13, 11, topLeftquarter, BoatData.WaterDepth, "%.1f"); }
+      if (String(Display_Config.FourWayTL) == "DEPTH") { UpdateDataTwoSize(RunSetup, "DEPTH", " M", true, true, 13, 11, topLeftquarter, BoatData.WaterDepth, "%.1f"); }
       if (String(Display_Config.FourWayTL) == "SOG") { UpdateDataTwoSize(RunSetup, "SOG", " Kts", true, true, 13, 11, topLeftquarter, BoatData.SOG, "%.1f"); }
       if (String(Display_Config.FourWayTL) == "STW") { UpdateDataTwoSize(RunSetup, "STW", " Kts", true, true, 13, 11, topLeftquarter, BoatData.STW, "%.1f"); }
 
@@ -927,7 +945,7 @@ if(Touch_available){
         }
 
         if (BoatData.MagHeading.data != NMEA0183DoubleNA) { UpdateLinef(9, BigSingleDisplay, "Mag Heading: %.4f", BoatData.MagHeading); }
-        if ((BoatData.Variation != NMEA0183DoubleNA)&& (BoatData.Variation != 0) &&!N2kIsNA(BoatData.Variation)) {UpdateLinef(9, BigSingleDisplay, "Variation: %.4f", BoatData.Variation);}
+        if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) { UpdateLinef(9, BigSingleDisplay, "Variation: %.4f", BoatData.Variation); }
       }
       if (CheckButton(BigSingleTopLeft)) { Display_Page = 10; }
       //if (CheckButton(bottomLeftquarter)) { Display_Page = 4; }  //Loop to the main settings page
@@ -1022,33 +1040,48 @@ if(Touch_available){
   RunSetup = false;
 }
 
-  bool CheckButton(_sButton & button) {  // trigger on release. needs index (s) to remember which button!
-  if(Touch_available){
+void TouchCrosshair(int size) {
+  for (int i = 0; i < (ts.touches); i++) {
+    TouchCrosshair(i, size, WHITE);
+  }
+}
+void TouchCrosshair(int point, int size, uint16_t colour) {
+  gfx->setCursor(ts.points[point].x, ts.points[point].y);
+  gfx->printf("%i %i  ", ts.points[point].x, ts.points[point].y);
+  gfx->drawFastVLine(ts.points[point].x, ts.points[point].y - size, 2 * size, colour);
+  gfx->drawFastHLine(ts.points[point].x - size, ts.points[point].y, 2 * size, colour);
+}
+
+
+bool CheckButton(_sButton& button) {  // trigger on release. needs index (s) to remember which button!
+  if (Touch_available) {
     //trigger on release! does not sense !isTouched ..  use Keypressed in each button struct to keep track!
     if (ts.isTouched && !button.Keypressed && (millis() - button.LastDetect >= 250)) {
       if (XYinBox(ts.points[0].x, ts.points[0].y, button.h, button.v, button.width, button.height)) {
         //Serial.printf(" Checkbutton size%i state %i %i \n",ts.points[0].size,ts.isTouched,XYinBox(ts.points[0].x, ts.points[0].y,button.h,button.v,button.width,button.height));
         button.Keypressed = true;
+        //button.BorderColor= BLACK;
         button.LastDetect = millis();
       }
       return false;
     }
   }
-    if (button.Keypressed && (millis() - button.LastDetect >= 250)) {
-      //Serial.printf(" Checkbutton released from  %i %i\n",button.h,button.v);
-      button.Keypressed = false;
-      return true;
-    }
-    return false;
+  if (button.Keypressed && (millis() - button.LastDetect >= 250)) {
+    //Serial.printf(" Checkbutton released from  %i %i\n",button.h,button.v);
+    button.Keypressed = false;
+    //button.BorderColor= WHITE;
+    return true;
   }
+  return false;
+}
 
-  void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes incrementing by 1.5
+void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes incrementing by 1.5
                                //Notes: May remove some later to save program mem space?
                                // used : 0,1,2,4 for keyboard
                                //      : 0,3,4,8,10,11 in main
   MasterFont = fontinput;
   switch (fontinput) {  //select font and automatically set height/offset based on character '['
-    // set the heights and offset to print [ in boxes. Heights in pixels are NOT the point heights!
+      // set the heights and offset to print [ in boxes. Heights in pixels are NOT the point heights!
 
     case 0:                        // SMALL 8pt
       Fontname = "FreeMono8pt7b";  //9 to 14 high?

@@ -24,6 +24,8 @@ void Display(bool reset, int page) ;
 bool CheckButton(_sButton & button);
 void setFont(int fontinput);
 void ShowGPSinBox(int font, _sButton button);
+void TouchCrosshair(int size);
+void TouchCrosshair(int point, int size, uint16_t colour);
 
 //****  My displays are based on '_sButton' structures to define position, width height, borders and colours.
 // int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
