@@ -456,20 +456,20 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
             // Print SSID and RSSI for each network found
             gfx->print(i + 1);
             gfx->print(": ");
-            //if (WiFi.SSID(i).length() > 20) { gfx->print("..(toolong).."); }
-            // gfx->print(WiFi.SSID(i).substring(0, 20));
-            // if (WiFi.SSID(i).length() > 20) { gfx->print(".."); }
-            // Serial.print(WiFi.SSID(i));
-            // Serial.println(WiFi.channel(i));
-            // gfx->print(" (");
-            // gfx->print(WiFi.RSSI(i));
-            // gfx->print(")");
-            // gfx->print(" ch<");
-            // gfx->print(WiFi.channel(i));
-            // gfx->println(">");
+            if (WiFi.SSID(i).length() > 20) { gfx->print("..(toolong).."); }
+            gfx->print(WiFi.SSID(i).substring(0, 20));
+            if (WiFi.SSID(i).length() > 20) { gfx->print(".."); }
+            Serial.print(WiFi.SSID(i));
+            Serial.println(WiFi.channel(i));
+            gfx->print(" (");
+            gfx->print(WiFi.RSSI(i));
+            gfx->print(")");
+            gfx->print(" ch<");
+            gfx->print(WiFi.channel(i));
+            gfx->println(">");
 
 
-            //    gfx->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+               gfx->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
             delay(10);
           }
         }

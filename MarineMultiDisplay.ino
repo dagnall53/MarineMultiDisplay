@@ -5,19 +5,20 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = "MMD WAVSHARE 4' V0.05";
+
 
 
 
 
 #define WAVSHARE
 
-
 // must be before NmeA2000 library initiates!
 #ifdef WAVSHARE 
+const char soft_version[] = "MMD WAVSHARE 4' V0.08";
   #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare module boards!
   #define ESP32_CAN_RX_PIN GPIO_NUM_0  // for the waveshare module boards!
 #else
+const char soft_version[] = "MMD Guitron V0.08";
  #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
  #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
 #endif
@@ -347,12 +348,12 @@ void loop() {
   static unsigned long SSIDSearchTimer;
 
   delay(1);
-  //SD_CS("LOW");
+  SD_CS("LOW");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
                           // SD_CS("HIGH");
   if (!HaltOtherOperations) {
     filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
-//    SD_CS("HIGH");
+    SD_CS("HIGH");
     if(Touch_available){ts.read();}
     EXTHeartbeat();
     CheckAndUseInputs();

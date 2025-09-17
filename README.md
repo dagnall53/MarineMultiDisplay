@@ -1,27 +1,20 @@
 
 # Marine Multi Display
-This project is a version of the NMEADISPLAY Wireless Instrument Repeater Display for Boats coded for the WaveShare Module
-<img width="432" height="426" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
-
-WIKI: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+This project is a version of the NMEADISPLAY Wireless Instrument Repeater Display for Boats
+It has two versins, one for for the WaveShare Module and one for the GUITRON module used in NMEADISPLAY 
 
 <i>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
 The user is responsible for cross-checking data with other sources, exercising judgment, and maintaining situational awareness. 
 No liability for any loss, damage, or injury resulting from the use of this instrument will be accepted. </i>
 
-This project now supports direct nMEA2000 connection. 
-It (will eventually) also work with NMEA0183 data from any wireless NMEA Gateway that sends NMEA 0183 instrument readings on UDP.
-But for now it just supports the N2K and Victron displays.
-Working with this board has been problematic compared to the Guitron version. It seems very sensitive to WDT timouts. Especially for the SD card. 
-So the SD card has been disabled (as well as the touch screen) on this code.  
-However, a redeeming feature is that I have made use of the Flash memory to act as a FATFS file server and replaced the editor on the old version with a VERY nice editor from https://github.com/holgerlembke/.
-This new editor is worth keeping and I may update the original NMEA display in the future to use this editor and the Flash/FATFS for file storage. 
-<img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
-
+This revised project supports direct nMEA2000 connection. and a completely revised file editor that makes use of the SD card optional.
+This new editor is very different and allows modification of the setup files far better than the orignal. 
+when connected via a PC, upload of new files (or images) is easy. However when connect by phone, you are effectively limited to just editing existing text files.
+ALL configuratin for this version of the code is now contained in three files that are stored in the FFATS flash and are automatically generated on first start. 
+There is no need to add a specially configured SD card.
 
 ## HOW TO INSTALL FIRST TIME
-(NOT TESTED YET for THIS VERSION) 
 First, plug your module into a com port on your PC. 
 Switch the module on (press the PWRKEY) and record which port it is using. 
 If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
@@ -31,11 +24,16 @@ Click the link below to download the file "WebProgram.bat" from the github.
 <a href="https://dagnall53.github.io/MarineMultiDisplay/build/MMDWebProgram.bat" download>Download MMD WebProgram.bat</a>
 
 Save this somewhere convenient such as downloads.
-Run the program .. 
+Run the program ..   Make sure you select the correct version for your module and set the correct USB port. 
 It will download the latest binaries to the directory where you saved it and program the hardware. 
 It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat file. 
 
-##Changed FILE STRUCTURE
+
+
+
+##Changed FILE STRUCTURE and editor 
+
+<img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
 The original program saved only the start page, WiFi details and source (UDP,ESPnow,Serial,N2K) switching. With the exception of the Start page, these could be set via the touch interface.
 Later versions added the ability to change what is shown on the "Quad Display" {the default 'page 4' start page}. This configuration is saved in config.txt along with the wifi etc details.
 Data to set up the victron displays is set in vconfig.txt and colortest.text.
@@ -45,6 +43,12 @@ In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and
 All config files are editable via the (new) editor.
 
 
+## module referennces (to be updated) 
+<img width="432" height="426" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
+WIKI: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+
+GUITRON device
+TBA
 
 
 ## FATFS files 
