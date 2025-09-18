@@ -1,50 +1,50 @@
 
 # Marine Multi Display
 This project is a version of the NMEADISPLAY Wireless Instrument Repeater Display for Boats
-It has two versins, one for for the WaveShare Module and one for the GUITRON module used in NMEADISPLAY 
+It has two versions, one for for the WaveShare Module and one for the GUITRON module used in NMEADISPLAY 
 
 <i>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
 The user is responsible for cross-checking data with other sources, exercising judgment, and maintaining situational awareness. 
 No liability for any loss, damage, or injury resulting from the use of this instrument will be accepted. </i>
 
-This revised project supports direct nMEA2000 connection. and a completely revised file editor that makes use of the SD card optional.
-This new editor is very different and allows modification of the setup files far better than the orignal. 
-when connected via a PC, upload of new files (or images) is easy. However when connect by phone, you are effectively limited to just editing existing text files.
-ALL configuratin for this version of the code is now contained in three files that are stored in the FFATS flash and are automatically generated on first start. 
-There is no need to add a specially configured SD card.
+This revised project supports direct NMEA2000 connection and has a completely revised file editor that makes use of the SD card optional.
+(see below))
+
 
 ## HOW TO INSTALL FIRST TIME
-First, plug your module into a com port on your PC. 
-Switch the module on (press the PWRKEY) and record which port it is using. 
-If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
+First, plug your module into a com port on your PC. Switch the module on (press the PWRKEY) and record which port it is using. If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
 Remember the port number!
 
 Click the link below to download the file "WebProgram.bat" from the github.
 <a href="https://dagnall53.github.io/MarineMultiDisplay/build/MMDWebProgram.bat" download>Download MMD WebProgram.bat</a>
 
 Save this somewhere convenient such as downloads.
+NOTE: this program will erase any data in the module flash memory. (*)
 Run the program ..   Make sure you select the correct version for your module and set the correct USB port. 
 It will download the latest binaries to the directory where you saved it and program the hardware. 
 It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat file. 
 
-
+(*) if you wish to retain your Flash/FFat files, delete the '-e' from the bat file (change 'write_flash -e -z' to 'write_flash -z'    )
+It is possible some PC/ modules/ cables may not program at full speed. If you have trouble programming, try reducing the baud rate from 921600 to 115200. 
 
 
 ##Changed FILE STRUCTURE and editor 
 
-<img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
-The original program saved only the start page, WiFi details and source (UDP,ESPnow,Serial,N2K) switching. With the exception of the Start page, these could be set via the touch interface.
-Later versions added the ability to change what is shown on the "Quad Display" {the default 'page 4' start page}. This configuration is saved in config.txt along with the wifi etc details.
-Data to set up the victron displays is set in vconfig.txt and colortest.text.
-In the origial code, these were stored on SD and if the SD is not present, default versions will be set, but cannot be altered.
-In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and so the SD card is not required. 
+When connected via a PC, upload of new files (or images) is easy. However when connect by phone, you are effectively limited to just editing existing text files.
+ALL configuration files (".txt") for this version of the code ars now contained in three files that are stored in the FFATS flash and are automatically generated on first start. 
+There is no need to add a specially configured SD card.
 
-All config files are editable via the (new) editor.
+<img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
+WiFi details and source (UDP,ESPnow,Serial,N2K) switching can be set via the touch interface, but more options are available by editing the configuration files via the filemanager, and this is the recommended method for setting the module.
+Most importantly, this allows the user to change what is shown on the "Quad Display" {the default 'page 4' start page}. This configuration is saved in config.txt along with the wifi etc details.
+Data to set up the victron displays is set in vconfig.txt and colortest.text.
+In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and so the SD card is not required. 
 
 
 ## module referennces (to be updated) 
-<img width="432" height="426" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
+
+<img width="100" height="100" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
 WIKI: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
 GUITRON device
@@ -57,21 +57,35 @@ config.txt, ( a json file with user settings) and
 vconfig.txt ( a json with settings for the ble victron mode )
 colortest.txt ( a json with settings that will eventually allow global day/night colours and also has some simulation/debug settings for the BLE part of the display)
   These txt files may (should!) self initiate if not present, but its better to have defaults present! 
-Add 
+
+Other files may be added :
 logo4.jpg (the new generic start screen image), 
 v3small.jpg (used in the webbrowser start screen).
 and loading.jpg, (a picture that appears during OTA updates). 
 (these can be found on the NMEADISPLAY github, or you can add your own 400*400 JPG files)
-The colour rendering on the Waveshare board is much less impressive than on the Guitron module
 
 ## Connecting to NMEA 2000
 Is done automatically and does not require the module to be wirlessly connected to a multiplexer.
 Wireless communication is necessary to change settings. 
+For the Guiton device, add a CAN Driver module such as the TJA1050 and a 3.3V voltage regulator.
+Connect the bottom left connection of the 8 way socket to TJA "TX" and the connection above to TJA "RX".
+Connect the 5v power supply (Bottom Right) to the 3.3v regulator input, and the output of the 3.3V regulator to the VCC connection of the TJA.
+Connect the NMEA2000 (or boat 12V) to a 5V regulator input and connect the 5V output to the 5V power supply on the module.
+Connect Ground (top pins of the 8 way socket) to the TJA ground and Regulator grounds. 
+Lastly, connect the CANH and CANl from the TJA to the NMEA2000 canbus. 
+
+The wavshare module has inbuilt 12V regulator and CAn driver, so connecting this device is simpler.  
+
+## CAUTIONS
+
+I have not managed to get the SD or the Touch screen working reliably on the WAVSHARE device, but it is still able to display data and can be fully configured via the filemanager.
+
 
 ## Connecting to your Wifi SSID 
+You can connect to the module's access point by connecting and then using a browser to connect to 192.168.4.1 
 
 If you happen to have a boat with a WiFi SSID "GuestBoat" and password 12345678, you will connect instantly as this is the default.
-For your SSID, Go to Settings WiFi,  Click on "set SSID", and you will be presented with a scan of available networks.
+With touchscreen, Go to Settings WiFi,  Click on "set SSID", and you will be presented with a scan of available networks.
 
 You can select a network by touching it and it will update in the second box and show (eg) Select<GUESTBOAT>?
 if you touch this, it will select that SSID and return you to the main WiFi Settings page. 
@@ -83,7 +97,14 @@ The Display does a scan on startup and will attempt to automatically connect IF 
 it will retry the scan once every 30 seconds if it does not find the SSID. 
 This will interrupt the display, but since you are not connected .. there is nothing to display! 
 
+### Webbrowser:
+
+There is a web interface that can be connected to by pointing a browser at http://nmeadisplay.local/ (default)
+If you change the panel name, you will need to point to the new name: eg http://panel2.local (etc).
+You can also point directly to the IP address as shown on the WiFi settings page. 
+
 ## USING FILE Manager to select settings.
+
 On web browser go to (IP:8080)
 EG 192.168.4.1:8080 
 This will bring up the new Trek style file browser.
@@ -100,13 +121,6 @@ on Saving (SDsave), the settings will be implemented on the display.
 To edit any of these, Click on the [E] alongside the file name and press save when finished. 
 
 The Display will check files on startup. If the file is not present it will use defaults. 
-
-### Webbrowser:
-
-There is a web interface that can be connected to by pointing a browser at http://nmeadisplay.local/ (default)
-If you change the panel name, you will need to point to the new name: eg http://panel2.local (etc).
-You can also point directly to the IP address as shown on the WiFi settings page. 
-
 
 ## Navigating the Display touch screen
 
@@ -128,29 +142,22 @@ https://www.vela-navega.com/index.php/multiplexers
 The module also natively supports NME2000. 
 
 
-## MODULE Hardware Requirements
 
-The code is based on the WAVESHARE  4.0 Inch ESP32-S3  Touch Screen LCD.
-There are sometimes two versions. I bough the one without Touch by mistake.
-I have not confirmed Touch operation.
-
-
-
-
-# Victron BLE device display
+### Victron BLE device display
 
 I have been adding the ability to switch the display to show Victron BLE data from suitable Victron devices.
 ![victrondisplay](https://github.com/user-attachments/assets/a0685f92-06f6-4189-8c27-e6e044bc54d0)
 This uses regular, repeated, BLE scanning for Victron devices and a subsequent screen display of parameters obtained. 
 This is immensely powerful, but interrupts the main wifi for one second every time it scans for BLE devices.
 It cannot therefore be used simultaneously with the standard NMEA display routines. 
-The Victron display is accessible via "experimental". I would emphasize that this feature/capability is experimental!
 
 There are two critical files for the display are vconfig.txt. (which has the Victron device Mac, key and names), and colortest.txt which has some settings to allow simulation of victron devices and other inputs useful during development.
 The display page uses a jpg (vicback.jpg) as a background for a more colourful display.
-The code recognises only Solar chargers , SmartShunt and ( tested and found to be very faulty! ) IP65 AC chargers.
+The code recognises only Solar chargers , SmartShunt and IP65 AC chargers.
 The graphical format of the display is defined in VICTRONBLE.cpp and (vconfig.txt).
 Each device has selected data displayed in a box with selectable position and height (but with fixed fonts and width).
+You will need to obtain the MAC and KEY via the victron app (see the device settings) and your devices must be connectable via the app.  
+
 
 There is a Simulate option, selectable in colortest, this initiates a crude simulation, suitable for assisting in code development.
 This works most logically with my default Vconfig.txt file. 

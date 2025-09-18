@@ -51,7 +51,7 @@ struct _MyColors {  // for later Day/Night settings
   bool BLEDebug;
 };
 
-struct _sInstData {  // struct to hold instrument data AND the time it was updated.
+struct _sInstData {  // struct to hold instrument data AND the time it was updated.  lastx lasty position printed 
   double data = NMEA0183DoubleNA;
   double lastdata = NMEA0183DoubleNA;
   unsigned long updated;
@@ -59,6 +59,7 @@ struct _sInstData {  // struct to hold instrument data AND the time it was updat
   bool greyed;     // when the data is OLD! 
   bool graphed;    // is used by Graphs, so you can display digital and graph on same page!
   int source;      // Ready to try an experiment with two GPS to see how they track .
+  int lastx,lasty,lasth,lastw;
  
 };
 
@@ -78,7 +79,7 @@ struct _sBoatData {
 
 };
 
-//BUTTON(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor;
+//BUTTON(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor; 
 struct _sButton { 
   int h, v, width, height, bordersize;
   uint16_t BackColor, TextColor, BorderColor;
@@ -87,6 +88,7 @@ struct _sButton {
   unsigned long LastDetect;  //used by keypressed
   int PrintLine;             // used for UpdateLinef()
   bool screenfull,debugpause;
+
 };
 
 struct Phv {   // struct for int positions h v typically on screen 
