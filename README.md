@@ -42,13 +42,18 @@ Data to set up the victron displays is set in vconfig.txt and colortest.text.
 In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and so the SD card is not required. 
 
 
-## module referennces (to be updated) 
-WAVSHARE LCD-4
+# MODULE HARDWARE 
+
+###WAVSHARE LCD-4
+
 <img width="200" height="200" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
 WIKI: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-GUITRON Module 
+###GUITRON Module 
+
 <img width="200" height="200" alt="Guitron" src="https://github.com/user-attachments/assets/d9f3aa7f-7baf-40a3-b50e-e2567d49540b" />
+"ESP32-S3 Development Board WiFi BT 4 Inch IPS Touch Screen for Arduino LVGL IOT ESP32 86 Box Central Centrol" 
+Availble from multiple sources (Possibly has part number JC4848W540C_I )
 
 
 
