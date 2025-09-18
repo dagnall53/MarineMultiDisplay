@@ -44,10 +44,11 @@ In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and
 
 ## module referennces (to be updated) 
 
-<img width="100" height="100" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
+<img width="200" height="200" alt="waveshare 480" src="https://github.com/user-attachments/assets/3ad72656-72e5-4775-a1ed-1393f1a75a34" />
 WIKI: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-GUITRON device
+GUITRON device<img width="200" height="200" alt="Guitron" src="https://github.com/user-attachments/assets/d9f3aa7f-7baf-40a3-b50e-e2567d49540b" />
+
 TBA
 
 
