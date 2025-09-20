@@ -18,6 +18,7 @@ struct _sDisplay_Config {  // will be Display_Config for the JSON set Defaults a
   char FourWayBL[10] ; 
   char FourWayTR[10] ;
   char FourWayTL[10] ;
+  char WideScreenCentral[10] ;
 };
 
 //  .ssid[25].password[25].UDP_PORT[5].UDP_ON .Serial_on .ESP_NOW_ON. N2K_ON .Log_ON. log_interval_setting. NMEA_log_ON. BLE_enable
@@ -48,7 +49,7 @@ struct _MyColors {  // for later Day/Night settings
   int ShowRawDecryptedDataFor;
   bool Frame;
   bool Debug;
-  bool BLEDebug;
+
 };
 
 struct _sInstData {  // struct to hold instrument data AND the time it was updated.  lastx lasty position printed 
@@ -88,7 +89,6 @@ struct _sButton {
   unsigned long LastDetect;  //used by keypressed
   int PrintLine;             // used for UpdateLinef()
   bool screenfull,debugpause;
-
 };
 
 struct Phv {   // struct for int positions h v typically on screen 
@@ -100,6 +100,8 @@ struct Phv {   // struct for int positions h v typically on screen
 
 struct _sMyVictronDevices{   // equivalent to _sDisplay_Config all known victron devices MAc and encryption keys.
                 //10 index for multiple saved instrument settings first
+  bool BLEDebug;
+  bool Simulate;
   char charMacAddr[20][13];   // a 12 char (+1!) array  typ= "ea9df3ebc625"  
   char charKey [20][33];      //32 etc...
   char FileCommentName [20][32];  // name from file that will be used in Display

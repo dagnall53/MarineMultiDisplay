@@ -4,6 +4,9 @@ FOR WAVESHARE 4inch LCD
 https://www.waveshare.com/esp32-s3-touch-lcd-4.htm
 https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
+     (V3)
+     https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4/ESP32-S3-Touch-LCD-4_V3.0.pdf
+
 also need ?
 #define ARDUINO_USB_MODE 1
 #define ARDUINO_USB_CDC_ON_BOOT 1
@@ -61,10 +64,7 @@ MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Displa
 */
 
 /*******************************************************************************
-Pins and defines for GFX - various versions!
-FOR WAVESHARE 4inch LCD 
-https://www.waveshare.com/esp32-s3-touch-lcd-4.htm
-https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+
 
 also need ?
 #define ARDUINO_USB_MODE 1

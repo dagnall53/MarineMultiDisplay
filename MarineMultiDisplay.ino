@@ -5,25 +5,38 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
+const char soft_version[] = " V0.10";
 
 
+bool _WideDisplay;  // so that I can pass this to sub files
 
-
-
-#define WAVSHARE
+//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for 
+#define WAVSHARE     // 4 inch but Touch untested and 
+//#define WIDEBOX    // 4.3inch 800 by 400 display 
 
 // must be before NmeA2000 library initiates!
 #ifdef WAVSHARE 
-const char soft_version[] = "MMD WAVSHARE 4' V0.08";
-  #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare module boards!
-  #define ESP32_CAN_RX_PIN GPIO_NUM_0  // for the waveshare module boards!
+#ifdef WIDEBOX
+const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B box";
+  #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards!
+  #define ESP32_CAN_RX_PIN GPIO_NUM_16  // 
+ // #define SCREEN_WIDTH  800
 #else
-const char soft_version[] = "MMD Guitron V0.09";
+const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
+  #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
+  #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
+ // #define SCREEN_WIDTH  480
+#endif
+#else
+ const char _device[]=  "Guitron 4inch";
  #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
  #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
 #endif
 
 #include "debug_port.h"
+#include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
+
+int Screen_Width;     // temporary solution until I can find why I am not passing this to aux_functions.cpp
 
 // Serial port is differently exposed on the two boards, making serial. print not compatible, and debug hard!
 // #ifdef WAVSHARE
@@ -55,7 +68,11 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 
 //*********** DISPLAY selector *************
 #ifdef WAVSHARE
+#ifdef WIDEBOX
+#include "WAV_4.3inch.h"
+#else
 #include "WAV_4inch.h"
+#endif
 #else
 #include "GUIT_4inch.h"
 #endif
@@ -170,20 +187,17 @@ int Display_Page;
 //****  My displays are based on '_sButton' structures to define position, width height, borders and colours.
 // int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
 
-_sButton FullSize = { 10, 0, 460, 460, 0, BLUE, WHITE, BLACK };
-_sButton FullSizeShadow = { 5, 10, 460, 460, 0, BLUE, WHITE, BLACK };
-_sButton CurrentSettingsBox = { 0, 0, 480, 80, 2, BLUE, WHITE, BLACK };  //also used for showing the current settings
 
-_sButton FontBox = { 0, 80, 480, 330, 5, BLUE, WHITE, BLUE };
+
+_sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE };
 
 //_sButton WindDisplay = { 0, 0, 480, 480, 0, BLUE, WHITE, BLACK };  // full screen no border
 
 //used for single data display
 // modified all to lift by 30 pixels to allow a common bottom row display (to show logs and get to settings)
-_sButton StatusBox = { 0, 460, 480, 20, 0, BLACK, WHITE, BLACK };
-_sButton WifiStatus = { 60, 180, 360, 120, 5, BLUE, WHITE, BLACK };  // big central box for wifi events to pop up - v3.5
 
-_sButton BigSingleDisplay = { 0, 90, 480, 360, 5, BLUE, WHITE, BLACK };              // used for wind and graph displays
+
+_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, BLACK };              // used for wind and graph displays
 _sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, BLACK };             //  ''
 _sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, BLACK };                //  ''
 _sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, BLACK };      //  ''
@@ -196,23 +210,20 @@ _sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, BLACK };
 // for the quarter screens on the main page
 _sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };  //h  reduced by 15 to give 30 space at the bottom
 _sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-_sButton topRightquarter = { 240, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-_sButton bottomRightquarter = { 240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-
+_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
+_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
+// for wide display //        int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
+_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, BLACK };
+_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, BLACK }; 
 
 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
 _sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, BLACK };
-_sButton TopRightbutton = { 405, 0, 75, 45, 5, BLUE, WHITE, BLACK };
-_sButton BottomRightbutton = { 405, 405, 75, 45, 5, BLUE, WHITE, BLACK };
+_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, BLACK };
+
+_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, BLACK };
 _sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, BLACK };
 
-// buttons for the wifi/settings pages
-_sButton TOPButton = { 20, 10, 430, 35, 5, WHITE, BLACK, BLUE };
-_sButton SecondRowButton = { 20, 60, 430, 35, 5, WHITE, BLACK, BLUE };
-_sButton ThirdRowButton = { 20, 100, 430, 35, 5, WHITE, BLACK, BLUE };
-_sButton FourthRowButton = { 20, 140, 430, 35, 5, WHITE, BLACK, BLUE };
-_sButton FifthRowButton = { 20, 180, 430, 35, 5, WHITE, BLACK, BLUE };
 
 #define sw_width 65
 //switches at line 180
@@ -230,43 +241,62 @@ _sButton Switch10 = { 340, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
 _sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
 
 
-_sButton Terminal = { 0, 100, 480, 330, 2, WHITE, BLACK, BLUE };
-//for selections
-_sButton FullTopCenter = { 80, 0, 320, 50, 5, BLUE, WHITE, BLACK };
+//WIDTH dependant settings, h, v, width, height, bordersize
+// read TOUCH_WIDTH nd subtract x..
 
-_sButton Full0Center = { 80, 55, 320, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full1Center = { 80, 110, 320, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full2Center = { 80, 165, 320, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full3Center = { 80, 220, 320, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full4Center = { 80, 275, 320, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full5Center = { 80, 330, 320, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full6Center = { 80, 385, 320, 50, 5, BLUE, WHITE, BLACK };  // inteferes with settings box do not use!
+_sButton StatusBox = { 0, 460, TOUCH_WIDTH, 20, 0, BLACK, WHITE, BLACK };
+_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, BLACK };  // big central box for wifi events to pop up - v3.5
+_sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, BLACK };
+_sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, BLACK };
+_sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, BLACK };  //also used for showing the current settings
+
+_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+
+
+_sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, BLACK, BLUE };
+//for selections
+_sButton FullTopCenter = { 80, 0, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+
+_sButton Full0Center = { 80, 55, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton Full1Center = { 80, 110, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton Full2Center = { 80, 165, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton Full3Center = { 80, 220, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton Full4Center = { 80, 275, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton Full5Center = { 80, 330, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };  // inteferes with settings box do not use!
 
 
 
 
 //#include "esp_task_wdt.h"
 #include "esp_partition.h"
-void SDList(char* msg){
-  DEBUG_PORT.println(msg);
-  listDir(SD, "/", 1);
-}
+// void SDList(char* msg){
+//   DEBUG_PORT.println(msg);
+//   listDir(SD, "/", 1);
+// }
 
 
 
 void setup() {
-  // the real setup  NOTE I had lots of trouble getting SD and serial to work 
- // _debug = false;
+  Screen_Width=TOUCH_WIDTH;  // temporary!
+  _WideDisplay =false;
+  #ifdef WIDEBOX 
+   _WideDisplay = true;
+  #endif
   delay(100);
-  Serial.begin(115200);
-  Serial0.begin(115200);  // If available
+   DEBUG_PORT.begin(115200);
+ //Serial0.begin(115200);  // If available
 //  if (_debug) {  DEBUG_PORT.print("Using DEBUG (small) startup NMEA Display");   setup2();    return;  }  // break here to try simpler setups
 
   DEBUG_PORT.print("Starting NMEA Display");
   DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
-  Serial.println(F(" Using Serial.print "));
-  Serial0.println(F(" Using Serial0.print "));
-  DEBUG_PORT.println(soft_version);
+  // Serial.println(F(" Using Serial.print "));
+  // Serial0.println(F(" Using Serial0.print "));
+  DEBUG_PORT.println(_device);DEBUG_PORT.println(soft_version); 
   Init_GFX(); // must be before SD setup (at least for Guitron) 
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
   if (TestFATSPartition()) {// TestFATSFormatted();//DEBUG_PORT.println("FATFs should be ok");
@@ -278,7 +308,11 @@ void setup() {
   delay(10);
   InitNMEA2000();
   keyboard(-1);  //just reset keyboard's static variables
+  DEBUG_PORT.println(F(" Printing to screen  "));
+  gfx->println(_device);
   gfx->println(soft_version);
+  gfx->println();
+
   if (hasFATS) {
     gfx->println(F("***  FATFS setup ***"));
     beep(3, EX106);
@@ -297,10 +331,11 @@ void setup() {
   } else {
     gfx->println(F("***  NO Touch Sensor ***"));
   }
-  delay(100);
+  delay(1000);
   bool FilesOK = true;
   if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
     DEBUG_PORT.println("USING FATS JSON for wifi and display settings");
+    gfx->println(F("USING FATS JSON for WiFi and display settings"));
     Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
     Display_Page = Display_Config.Start_Page;
    } else {
@@ -309,28 +344,36 @@ void setup() {
     Display_Config = Default_JSON;
     Current_Settings = Default_Settings_JSON;
     DEBUG_PORT.println(" USING  defaults for wifi and display settings");
+    gfx->println(F("Setting WiFi and Display settings to defaults"));
     SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings);
   }
   if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
     DEBUG_PORT.println("USING FATS JSON for Victron data settings");
+    gfx->println(F("USING FATS JSON for Victron settings"));
   } else {
     FilesOK = false;
     DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");
+    gfx->println(F("Setting Victron settings to defaults"));
+    victronDevices.BLEDebug="FALSE";
     Num_Victron_Devices = 6;
     CommonDisplayWIdth = 150;
     SaveVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
   }
   if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
     DEBUG_PORT.println("USING FATS JSON for Colours data settings");
+    gfx->println(F("USING FATS JSON for Colours data settings"));
   } else {
     FilesOK = false;
     DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
+    gfx->println(F("Setting Victron settings to defaults"));
     SaveDisplayConfiguration(FFat, ColorsFilename, ColorSettings);  // should write a default file if it was missing?
   }
-  if (!FilesOK) {
-    beep(1, EX106);
-    DEBUG_PORT.println("Sound to indicate a JSON settings to default ");
-  }
+  // if (!FilesOK) {
+  //   beep(1, EX106);
+  //   DEBUG_PORT.println("Sound to indicate a JSON settings to default ");
+  // }
+
+
   ConnectWiFiusingCurrentSettings();
   SetupWebstuff();
   Udp.begin(atoi(Current_Settings.UDP_PORT));
@@ -371,6 +414,7 @@ void loop() {
     if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
       WIFIGFXBoxdisplaystarted = false;
       // - see OTA    WebServerActive = false;
+      Display(true, -99);delay(10);
       Display(true, Display_Page);
       delay(50);  // change page back, having set zero above which alows the graphics to reset up the boxes etc.
     }
@@ -379,8 +423,7 @@ void loop() {
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
       BLEloop();
     }
-    else
-    {if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
+    else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
   }
 }
 
@@ -394,7 +437,8 @@ void Init_GFX() {
   expander.digitalWrite(EX103, LOW);
   delay(100);
    expander.digitalWrite(EX103, HIGH);  // Step 3: Release RST HIGH while keeping INT LOW
-  delay(1);             
+  delay(10);     
+
   #endif
 
  #ifdef GFX_BL
@@ -406,7 +450,7 @@ void Init_GFX() {
   //if GFX> 1.3.1 try and do this as the invert colours write 21h or 20h to 0Dh has been lost from the structure!
   gfx->invertDisplay(false);
   gfx->fillScreen(BLUE);
-  gfx->setTextBound(0, 0, 480, 480);
+  gfx->setTextBound(0, 0, TOUCH_WIDTH, 480);
   gfx->setTextColor(WHITE);
   setFont(4);
   gfx->setCursor(0, 20);
@@ -417,6 +461,11 @@ void Init_GFX() {
 }
 
 void InitNMEA2000() {  // make it display device Info on start up..
+
+ DEBUG_PORT.print("NMEA2000 using RX pin ");DEBUG_PORT.println(ESP32_CAN_RX_PIN);
+ DEBUG_PORT.print("NMEA2000 using TX pin ");DEBUG_PORT.println(ESP32_CAN_TX_PIN);
+ gfx->println(F("Setting uo NMEA2000 interface"));
+ delay(10);
   NMEA2000.SetN2kCANMsgBufSize(8);
   NMEA2000.SetN2kCANReceiveFrameBufSize(100);
   // Set device information
@@ -424,7 +473,7 @@ void InitNMEA2000() {  // make it display device Info on start up..
   uint32_t SerialNumber;
   SerialNumber = 9999;
   snprintf(SnoStr, 32, "%lu", SerialNumber);
-  DEBUG_PORT.println("NMEA2000 Initialization ...");
+  DEBUG_PORT.println(".. Initializing ...");
   DEBUG_PORT.printf("   Unique ID: <%i> \r\n", SerialNumber);
   NMEA2000.SetDeviceInformation(SerialNumber,  // Unique number. Use e.g. Serial number.
                                 130,           // Device function=Display. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
@@ -522,39 +571,19 @@ void Fatfs_Setup() {
 void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
   DEBUG_PORT.printf("SAVING CONFIG\n");
   SaveConfiguration(FFat, Setupfilename, B, A);
- // Saved_Display_Config=B;Saved_Settings=A; (in saveConfig now)
- // LoadConfiguration(FFat, Setupfilename, Saved_Display_Config, Saved_Settings);
-  return;
-  // save my current settings
-  // ALWAYS Write the Default display page!  may change this later and save separately?!!
-  // DEBUG_PORT.printf("SAVING EEPROM\n key:%i \n", A.EpromKEY);
-  // EEPROM.put(1, A.EpromKEY);  // separate and duplicated so it can be checked by itsself first in case structures change
-  // EEPROM.put(10, A);
-  // EEPROM.commit();
-  // delay(50);
-  //NEW also save as a JSON on the SD card SD card will overwrite current settings on setup..
-
-  // SaveVictronConfiguration(VictronDevicesSetupfilename,victronDevices); // should write a default file if it was missing?
 }
+void SaveConfiguration(){//overload of Save configuration in case new data stored 
+  SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings); 
+}
+
+void LoadConfiguration(){//overload of Reload configuration in case new data stored 
+  LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings); 
+}
+
 void EEPROM_READ(_sDisplay_Config B, _sWiFi_settings_Config A) {
   LoadConfiguration(FFat, Setupfilename, B, A);
   return;
-  // int key;
-  // EEPROM.begin(512);
-  // DEBUG_PORT.print("READING EEPROM ");
-  // gfx->println(" EEPROM READING ");
-  // EEPROM.get(1, key);
-  // // DEBUG_PORT.printf(" read %i  default %i \n", key, Default_Settings.EpromKEY);
-  // if (key == Default_Settings_JSON.EpromKEY) {
-  //   EEPROM.get(10, Saved_Settings);
-  //   DEBUG_PORT.println("- Key OK");
-  //   gfx->println(" Key OK");
-  // } else {
-  //   Saved_Settings = Default_Settings_JSON;
-  //   gfx->println("Using DEFAULTS");
-  //   DEBUG_PORT.println("Using DEFAULTS");
-  //   EEPROM_WRITE(Default_JSON, Default_Settings_JSON);
-  // }
+
 }
 //***********  JSON for configurations ****************
 bool LoadVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevices& config) {
@@ -576,6 +605,10 @@ bool LoadVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
     DEBUG_PORT.println(F("**Failed to deserialise victron JSON file"));
     fault = true;
   }
+  strlcpy(temp, doc["BLEDebug"] | "false", sizeof(temp));
+  config.BLEDebug = (strcmp(temp, "false"));
+  strlcpy(temp, doc["Simulate"] | "false", sizeof(temp));
+  config.Simulate = (strcmp(temp, "false"));
   Num_Victron_Devices = doc["Num_Devices"] | 4;
   CommonDisplayWIdth = doc["CommonDisplayWIdth"] | 150;
   for (int index = 0; index < Num_Victron_Devices; index++) {
@@ -612,15 +645,17 @@ void SaveVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
   // Allocate a temporary JsonDocument
   JsonDocument doc;
   doc[" Comment"] = " DisplayShow Options: 'P' Power 'V' Battery Volts 'I' Battery Current";
-  doc[" C"] = " 'v' second Battery Volts 'i' second Battery Current  (ac charger only)";
-  doc[" C1"] = "'L' Load current 'S' State of charge 'E' error codes 'T' Temperature";
-  doc[" C2"] = " 'A' Aux reading(t or starter) ";
+  doc[" "] = " 'v' second Battery Volts 'i' second Battery Current  (ac charger only)";
+  doc[" "] = "'L' Load current 'S' State of charge 'E' error codes 'T' Temperature";
+  doc[" "] = " 'A' Aux reading(t or starter) ";
 
 
-  doc[" Example"] = "for SmartShunt, IAS will display current, State of charge and Additional data( starter V or temperature)";
-  doc[" Example"] = "for Battery Monitor: V will display Voltage (only)";
+  doc[" "] = "for SmartShunt, IAS will display current, State of charge and (starter V or temperature)";
+  doc[" "] = "for Battery Monitor: V will display Voltage (only)";
   doc[" note"] = "Display height is also adjustable for each 'device', and devices can be duplicated";
-  doc[" note "] = "VICTRON_BLE_RECORD_TYPE:   SOLAR_CHARGER =1,  BATTERY_MONITOR = 2, AC Charger = 8";
+  doc[" Types known "] = " SOLAR_CHARGER =1,  BATTERY_MONITOR = 2, AC Charger = 8";
+  doc["BLEDebug"] = config.BLEDebug True_False; //set.Debug True_False;
+  doc["Simulate"] = config.Simulate True_False; 
   doc["Num_Devices"] = Num_Victron_Devices;
   doc["Common_width"] = CommonDisplayWIdth;
   // doc[" Comment1"]= "for Shunt, VIA will display Battery Volts, Current, Additional data";
@@ -680,9 +715,9 @@ void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   // doc["BoxW"] = set.BoxW;
   doc["FontH"] = set.FontH;
   doc["FontS"] = set.FontS;
-  doc["Simulate"] = set.Simulate True_False;
+ // doc["Simulate"] = set.Simulate True_False;
   doc["Debug"] = set.Debug True_False;
-  doc["BLEDebug"] = set.BLEDebug True_False;
+
   doc["ShowRawDecryptedDataFor"] = set.ShowRawDecryptedDataFor;
   doc["Frame"] = set.Frame True_False;
   // Serialize JSON to file
@@ -723,14 +758,13 @@ bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
 
   set.FontH = doc["FontH"] | WHITE;
   set.FontS = doc["FontS"] | WHITE;
-  strlcpy(temp, doc["Simulate"] | "false", sizeof(temp));
-  set.Simulate = (strcmp(temp, "false"));
+  // strlcpy(temp, doc["Simulate"] | "false", sizeof(temp));
+  // set.Simulate = (strcmp(temp, "false"));
   strlcpy(temp, doc["Frame"] | "false", sizeof(temp));
   set.Frame = (strcmp(temp, "false"));
   strlcpy(temp, doc["Debug"] | "false", sizeof(temp));
   set.Debug = (strcmp(temp, "false"));
-  strlcpy(temp, doc["BLEDebug"] | "false", sizeof(temp));
-  set.BLEDebug = (strcmp(temp, "false"));
+
 
   set.ShowRawDecryptedDataFor = doc["ShowRawDecryptedDataFor"] | 1;
   // Close the file (Curiously, File's destructor doesn't close the file)
@@ -768,6 +802,7 @@ bool LoadConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   strlcpy(config.FourWayBL, doc["FourWayBL"] | "DEPTH", sizeof(config.FourWayBL));
   strlcpy(config.FourWayTR, doc["FourWayTR"] | "WIND", sizeof(config.FourWayTR));
   strlcpy(config.FourWayTL, doc["FourWayTL"] | "STW", sizeof(config.FourWayTL));
+  strlcpy(config.WideScreenCentral, doc["WideScreenCentral"] | "DGRAPH", sizeof(config.WideScreenCentral));
   strlcpy(config.PanelName,                  // User selectable
           doc["PanelName"] | "NMEADISPLAY",  // <- and default in case Json is corrupt / missing !
           sizeof(config.PanelName));
@@ -818,7 +853,6 @@ void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   fs.remove(filename);
   // Open file for writing
   file = fs.open(filename, FILE_WRITE);
-
   if (!file) {
     DEBUG_PORT.println(F("JSON: Failed to create file"));
     if (&fs == &SD) { SD_CS(HIGH); }
@@ -828,7 +862,20 @@ void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   JsonDocument doc;
   // Set the values in the JSON file.. // NOT ALL ARE read yet!!
   //now the settings WIFI etc..
-  doc["WIFI"] = "WIFI  settings and sources";
+   //modify how the display works
+  doc["Display Set"] = "if Start_Page=4, The main 'quad' display ";
+  doc["other useful settings"] ="-21 terminal  -87 victron ble";
+  doc["Start_Page"] = config.Start_Page;
+  doc["LocalTimeOffset"] = config.LocalTimeOffset;
+  doc["Display Options "] = "are: WIND TIME TIMEL SOG SOGGRAPH STW STWGRAPH GPS DEPTH";
+  doc["Graph Options."] = "DGRAPH and DGRAPH2 display 10 and 30 m ranges";
+  doc["FourWayBR"] = config.FourWayBR;
+  doc["FourWayBL"] = config.FourWayBL;
+   doc["FourWayTR"] = config.FourWayTR;
+  doc["FourWayTL"] = config.FourWayTL;
+  doc["Widescreen is "] =" only available for Wide (800 pixel) screens";
+  doc["WideScreenCentral"] = config.WideScreenCentral;
+  doc["WIFI settings"] = "Fill in these for your network";
   doc["ssid"] = settings.ssid;
   doc["password"] = settings.password;
   doc["UDP_PORT"] = settings.UDP_PORT;
@@ -838,34 +885,20 @@ void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   doc["UDP"] = settings.UDP_ON True_False;
   doc["ESP"] = settings.ESP_NOW_ON True_False;
   doc["N2K"] = settings.N2K_ON True_False;
+  doc["BLE - Victron setting"] = "only for Victron display pages (-87,-86)";
+  doc["BLE_enable"] = settings.BLE_enable True_False;
+
  // DEBUG_PORT.print("save magvar:");
  // DEBUG_PORT.printf("%5.3f", BoatData.Variation);
   snprintf(buff, sizeof(buff), "%5.3f", BoatData.Variation);
   doc["Mag_Var"] = buff;
-  //modify how the display works
-  doc["Display Set"] = "set Default Start Page and (if 4) what is shown on the 'quad' display";
-  doc["Start_Page"] = config.Start_Page;
-  doc["LocalTimeOffset"] = config.LocalTimeOffset;
-  doc["Options "] = "options are : SOG SOGGRAPH STW STWGRAPH GPS DEPTH DGRAPH DGRAPH2 ";
-  doc["options cont."] = "DGRAPH  and DGRAPH2 display 10 and 30 m ranges respectively";
-  doc["FourWayBR"] = config.FourWayBR;
-  doc["FourWayBL"] = config.FourWayBL;
-  doc["time display option"] = "Top row right can be WIND or TIME (UTC) or TIMEL (LOCAL)";
-  doc["FourWayTR"] = config.FourWayTR;
-  doc["FourWayTL"] = config.FourWayTL;
-
-  doc["LogComments0"] = "LOG saves read data in SD file with date as name- BUT only when GPS date has been seen!";
-  doc["LogComments1"] = "NMEALOG saves every message. Use NMEALOG only for debugging!";
-  doc["LogComments2"] = "or the NMEALOG files will become huge";
+ 
+  doc["Log settings"] = "LOG saves read data in SD file with date as name- BUT only when GPS date has been seen!";
+  doc["NMEALOG"] = "NMEALOG saves every message. Use NMEALOG only for debugging!";
+  doc["Be Careful"] = " the NMEALOG files will become huge";
   doc["LOG"] = settings.Log_ON True_False;
   doc["LogInterval"] = settings.log_interval_setting;
   doc["NMEALOG"] = settings.NMEA_log_ON True_False;
-
-  doc["BLE - Victron _comment_"] = "These settings below apply only to Victron display pages (-87,-86)";
-  doc["BLE_enable"] = settings.BLE_enable True_False;
-
-
-
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
     DEBUG_PORT.println(F("JSON: Failed to write to file"));
@@ -1003,9 +1036,9 @@ void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
   lastfont = MasterFont;
   if (Speed.data != NMEA0183DoubleNA) {
     if (rad <= 130) {
-      UpdateDataTwoSize(true, true, 8, 7, button, Speed, "%2.0fkt");
+      UpdateDataTwoSize(1,true, true, 8, 7, button, Speed, "%2.0fkt");
     } else {
-      UpdateDataTwoSize(true, true, 10, 9, button, Speed, "%2.0fkt");
+      UpdateDataTwoSize(1,true, true, 10, 9, button, Speed, "%2.0fkt");
     }
   }
 
@@ -1073,8 +1106,12 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       //  gfx->println(WiFi.SSID());
       DEBUG_PORT.print(WiFi.SSID());
       DEBUG_PORT.println(">");
-      //  WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>", WiFi.SSID());
-      MDNS_START();  //(includes advice above)
+     
+      if (MDNS_START()){  //
+      DEBUG_PORT.printf("MDNS Started: http://%s.local\n", WiFi.SSID(),Display_Config.PanelName);
+          WifiGFXinterrupt(8, WifiStatus, "MDNS Started: http://%s.local", WiFi.SSID(),Display_Config.PanelName);}
+        else{WifiGFXinterrupt(8, WifiStatus, "MDNS Fail Connected TO\n<%s>", WiFi.SSID());}
+  
       break;
     case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
       // take care with printf. It can quickly crash if it gets stuff it cannot deal with.
@@ -1153,6 +1190,7 @@ void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //qui
   }
   WIFIGFXBoxdisplaystarted = true;
   WIFIGFXBoxstartedTime = millis();
+  delay(100); // take a breath after showing on screen!
 }
 
 String disconnectreason(int reason) {
@@ -1238,7 +1276,7 @@ bool ScanAndConnect(bool display) {
       delay(1000);
     }
     if (WiFi.status() != WL_CONNECTED) { WifiGFXinterrupt(8, WifiStatus, "Timeout - will try later"); }
-    gfx->setTextBound(0, 0, 480, 480);
+    gfx->setTextBound(0, 0, TOUCH_WIDTH, 480);
   } else {
     AttemptingConnect = false;
     if (display) { WifiGFXinterrupt(8, WifiStatus, "%is WIFI scan found\n <%i> networks\n but not %s\n Will look again in %i seconds", millis() / 1000, NetworksFound, Current_Settings.ssid, scansearchinterval / 1000); }
@@ -1741,3 +1779,9 @@ IPAddress Get_UDP_IP(IPAddress ip, IPAddress mk) {
   ip[3] = lowByte(ip_l);
   return ip;
 }
+
+// Reset the touch screen
+
+
+
+

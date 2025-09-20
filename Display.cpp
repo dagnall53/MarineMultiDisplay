@@ -13,14 +13,16 @@
 
 
 extern bool WIFIGFXBoxdisplaystarted;
+extern bool _WideDisplay;
 extern _sWiFi_settings_Config Current_Settings;
 extern _sDisplay_Config Display_Config;
 extern _sWiFi_settings_Config Saved_Settings;
 extern _sBoatData BoatData;  // BoatData values, int double etc
 extern const char* Setupfilename;
-extern void EEPROM_READ(_sDisplay_Config B, _sWiFi_settings_Config A);
-extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
 
+extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
+extern void SaveConfiguration();
+extern void LoadConfiguration();  // replacement for EEPROM READ
 
 extern void ShowToplinesettings(String Text);
 extern void ShowToplinesettings(_sWiFi_settings_Config A, String Text);
@@ -30,6 +32,8 @@ extern void DrawMeterPointer(Phv center, double wind, int inner, int outer, int 
 extern void DrawCompass(_sButton button);
 extern char* LongtoString(double data);
 extern char* LattoString(double data);
+
+
 
 extern boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B);
 extern boolean IsConnected;        // may be used in AP_AND_STA to flag connection success (got IP)
@@ -73,10 +77,12 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
   if (page != LastPageselected) {
     WIFIGFXBoxdisplaystarted = false;  // will have reset the screen, so turn off the auto wifibox blanking if there was a wifiiterrupt box
                                        // this (above) saves a timed screen refresh that can clear keyboard stuff
+    LoadConfiguration();               //Reload configuration in case new data stored
     RunSetup = true;
   }
   if (reset) {
     WIFIGFXBoxdisplaystarted = false;
+    LoadConfiguration();               //Reload configuration in case new data stored
     RunSetup = true;
   }
   //generic setup stuff for ALL pages
@@ -102,7 +108,15 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
   if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
   // Now specific stuff for each page
 
-  switch (page) {  // just show the logos on the sd card top page
+  switch (page) {  // just show the logos 
+    case -99:  // page for just a blank
+      if (RunSetup) {
+          gfx->fillScreen(BLACK);
+      }
+         gfx->fillScreen(BLACK);
+      break;
+
+
     case -200:
       if (RunSetup) {
         showPicture("/logo.jpg");
@@ -145,7 +159,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
 
       break;
 
-    case -99:  //a test for Screen Colours / fonts
+    case -199:  //a test for Screen Colours / fonts
       if (RunSetup) {
         gfx->fillScreen(BLACK);
         gfx->setTextColor(WHITE);
@@ -185,10 +199,6 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
             GFXBorderBoxPrintf(CurrentSettingsBox, "GREEN ");
             break;
         }
-        
-
-
-
         //gfx->fillScreen(BLACK);
         fontlocal = fontlocal + 1;
         if (fontlocal > 5) { fontlocal = 0; }
@@ -201,10 +211,11 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (RunSetup) {
         jpegDraw("/vicback.jpg", jpegDrawCallback, true /* useBigEndian */,
                  0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        Serial.println("redrawing background");
+       // Serial.println("redrawing background");
       }
-
+       
       // all graphics done in VICTRONBLE
+      if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
       if (CheckButton(FullTopCenter)) { Display_Page = -86; }
       break;
     case -86:                                              // page for text display of Vicron data
@@ -238,7 +249,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
     case -22:                                              //  "EXPERIMENT in N2K data"
       if (RunSetup) { GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        //EEPROM_READ(Display_Config, Current_Settings);  // makes sure eeprom update data is latest and synchronised! 
+        //LoadConfiguration();//(Display_Config, Current_Settings);  // makes sure eeprom update data is latest and synchronised!
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
@@ -266,7 +277,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       //   DataChanged = true;
       // };
       // if (CheckButton(Switch11)) {
-      //   EEPROM_WRITE(Display_Config, Current_Settings);
+      //    SaveConfiguration();//(Display_Config, Current_Settings);
       //   delay(50);
       //   // Display_Page = 0;
       //   DataChanged = true;
@@ -303,7 +314,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         GFXBorderBoxPrintf(Terminal, "");
       }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        //EEPROM_READ((Display_Config, Current_Settings); // makes sure eeprom update data is latest and synchronised!
+        //LoadConfiguration();//((Display_Config, Current_Settings); // makes sure eeprom update data is latest and synchronised!
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
         // GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
@@ -363,7 +374,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         DataChanged = true;
       };
       if (CheckButton(Switch11)) {
-        EEPROM_WRITE(Display_Config, Current_Settings);
+        SaveConfiguration();  //(Display_Config, Current_Settings);
         delay(50);
         // Display_Page = 0;
         DataChanged = true;
@@ -469,7 +480,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
             gfx->println(">");
 
 
-               gfx->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+            gfx->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
             delay(10);
           }
         }
@@ -570,7 +581,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         gfx->fillScreen(BLACK);
         gfx->setTextColor(BLACK);
         gfx->setTextSize(1);
-        //EEPROM_READ((Display_Config, Current_Settings);
+        //LoadConfiguration();//((Display_Config, Current_Settings);
         ShowToplinesettings(Saved_Settings, "EEPROM");
         setFont(4);
         GFXBorderBoxPrintf(SecondRowButton, "SSID <%s>", Current_Settings.ssid);
@@ -614,7 +625,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       };
 
       if (CheckButton(Switch4)) {
-        EEPROM_WRITE(Display_Config, Current_Settings);
+        SaveConfiguration();  //(Display_Config, Current_Settings);
         delay(50);
         // Display_Page = 0;
         DataChanged = true;
@@ -651,7 +662,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (CheckButton(Full5Center)) { Display_Page = -86; }
       if (CheckButton(Full6Center)) {
         //Display_Page = 4;
-        EEPROM_WRITE(Display_Config, Current_Settings);
+        SaveConfiguration();  //(Display_Config, Current_Settings);
         delay(50);
         //    WiFi.disconnect();
         ESP.restart();
@@ -662,82 +673,42 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (RunSetup) {
         setFont(10);
         gfx->fillScreen(BLACK);
-        if (String(Display_Config.FourWayTR) == "WIND") {
-          DrawCompass(topRightquarter);  // only draw the compass once!
-          AddTitleInsideBox(8, 3, topRightquarter, "WIND APP ");
-        }
-        //   GFXBorderBoxPrintf(topLeftquarter, "");
-        // AddTitleInsideBox(9, 3, topLeftquarter, "STW ");
-        //AddTitleInsideBox(9, 2, topLeftquarter, " Kts");  //font,position
-        setFont(10);
-        //SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m");
       }
-      if (millis() > slowdown + 1000) {
-        slowdown = millis();  //only make/update copies every second!  else undisplayed copies will be redrawn!
-        // could have more complex that accounts for displayed already?
-        setFont(12);
-        if (String(Display_Config.FourWayTR) == "TIME") {
-          GFXBorderBoxPrintf(topRightquarter, "%02i:%02i",
-                             int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
-          AddTitleInsideBox(9, 3, topRightquarter, "UTC ");
-        }
-        if (String(Display_Config.FourWayTR) == "TIMEL") {
-          GFXBorderBoxPrintf(topRightquarter, "%02i:%02i",
-                             int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
-          AddTitleInsideBox(9, 3, topRightquarter, "LOCAL ");
-        }
-        setFont(10);
-      }
+      ButtonDataSelect(topLeftquarter, 0, Display_Config.FourWayTL, RunSetup);
+      ButtonDataSelect(topRightquarter, 1, Display_Config.FourWayTR, RunSetup);
+      ButtonDataSelect(bottomRightquarter, 2, Display_Config.FourWayBR, RunSetup);
+      ButtonDataSelect(bottomLeftquarter, 3, Display_Config.FourWayBL, RunSetup);
+    if (_WideDisplay)  {ButtonDataSelect(WideScreenCentral, 4, Display_Config.WideScreenCentral, RunSetup);}
 
-      //UpdateDataTwoSize(true, true, 13, 11, topLeftquarter, BoatData.STW, "%.1f");
-
-
-      if (String(Display_Config.FourWayTR) == "WIND") { WindArrow2(topRightquarter, BoatData.WindSpeedK, BoatData.WindAngleApp); }
-
-
-      //seeing if JSON setting of (bottom two sides of) quad is useful.. TROUBLE with two scrollGraphss so there is now extra 'instances' settings allowing two to run simultaneously!! ?
-      if (String(Display_Config.FourWayTL) == "DEPTH") { UpdateDataTwoSize(RunSetup, "DEPTH", " M", true, true, 13, 11, topLeftquarter, BoatData.WaterDepth, "%.1f"); }
-      if (String(Display_Config.FourWayTL) == "SOG") { UpdateDataTwoSize(RunSetup, "SOG", " Kts", true, true, 13, 11, topLeftquarter, BoatData.SOG, "%.1f"); }
-      if (String(Display_Config.FourWayTL) == "STW") { UpdateDataTwoSize(RunSetup, "STW", " Kts", true, true, 13, 11, topLeftquarter, BoatData.STW, "%.1f"); }
-
-
-
-      if (String(Display_Config.FourWayBL) == "DEPTH") { UpdateDataTwoSize(RunSetup, "DEPTH", " M", true, true, 13, 11, bottomLeftquarter, BoatData.WaterDepth, "%.1f"); }
-      if (String(Display_Config.FourWayBL) == "SOG") { UpdateDataTwoSize(RunSetup, "SOG", " Kts", true, true, 13, 11, bottomLeftquarter, BoatData.SOG, "%.1f"); }
-      if (String(Display_Config.FourWayBL) == "STW") { UpdateDataTwoSize(RunSetup, "STW", " Kts", true, true, 13, 11, bottomLeftquarter, BoatData.STW, "%.1f"); }
-
-      if (String(Display_Config.FourWayBL) == "GPS") { ShowGPSinBox(9, bottomLeftquarter); }
-
-      if (String(Display_Config.FourWayBL) == "DGRAPH") { SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.WaterDepth, 10, 0, 8, "Fathmometer 10m ", "m"); }
-      if (String(Display_Config.FourWayBL) == "DGRAPH2") { SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
-      if (String(Display_Config.FourWayBL) == "STWGRAPH") { SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.STW, 0, 10, 8, "STW ", "kts"); }
-      if (String(Display_Config.FourWayBL) == "SOGGRAPH") { SCROLLGraph(RunSetup, 0, 1, true, bottomLeftquarter, BoatData.SOG, 0, 10, 8, "SOG ", "kts"); }
-
-      // note use of SCROLLGraph2
-      if (String(Display_Config.FourWayBR) == "DEPTH") { UpdateDataTwoSize(RunSetup, "DEPTH", " M", true, true, 13, 11, bottomRightquarter, BoatData.WaterDepth, "%.1f"); }
-      if (String(Display_Config.FourWayBR) == "SOG") { UpdateDataTwoSize(RunSetup, "SOG", " Kts", true, true, 13, 11, bottomRightquarter, BoatData.SOG, "%.1f"); }
-      if (String(Display_Config.FourWayBR) == "STW") { UpdateDataTwoSize(RunSetup, "STW", " Kts", true, true, 13, 11, bottomRightquarter, BoatData.STW, "%.1f"); }
-
-      if (String(Display_Config.FourWayBR) == "GPS") { ShowGPSinBox(9, bottomRightquarter); }
-
-      if (String(Display_Config.FourWayBR) == "DGRAPH") { SCROLLGraph(RunSetup, 1, 1, true, bottomRightquarter, BoatData.WaterDepth, 10, 0, 8, "Fathmometer 10m ", "m"); }
-      if (String(Display_Config.FourWayBR) == "DGRAPH2") { SCROLLGraph(RunSetup, 1, 1, true, bottomRightquarter, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
-      if (String(Display_Config.FourWayBR) == "SOGGRAPH") { SCROLLGraph(RunSetup, 1, 1, true, bottomRightquarter, BoatData.SOG, 0, 10, 8, "SOG ", "kts"); }
-      if (String(Display_Config.FourWayBR) == "STWGRAPH") { SCROLLGraph(RunSetup, 1, 1, true, bottomRightquarter, BoatData.STW, 0, 10, 8, "STW ", "kts"); }
-
-
-      if (CheckButton(topLeftquarter)) { Display_Page = 6; }     //stw
-      if (CheckButton(bottomLeftquarter)) { Display_Page = 7; }  //depth
-      if (CheckButton(topRightquarter)) { Display_Page = 5; }    // Wind
-      if (CheckButton(bottomRightquarter)) {
-        if (String(Display_Config.FourWayBR) == "GPS") {
-          Display_Page = 9;
-        } else {
-          Display_Page = 8;
-        }  //SOG
-      }
+      if (CheckButton(topLeftquarter)) { Display_Page = 20; }     //stw
+      if (CheckButton(bottomLeftquarter)) { Display_Page = 23; }  //depth
+      if (CheckButton(topRightquarter)) { Display_Page = 21; }    // Wind
+      if (CheckButton(bottomRightquarter)) { Display_Page = 22; }
+    if (_WideDisplay)  {  if (CheckButton(WideScreenCentral)) { Display_Page = 24; }}
 
       break;
+    case 20:  // full screen display (new)
+      ButtonDataSelect(FullScreen, 0, Display_Config.FourWayTL, RunSetup);
+      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }  // option for later adding buttons top left / right
+      break;
+    case 21:  // full screen display (new)
+      ButtonDataSelect(FullScreen, 1, Display_Config.FourWayTR, RunSetup);
+      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }
+      break;
+    case 22:  // full screen display (new)
+      ButtonDataSelect(FullScreen, 2, Display_Config.FourWayBR, RunSetup);
+      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }
+      break;
+    case 23:  // full screen display (new)
+      ButtonDataSelect(FullScreen, 3, Display_Config.FourWayBL, RunSetup);
+      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }
+      break;
+    case 24:  // full screen display (new)
+    if (!_WideDisplay) {return;}
+      ButtonDataSelect(FullScreen, 4, Display_Config.WideScreenCentral, RunSetup);
+      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }  
+      break;
+
 
     case 5:  // wind instrument
       if (RunSetup) {
@@ -753,164 +724,13 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       }
 
       WindArrow2(BigSingleDisplay, BoatData.WindSpeedK, BoatData.WindAngleApp);
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.WindAngleApp, "%.1f");
+      UpdateDataTwoSize(1, true, true, 12, 10, BigSingleTopRight, BoatData.WindAngleApp, "%.1f");
       if (CheckButton(BigSingleDisplay)) { Display_Page = 15; }
       if (CheckButton(topLeftquarter)) { Display_Page = 4; }
       break;
 
-    case 6:  //STW Speed Through WATER GRAPH
-      if (RunSetup) {
-        setFont(10);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        GFXBorderBoxPrintf(BigSingleTopLeft, "");
-        AddTitleInsideBox(8, 3, BigSingleTopRight, "STW");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, "Kts");
-        AddTitleInsideBox(8, 3, BigSingleTopLeft, "SOG");
-        AddTitleInsideBox(8, 2, BigSingleTopLeft, "Kts");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-      }
 
-      SCROLLGraph(RunSetup, 0, 3, true, BigSingleDisplay, BoatData.STW, 0, 10, 9, "STW Graph ", "Kts");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopLeft, BoatData.SOG, "%.1f");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.STW, "%.1f");
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 16; }
-      //        TouchCrosshair(20); quarters select big screens
-      if (CheckButton(BigSingleTopLeft)) { Display_Page = 8; }
-      //if (CheckButton(bottomLeftquarter)) { Display_Page = 9; }
-      //if (CheckButton(bottomRightquarter)) { Display_Page = 4; }
 
-      break;
-
-    case 16:  //STW large
-      if (RunSetup) {
-        setFont(10);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        GFXBorderBoxPrintf(BigSingleTopLeft, "");
-        AddTitleInsideBox(8, 3, BigSingleTopRight, "STW");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, "Kts");
-        AddTitleInsideBox(8, 3, BigSingleDisplay, "STW");
-        AddTitleInsideBox(8, 2, BigSingleDisplay, "Kts");
-        AddTitleInsideBox(8, 3, BigSingleTopLeft, "SOG");
-        AddTitleInsideBox(8, 2, BigSingleTopLeft, "Kts");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-      }
-      LocalCopy = BoatData.STW;
-      UpdateDataTwoSize(3, true, true, 13, 12, BigSingleDisplay, LocalCopy, "%.1f");  // note magnify 3!! so needs the local copy
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopLeft, BoatData.SOG, "%.1f");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.STW, "%.1f");
-
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 6; }
-      //        TouchCrosshair(20); quarters select big screens
-      if (CheckButton(BigSingleTopLeft)) { Display_Page = 8; }
-      break;
-
-    case 7:  // Depth  (fathmometer 30)  (circulate 7/11/17)
-      if (RunSetup) {
-        setFont(11);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        AddTitleInsideBox(8, 3, BigSingleTopRight, "Depth");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, " m");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-        //AddTitleInsideBox(9,3,BigSingleDisplay, "Fathmometer 30m");
-      }
-
-      SCROLLGraph(RunSetup, 0, 3, true, BigSingleDisplay, BoatData.WaterDepth, 30, 0, 9, "Fathmometer 30m ", "m");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.WaterDepth, "%.1f");
-
-      if (CheckButton(BigSingleTopRight)) { Display_Page = 4; }
-      //        TouchCrosshair(20); quarters select big screens
-      if (CheckButton(topLeftquarter)) { Display_Page = 4; }
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 11; }
-      break;
-
-    case 11:  // Depth (fathmometer 1 0) different range
-      if (RunSetup) {
-        setFont(10);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        AddTitleInsideBox(8, 1, BigSingleTopRight, "Depth");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, "m");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-      }
-
-      SCROLLGraph(RunSetup, 0, 3, true, BigSingleDisplay, BoatData.WaterDepth, 10, 0, 9, "Fathmometer 10m ", "m");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.WaterDepth, "%.1f");
-
-      //        TouchCrosshair(20); quarters select big screens
-      if (CheckButton(topLeftquarter)) { Display_Page = 4; }
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 17; }
-      if (CheckButton(topRightquarter)) { Display_Page = 7; }
-      break;
-
-    case 17:  // Depth (big digital)
-      if (RunSetup) {
-        setFont(10);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        AddTitleInsideBox(8, 1, BigSingleTopRight, "Depth");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, "m");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-        AddTitleInsideBox(10, 2, BigSingleDisplay, "m");
-      }
-      LocalCopy = BoatData.WaterDepth;  //WaterDepth, "%4.1f m");  // nb %4.1 will give leading printing space- giving formatting issues!
-      UpdateDataTwoSize(4, true, true, 12, 10, BigSingleDisplay, LocalCopy, "%.1f");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.WaterDepth, "%.1f");
-      if (CheckButton(topLeftquarter)) { Display_Page = 4; }
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 7; }
-      //if (CheckButton(topRightquarter)) { Display_Page = 4; }
-      break;
-
-    case 8:  //SOG  graph
-      if (RunSetup || DataChanged) {
-        setFont(11);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        GFXBorderBoxPrintf(BigSingleTopLeft, "");
-        AddTitleInsideBox(8, 3, BigSingleTopRight, "STW");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, "Kts");
-        AddTitleInsideBox(8, 3, BigSingleTopLeft, "SOG");
-        AddTitleInsideBox(8, 2, BigSingleTopLeft, "Kts");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-
-        DataChanged = false;
-      }
-
-      SCROLLGraph(RunSetup, 0, 3, true, BigSingleDisplay, BoatData.SOG, 0, 10, 9, "SOG Graph ", "kts");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.STW, "%.1f");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopLeft, BoatData.SOG, "%.1f");
-
-      //if (CheckButton(Full0Center)) { Display_Page = 4; }
-      //        TouchCrosshair(20); quarters select big screens
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 18; }  //18 is BIG SOG
-      //if (CheckButton(bottomLeftquarter)) { Display_Page = 9; }
-      if (CheckButton(BigSingleTopRight)) { Display_Page = 6; }
-      if (CheckButton(BigSingleTopLeft)) { Display_Page = 4; }
-      break;
-
-    case 18:  //BIG SOG
-      if (RunSetup || DataChanged) {
-        setFont(11);
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        GFXBorderBoxPrintf(BigSingleTopLeft, "");
-        AddTitleInsideBox(8, 3, BigSingleTopRight, "STW");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, "Kts");
-        AddTitleInsideBox(8, 3, BigSingleTopLeft, "SOG");
-        AddTitleInsideBox(8, 2, BigSingleTopLeft, "Kts");
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-        DataChanged = false;
-      }
-      if (millis() > slowdown + 500) {
-        slowdown = millis();
-      }
-      LocalCopy = BoatData.SOG;
-      UpdateDataTwoSize(3, true, true, 13, 12, BigSingleDisplay, LocalCopy, "%.1f");  //note magnify 3 is a repeat display so needs the localCopy
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopRight, BoatData.STW, "%.1f");
-      UpdateDataTwoSize(true, true, 12, 10, BigSingleTopLeft, BoatData.SOG, "%.1f");
-
-      //if (CheckButton(Full0Center)) { Display_Page = 4; }
-      //        TouchCrosshair(20); quarters select big screens
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 8; }  //18 is BIG SOG
-      //if (CheckButton(bottomLeftquarter)) { Display_Page = 9; }
-      if (CheckButton(BigSingleTopRight)) { Display_Page = 6; }
-      if (CheckButton(BigSingleTopLeft)) { Display_Page = 4; }
-      break;
 
     case 9:  // GPS page
       if (RunSetup) {
@@ -921,8 +741,8 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
         setFont(10);
       }
-      UpdateDataTwoSize(true, true, 9, 8, TopHalfBigSingleTopRight, BoatData.SOG, "SOG: %.1f kt");
-      UpdateDataTwoSize(true, true, 9, 8, BottomHalfBigSingleTopRight, BoatData.COG, "COG: %.1f d");
+      UpdateDataTwoSize(1, true, true, 9, 8, TopHalfBigSingleTopRight, BoatData.SOG, "SOG: %.1f kt");
+      UpdateDataTwoSize(1, true, true, 9, 8, BottomHalfBigSingleTopRight, BoatData.COG, "COG: %.1f d");
       if (millis() > slowdown + 1000) {
         slowdown = millis();
         GFXBorderBoxPrintf(BigSingleDisplay, "");
@@ -1025,9 +845,9 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (millis() > slowdown + 500) {
         slowdown = millis();
       }
-      UpdateDataTwoSize(true, true, 9, 8, TopHalfBigSingleTopRight, BoatData.WindAngleApp, "app %.1f");
+      UpdateDataTwoSize(1, true, true, 9, 8, TopHalfBigSingleTopRight, BoatData.WindAngleApp, "app %.1f");
       WindArrow2(BigSingleDisplay, BoatData.WindSpeedK, BoatData.WindAngleGround);
-      UpdateDataTwoSize(true, true, 9, 8, BottomHalfBigSingleTopRight, BoatData.WindAngleGround, "gnd %.1f");
+      UpdateDataTwoSize(1, true, true, 9, 8, BottomHalfBigSingleTopRight, BoatData.WindAngleGround, "gnd %.1f");
 
       if (CheckButton(topLeftquarter)) { Display_Page = 4; }
       if (CheckButton(BigSingleDisplay)) { Display_Page = 5; }
@@ -1244,5 +1064,51 @@ void ShowGPSinBox(int font, _sButton button) {
       UpdateLinef(font, button, "%s", LongtoString(BoatData.Longitude.data));
       UpdateLinef(font, button, "");
     }
+  }
+}
+void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSetup) {  //replaces all the code in earlier versions
+  // set text size depending on the button Height
+  int magnify; int timefont;
+  timefont=12;
+  static unsigned int slowdown;
+  magnify = 1;
+  if (Position.height >= 250) {
+    magnify = 3;
+    timefont=13;
+  }
+  if(RunSetup) slowdown=0;
+
+  if (Choice == "SOG") { ButtonMasterDisplay(RunSetup, "SOG", " Kts", magnify, true, true, 13, 11, Position, BoatData.SOG, "%.1f"); }
+  if (Choice == "STW") { ButtonMasterDisplay(RunSetup, "STW", " Kts", magnify, true, true, 13, 11, Position, BoatData.STW, "%.1f"); }
+  if (Choice == "DEPTH") { ButtonMasterDisplay(RunSetup, "DEPTH", " M", magnify, true, true, 13, 11, Position, BoatData.WaterDepth, "%.1f"); }
+  if (Choice == "DGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 10, 0, 8, "Fathmometer 10m ", "m"); }
+  if (Choice == "DGRAPH2") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
+  if (Choice == "STWGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.STW, 0, 10, 8, "STW-Graph ", "kts"); }
+  if (Choice == "SOGGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.SOG, 0, 10, 8, "SOG-Graph ", "kts"); }
+  if (Choice == "GPS") { ShowGPSinBox(9, Position); }
+  if (Choice == "TIME") {
+    if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
+      slowdown = millis();setFont(timefont);
+      GFXBorderBoxPrintf(Position, "%02i:%02i",
+                         int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
+      AddTitleInsideBox(9, 3, Position, "UTC ");setFont(10);
+    }
+  }
+  if (Choice == "TIMEL") {
+    if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
+      slowdown = millis();setFont(timefont);
+      GFXBorderBoxPrintf(Position, "%02i:%02i",
+                         int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
+      AddTitleInsideBox(9, 3, Position, "LOCAL ");setFont(10);
+    }
+  }
+
+  if (Choice == "WIND") {
+    if (RunSetup) {
+      AddTitleInsideBox(8, 2, Position, " deg");
+      DrawCompass(Position);
+      AddTitleInsideBox(8, 3, Position, "WIND Apparent ");
+    }
+    WindArrow2(Position, BoatData.WindSpeedK, BoatData.WindAngleApp);
   }
 }

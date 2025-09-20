@@ -43,12 +43,19 @@ extern bool hasSD;
 static bool INSTlogFileStarted = false;
 static bool NMEAINSTlogFileStarted = false;
 
-extern _sDisplay_Config Display_Config;
 
 extern const char *Setupfilename;
 extern bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings);
 extern void SaveConfiguration(fs::FS &fs, const char *filename, _sDisplay_Config &config, _sWiFi_settings_Config &settings);
 extern _sWiFi_settings_Config Current_Settings;
+extern _sDisplay_Config Saved_Display_Config;
+extern _sDisplay_Config Display_Config;
+extern _sWiFi_settings_Config Saved_Settings;
+extern _sDisplay_Config Default_JSON;  // many display stuff set default
+extern _sWiFi_settings_Config Default_Settings_JSON;
+
+
+
 extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
 
 extern void PrintJsonFile(const char *comment, const char *filename);
@@ -68,6 +75,7 @@ extern void showPicture(const char *name);
 extern Arduino_RGB_Display *gfx;  //  change if alternate (not 'Arduino_RGB_Display' ) display !
 extern void setFont(int);
 extern const char soft_version[];
+extern const char _device[];
 //const char *host = "NMEADisplay";
 extern _sBoatData BoatData;
 extern void WifiGFXinterrupt(int font, _sButton &button, const char *fmt, ...);
@@ -86,16 +94,16 @@ extern bool SDexists(const char *path);  // only for SD library
 
 // //****************write file etc from examples and  from (eg) https://randomnerdtutorials.com/esp32-data-logging-temperature-to-microsd-card/
 void writeFile(fs::FS &fs, const char *path, const char *message) {
-  DEBUG_PORT.printf("*writeFile  Writing file: [%s]  [%s]\n", path, message);
+  Serial.printf("*writeFile  Writing file: [%s]  [%s]\n", path, message);
   File file = fs.open(path, FILE_WRITE);
   if (!file) {
-    DEBUG_PORT.println("*writeFile Failed to open file for writing");
+    Serial.println("*writeFile Failed to open file for writing");
     return;
   }
   if (file.print(message)) {
-    //  DEBUG_PORT.println("File written");
+    //  Serial.println("File written");
   } else {
-    DEBUG_PORT.println("*writeFile Write failed");
+    Serial.println("*writeFile Write failed");
   }
   file.close();
 }
@@ -123,13 +131,13 @@ String html_Question() {
   st += String(esp_get_idf_version());
   st += ")</center><br><center>Code Comments</b><br></center><left>";
   st += "<title>NavDisplay ";
-  st += String(soft_version);
+  st += String(_device);  st += String(soft_version);
   st += "</title>";
   st += " </head>";
   st += "<body><center><h1 ><a>This device's panel name is ";
   st += String(Display_Config.PanelName);
   st += "</h1><br>\r\n</a><h1>Software :";
-  st += String(soft_version);
+  st += String(_device);  st += String(soft_version);
   st += "</h1><br> I may add user help instructions here:<br>";
   st += "</center></body></html>";
   return st;
@@ -166,11 +174,14 @@ String html_startws() {
   st += String(Display_Config.PanelName);
   st += "</div>"
         "<div class='version'>";
-  st += String(soft_version);
+  st += String(_device);  st += String(soft_version);
   st += "</div>"
         "<h1><a class='button-link' href='http://";
   st += String(Display_Config.PanelName);
   st += ".local/Reset'>RESTART</a></h1>"
+        "<h1><a class='button-link' href='http://";
+  st += String(Display_Config.PanelName);
+  st += ".local/Reload'>Reload Config files</a></h1>"
         "<h1><a class='button-link' href='http://";
   st += String(Display_Config.PanelName);
   st += ".local/OTA'>OTA UPDATE</a></h1>"
@@ -182,7 +193,7 @@ String html_startws() {
   File dir = SD.open("/logs");
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
-    DEBUG_PORT.println(entry.path());
+    Serial.println(entry.path());
     if (!entry) { break; }
     filename = String(entry.path());
     st += "<h1 ><a class='button-linkSmall' href='http://";
@@ -218,7 +229,7 @@ String serverIndex() {
     DEBUG_PORT.println("using Ffats /edit/ javascript");
     st = "<script src='/edit/jquery.min.js'></script>";
   } else {
-    DEBUG_PORT.println("using Internet js");
+    Serial.println("using Internet js");
     st = "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>";
   }
 
@@ -273,7 +284,7 @@ String serverIndex() {
 }
 
 void handleRoot() {
-  //DEBUG_PORT.println(" Sending local html version of Root webpage");
+  //Serial.println(" Sending local html version of Root webpage");
   server.send(200, "text/html", html_startws() + "\r\n");
 }
 
@@ -284,31 +295,60 @@ void handleQuestion() {
   server.client().stop();
 }
 
-void MDNS_START(){ 
+bool MDNS_START(){ 
   delay(10) ;
   if (MDNS.begin(Display_Config.PanelName)) {
     MDNS.addService("http", "tcp", 80);
-    DEBUG_PORT.println("MDNS responder started");
-    DEBUG_PORT.print("You can now connect to http://");
-    DEBUG_PORT.print(Display_Config.PanelName);
-    DEBUG_PORT.println(".local");
-    WifiGFXinterrupt(8, WifiStatus, "Connected:\n<%s>\n http://%s.local", WiFi.SSID(),Display_Config.PanelName);
-  }else{DEBUG_PORT.println(" MDNS responder FAILED to start");WifiGFXinterrupt(8, WifiStatus, "Connected TO\n<%s>", WiFi.SSID());}
+    Serial.println("MDNS responder started");
+    Serial.print("You can now connect to http://");
+    Serial.print(Display_Config.PanelName);
+    Serial.println(".local");
+    return true;
+   //WifiGFXinterrupt(8, WifiStatus, "MDNS Started: http://%s.local", WiFi.SSID(),Display_Config.PanelName);
+  }else{
+    return false;}
   }
 
 void SetupWebstuff() {
- MDNS_START();
+  // do in events ?MDNS_START();
   //**************
   server.on("/", HTTP_GET, []() {
-    DEBUG_PORT.println(" handling  root");
+    Serial.println(" handling  root");
     WifiGFXinterrupt(8, WifiStatus, "Running Webserver");
     WebServerActive = true;
     handleRoot();
   });
+
+  server.on("/Reload", HTTP_GET, []() {
+    if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
+    DEBUG_PORT.println("USING FATS JSON for wifi and display settings");
+    gfx->println(F("USING FATS JSON for WiFi and display settings"));
+    Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
+    Display_Page = Display_Config.Start_Page;
+   } 
+  if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
+    DEBUG_PORT.println("USING FATS JSON for Victron data settings");
+    gfx->println(F("USING FATS JSON for Victron settings"));
+  } 
+  if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
+    DEBUG_PORT.println("USING FATS JSON for Colours data settings");
+    gfx->println(F("USING FATS JSON for Colours data settings"));
+  } 
+
+    delay(100);
+    WifiGFXinterrupt(8, WifiStatus, "Reloading configs");
+    handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
+
+    delay(150);
+
+  });
+
   server.on("/Reset", HTTP_GET, []() {
     handleRoot();
     if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) { EEPROM_WRITE(Display_Config, Current_Settings); }  // stops overwrite with bad JSON data!!
-    // Victron is never set up by the touchscreen only via SD editor so NO SaveVictronConfiguration(VictronDevicesSetupfilename,victronDevices);// save config with bytes ??
+    // Victron is never set up by the touchscreen only via SD editor so NOT needed? but makes sure construct is our usual one   
+    SaveVictronConfiguration(FFat,VictronDevicesSetupfilename,victronDevices);// save config with bytes ??
+    delay(100);
     WifiGFXinterrupt(8, WifiStatus, "RESTARTING");
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
     server.sendHeader("Connection", "close");
@@ -319,17 +359,17 @@ void SetupWebstuff() {
   server.on("/Save", HTTP_GET, []() {
     handleRoot();
     if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) {
-      DEBUG_PORT.println("***Updating EEPROM from ");
+      Serial.println("***Updating EEPROM from ");
       EEPROM_WRITE(Display_Config, Current_Settings);
     }  // stops overwrite with bad JSON data!!
     if (LoadVictronConfiguration(FFat,VictronDevicesSetupfilename, victronDevices)) {
       PrintJsonFile(" Check Updated Victron settings after Web initiated SAVE ", VictronDevicesSetupfilename);
-      DEBUG_PORT.println("***Updated Victron data settings");
+      Serial.println("***Updated Victron data settings");
     }
     if (LoadDisplayConfiguration(FFat,ColorsFilename, ColorSettings)) {
-      DEBUG_PORT.println(" USING JSON for Colours data settings");
+      Serial.println(" USING JSON for Colours data settings");
     } else {
-      DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT and Making File on SD****\n\n");
+      Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT and Making File on SD****\n\n");
       SaveDisplayConfiguration(FFat,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
     }
     delay(50);
@@ -338,16 +378,14 @@ void SetupWebstuff() {
   });
 
   server.on("/OTA", HTTP_GET, []() {
-    WifiGFXinterrupt(9, WifiStatus, "Halting for OTA");
+    WifiGFXinterrupt(8, WifiStatus, "Ready for OTA");
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", serverIndex());
-    HaltOtherOperations=true;
   });
   server.on("/ota", HTTP_GET, []() {
-    WifiGFXinterrupt(9, WifiStatus, "Halting for OTA");
+    WifiGFXinterrupt(8, WifiStatus, "Ready for OTA");
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", serverIndex());
-    HaltOtherOperations=true;
   });
 
 
@@ -371,8 +409,9 @@ void SetupWebstuff() {
         gfx->setCursor(0, 40);
         gfx->setTextWrap(true);
         gfx->printf("Update: %s\n", upload.filename.c_str());
-        DEBUG_PORT.printf("Update: %s\n", upload.filename.c_str());
-        DEBUG_PORT.printf("   current size: %u   total size %u\n", upload.currentSize, upload.totalSize);
+        // Does not know total size here!gfx->printf("Total size: %u\n", upload.totalSize);
+       // Serial.printf("Update: %s\n", upload.filename.c_str());
+       // Serial.printf("   current size: %u   total size %u\n", upload.currentSize, upload.totalSize);
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  //start with max available size
           Update.printError(Serial);
         }
@@ -386,14 +425,13 @@ void SetupWebstuff() {
         static uint32_t next = 51200;
         if (upload.totalSize >= next) {
          gfx->printf(" %dk ", next / 1024);
-         DEBUG_PORT.printf("%dk ", next / 1024);
+         //Serial.printf("%dk ", next / 1024);
           next += chunk_size;
         }
       } else if (upload.status == UPLOAD_FILE_END) {
         if (Update.end(true)) {             //true to set the size to the current progress
-        HaltOtherOperations=false;
         WifiGFXinterrupt(9, WifiStatus, "SW UPDATED");
-        DEBUG_PORT.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+        //Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
           delay(500);
         } else {
           Update.printError(Serial);
@@ -406,14 +444,14 @@ void SetupWebstuff() {
 
 
   server.begin();
-  DEBUG_PORT.println("HTTP server started");
+  Serial.println("HTTP server started");
 }
 
 
 
 // Append data to the SD card (DON'T MODIFY THIS FUNCTION)
 void appendFile(fs::FS &fs, const char *path, const char *message) {
-  // DEBUG_PORT.printf("Appending to file: %s\n", path);
+  // Serial.printf("Appending to file: %s\n", path);
   if (!hasSD){return;}
   SD_CS(LOW);
   File file = fs.open(path, FILE_APPEND);

@@ -589,7 +589,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
              manCharBuf[j]=pHex[j];  // save to our won array from pHex pointer for use in this function
           }                          // NOTE: could use pHex[x] directly, but I noted some issues - probably with timing and Serial printf and (possibly) another call to this function while the printf was being done
 
-    if (ColorSettings.BLEDebug) {  //SERIAL print shows ANY BLE with MFr data.
+    if (victronDevices.BLEDebug) {  //SERIAL print shows ANY BLE with MFr data.
       Serial.printf("BLE: mac<%s> type<%02X> <%s> ", advertisedDevice.getAddress().toString().c_str(),
                     manCharBuf[1], Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
       if (advertisedDevice.haveName()) {
@@ -663,7 +663,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     return;
   }
   // Serial.printf("Deal_With_BLE_<%i>_Data", i); 
-  if(ColorSettings.BLEDebug){
+  if(victronDevices.BLEDebug){
   snprintf(debugMsg, 120, "Victron<%i>,", i);
   strcat(VictronBuffer, debugMsg);
 
@@ -677,14 +677,14 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   // // for record type list see line 300 on https://github.com/Fabian-Schmidt/esphome-victron_ble/blob/main/components/victron_ble/victron_ble.h
   // Product mapping in decimal: https://github.com/keshavdv/victron-ble/blob/main/Victron_ProductId_mapping.txt
 
-  if (ColorSettings.Simulate) {  // // now.. 4.31, Use the value written as part of the device data in vconfig.txt
+  if (victronDevices.Simulate) {  // // now.. 4.31, Use the value written as part of the device data in vconfig.txt
     vicData->VICTRON_BLE_RECORD_TYPE = victronDevices.VICTRON_BLE_RECORD_TYPE[i];
     vicData->product_id = 1000;  // just a dummy
 
   } else {
     victronDevices.VICTRON_BLE_RECORD_TYPE[i] = vicData->VICTRON_BLE_RECORD_TYPE;
   }  //save it to our config file to save us having to do it manually      }
-  if(ColorSettings.BLEDebug){
+  if(victronDevices.BLEDebug){
    snprintf(debugMsg, 120, " Type<%s>,ProductID(%i),", RecordTypeToChar(vicData->VICTRON_BLE_RECORD_TYPE), vicData->product_id);
    strcat(VictronBuffer, debugMsg);}
   //Serial.println(debugMsg);
@@ -696,7 +696,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   //Decode / decrypt..
   unsigned char localbyteKey[17];
   hexCharStrToByteArray(victronDevices.charKey[i], localbyteKey);
-  if (!ColorSettings.Simulate) {  //disable for simulate
+  if (!victronDevices.Simulate) {  //disable for simulate
     if (vicData->encryption_key_0 != localbyteKey[0]) {
       snprintf(debugMsg, 120, "BUT key is MIS-MATCHED %x Localbyte(0)%x\n", localbyteKey[0]);  //Serial.println(debugMsg);
       strcat(VictronBuffer, debugMsg);
@@ -716,7 +716,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   esp_aes_context ctx;
   esp_aes_init(&ctx);
   auto status = esp_aes_setkey(&ctx, localbyteKey, AES_KEY_BITS);
-  if (!ColorSettings.Simulate) {
+  if (!victronDevices.Simulate) {
     if (status != 0) {
       snprintf(debugMsg, 120, " Error in esp_aes_setkey op (%i)\n", status);
       strcat(VictronBuffer, debugMsg);
@@ -725,7 +725,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     }
   }
 
-  if (!ColorSettings.Simulate) {
+  if (!victronDevices.Simulate) {
     uint8_t data_counter_lsb = (vicData->data_counter_lsb);
     uint8_t data_counter_msb = (vicData->data_counter_msb);
     u_int8_t nonce_counter[16] = { data_counter_lsb, data_counter_msb, 0 };
@@ -752,7 +752,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     uint16_t pv_power = victronData->pv_power;
     float load_current = float(victronData->load_current) * 0.1;
 
-    if (ColorSettings.Simulate) {
+    if (victronDevices.Simulate) {
       charger_error = int(random(0, 20));
       device_state = int(random(0, 5));
       battery_voltage = random(10.9, 13.5);
@@ -767,7 +767,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     if (Display_Page == -87) {
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
-      if (ColorSettings.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
+      if (victronDevices.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
       DisplayOuterbox.PrintLine = 5;
       if (strstr(victronDevices.DisplayShow[i], "P")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%3dw", pv_power); }
       if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV", battery_voltage); }
@@ -788,7 +788,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     int auxtype = victronData->aux_input_type;
     float aux_input = float(victronData->aux_input) * 0.01;  // starter battery for Shunt
     float state_of_charge = float(victronData->state_of_charge) * 0.1;
-    if (ColorSettings.Simulate) {
+    if (victronDevices.Simulate) {
       battery_voltage = random(10.9, 13.5);
       battery_current = random(-2.2, 20.6);
       state_of_charge = 50;
@@ -801,7 +801,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
       DisplayOuterbox.PrintLine = 5;
-      if (ColorSettings.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
+      if (victronDevices.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
       if (strstr(victronDevices.DisplayShow[i], "S")) { DrawBar(DisplayOuterbox, victronDevices.FileCommentName[i], GREEN, state_of_charge); }
       if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FV", battery_voltage); }
       if (strstr(victronDevices.DisplayShow[i], "I")) { if (abs(battery_current)>=9.9){UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA", battery_current);}
@@ -829,7 +829,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     float battery_voltage_2 = victronData->battery_voltage_2 * 0.01;
     float battery_current_2 = victronData->battery_current_2 * 0.1;
     float temperature = victronData->temperature;
-    if (ColorSettings.Simulate) {
+    if (victronDevices.Simulate) {
       charger_error = int(random(0, 20));
       device_state = int(random(0, 5));
       battery_voltage_1 = random(10.9, 13.5);
@@ -844,7 +844,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
       DisplayOuterbox.PrintLine = 5;
-      if (ColorSettings.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
+      if (victronDevices.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
       if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV1", battery_voltage_1); }
       if (strstr(victronDevices.DisplayShow[i], "I")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA1", battery_current_1); }
       if (strstr(victronDevices.DisplayShow[i], "v")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV2", battery_voltage_2); }
@@ -855,7 +855,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       if (strstr(victronDevices.DisplayShow[i], "E")) { UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", ErrorCodeToChar(charger_error)); }
     }
   }
-if(ColorSettings.BLEDebug){  Serial.println(VictronBuffer);}
+if(victronDevices.BLEDebug){  Serial.println(VictronBuffer);}
   victronDevices.displayed[i] = true;
 }
 
@@ -897,7 +897,7 @@ void BLEloop() {
     // Serial.printf("BLE Scanning:\n");
     // snprintf(debugMsg, 120, "BLE Scan Commence");
     // strcat(VictronBuffer, debugMsg);
-    if (ColorSettings.Simulate) {  // pull the simulate trigger on all listed in sequence !
+    if (victronDevices.Simulate) {  // pull the simulate trigger on all listed in sequence !
       VictronSimulateIndex++;
       if (VictronSimulateIndex >= Num_Victron_Devices) { VictronSimulateIndex = 0; }
 

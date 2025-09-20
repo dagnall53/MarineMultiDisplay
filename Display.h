@@ -2,6 +2,7 @@
 #define Display_Func
 #include "Structures.h"
 #include <Arduino_GFX_Library.h> // defines colours BLUE etc
+#include "debug_port.h"
 
 extern int MasterFont;  //global for font! Idea is to use to reset font after 'temporary' seletion of another
 extern String Fontname;
@@ -26,6 +27,7 @@ void setFont(int fontinput);
 void ShowGPSinBox(int font, _sButton button);
 void TouchCrosshair(int size);
 void TouchCrosshair(int point, int size, uint16_t colour);
+void ButtonDataSelect( _sButton Position, int Instance, String Choice,bool RunSetup);
 
 //****  My displays are based on '_sButton' structures to define position, width height, borders and colours.
 // int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
@@ -48,6 +50,7 @@ extern _sButton BigSingleTopRight;             //  ''
 extern _sButton BigSingleTopLeft;                //  ''
 extern _sButton TopHalfBigSingleTopRight;      //  ''
 extern _sButton BottomHalfBigSingleTopRight;  //  ''
+extern _sButton FullScreen;
 //used for nmea RMC /GPS display // was only three lines to start!
 extern _sButton Threelines0;
 extern _sButton Threelines1 ;
@@ -58,6 +61,7 @@ extern _sButton topLeftquarter;  //h  reduced by 15 to give 30 space at the bott
 extern _sButton bottomLeftquarter ;
 extern _sButton topRightquarter;
 extern _sButton bottomRightquarter ;
+extern _sButton WideScreenCentral;
 
 
 

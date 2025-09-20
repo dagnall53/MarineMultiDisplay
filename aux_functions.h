@@ -17,13 +17,15 @@ void GFXBorderBoxPrintf(_sButton button, const char* fmt, ...) ; // main button 
 void UpdateLinef(int font,_sButton& button, const char* fmt, ...) ; // (sequentially) types lines (in 'font') into the selected button space 
 void UpdateLinef(uint16_t color,int font,_sButton& button, const char* fmt, ...) ; // (sequentially) types lines (in 'font') into the selected button space 
 
-// Special 'update' for instruments.. Gives two size display, Digits in big, decimal and efverything after in small font
-void UpdateDataTwoSize(bool horizCenter, bool vertCenter,int bigfont, int smallfont,_sButton button, _sInstData &data, const char *fmt);
-// for even bigger, magnify the font  
+void ButtonMasterDisplay(bool reset, const char *msg, const char *units,
+                               int magnify, bool horizCenter, bool vertCenter, 
+                               int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt);
+
+// Special 'update' for instruments.. Gives two size display, Digits in big, decimal and everything after in smaller font
+/// for even bigger, magnify the font  
 void UpdateDataTwoSize(int magnify,bool horizCenter, bool vertCenter,int bigfont, int smallfont,_sButton button, _sInstData &data, const char *fmt);
 // NEW version that will update the box etc on starting Simplifies the Display page settings when selecting by JSON..
-void UpdateDataTwoSize(bool reset,const char *msg, const char *units,bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt) ;
-  
+
   //Simpler   TWO font print of (any) data. For Victron displays separates at decimal point Centers text in space GREYS if data is OLD
 void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...);
 // Sub function to update (multiple) lines in a button (uses \n to separate lines )
@@ -41,6 +43,8 @@ void PfillCircle(Phv P1, int rad, uint16_t COLOUR);
 
 //Note two instances so you can display two simultaneously?
 void SCROLLGraph(bool reset,int instance, int dotsize, bool line,_sButton button, _sInstData &DATA, double dmin, double dmax, int font, const char *msg, const char *units);
+
+
 
 void DrawGPSPlot(bool reset, _sButton button,_sBoatData BoatData, double magnification );
 // Sub for functions, Circular keeps things in range.. eg degrees kept in range 0-359 

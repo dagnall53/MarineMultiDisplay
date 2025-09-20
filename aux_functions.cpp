@@ -9,6 +9,7 @@ but highly modified!
 #include <NMEA0183.h>  // for the TL NMEA0183 library functions
 #include <NMEA0183Msg.h>
 #include <NMEA0183Messages.h>
+#include "debug_port.h"
 
 extern int text_offset;
 extern int MasterFont;
@@ -17,10 +18,8 @@ extern int text_height;
 extern int Display_Page;
 extern _MyColors ColorSettings;
 extern _sDisplay_Config Display_Config;
-extern void showPictureFrame(_sButton &button,const char* name);
-
-
-
+extern void showPictureFrame(_sButton &button, const char *name);
+extern int Screen_Width;
 
 extern double NMEA0183GetDouble(const char *data);  // have to do this as its local to NMEA0183Messagesmessages.cpp!
 
@@ -213,13 +212,13 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array
 
       BoatData.Latitude.data = LatLonToDouble(Field[3], Field[4][0]);   // using TL's functions that return null value
       BoatData.Longitude.data = LatLonToDouble(Field[5], Field[6][0]);  //nb we use +1 on his numbering that omits the command
- 
+
       BoatData.GPSTime = NMEA0183GPTimeToSeconds(Field[1]);
-      BoatData.LOCTime = NMEA0183GPTimeToSeconds(Field[1]) +3600* Display_Config.LocalTimeOffset  ;
-      
-      while ( (int(BoatData.LOCTime) / 3600) >= 24) {BoatData.LOCTime=BoatData.LOCTime-86400;}
-      while ( int(int(BoatData.LOCTime) / 3600) < 1) {BoatData.LOCTime=BoatData.LOCTime+86400;}
-      while ( (int(BoatData.LOCTime) / 3600) >= 24) {BoatData.LOCTime=BoatData.LOCTime-86400;} //catch wrap around 
+      BoatData.LOCTime = NMEA0183GPTimeToSeconds(Field[1]) + 3600 * Display_Config.LocalTimeOffset;
+
+      while ((int(BoatData.LOCTime) / 3600) >= 24) { BoatData.LOCTime = BoatData.LOCTime - 86400; }
+      while (int(int(BoatData.LOCTime) / 3600) < 1) { BoatData.LOCTime = BoatData.LOCTime + 86400; }
+      while ((int(BoatData.LOCTime) / 3600) >= 24) { BoatData.LOCTime = BoatData.LOCTime - 86400; }  //catch wrap around
       BoatData.GPSDate = atof(Field[9]);
       // mag variation is [10]/[11] (E) But I think this comes from a look up and not the satellites at least on my cheapo GPS module.
 
@@ -273,7 +272,7 @@ int TopLeftYforthisLine(_sButton button, int printline) {
 }
 
 
-// this overload has no option for centered.. 
+// this overload has no option for centered..
 void CommonSub_UpdateLine(uint16_t color, int font, _sButton &button, const char *msg) {
   CommonSub_UpdateLine(true, false, color, font, button, msg);
 }
@@ -298,7 +297,7 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
   }
   // get bounds as would be printed at top of box..
   // set text bounds first so that can be taken into account ! Use same zero starts as in Sub_for_UpdateTwoSize
-  gfx->setTextBound(0, 0, 480, 480);                          // so that TBx1 can be simply obtained and used in better h centering
+  gfx->setTextBound(0, 0, Screen_Width, 480);                 // so that TBx1 can be simply obtained and used in better h centering
   gfx->getTextBounds(msg, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // do not forget '&' using pointers not values!!!
 
   // gfx->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);                               //
@@ -308,7 +307,7 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
   LinesPrinted = int(0.5 + TBh1 / text_offset);
   gfx->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);  //
   //test gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH,RED);
- 
+
   y = button.v + text_offset;
   x = button.h + button.bordersize;
   if (horizCenter) { x = x + ((typingspaceW - (TBw1)) / 2) - TBx1; }                                   // subtract any start text offset
@@ -316,7 +315,7 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
   if (vertCenter) { y = text_offset + button.bordersize + button.v + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
   //gfx->fillRect(x,y-text_offset,TBw1,TBh1, button.BackColor); // Background exactly the text - needed for STATUS to make flash work in status!
   gfx->setCursor(x, y);
-  gfx->setTextColor(color,button.BackColor); // Background colour the text
+  gfx->setTextColor(color, button.BackColor);  // Background colour the text
   gfx->print(msg);
   button.PrintLine = button.PrintLine + LinesPrinted;
   //NOTE TEXT WRAP uses the last variable in the GFXFont setting, which should be roughly twice the character height.
@@ -332,7 +331,7 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
   }
 
   //  button.PrintLine = button.PrintLine + 1;  //  FOR NEXT LINE (TBh / (text_height + 2)) + 1;
-  gfx->setTextBound(0, 0, 480, 480);  //MUST RESET IT ?
+  gfx->setTextBound(0, 0, Screen_Width, 480);  //MUST RESET IT ?
   //gfx->setTextWrap(true);
   setFont(local);
 }
@@ -360,7 +359,7 @@ void UpdateLinef(int font, _sButton &button, const char *fmt, ...) {  // Types s
 }
 
 void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
-  //Serial.print(" UD2S: ");Serial.println(data); this version does not use the border for the height evaluation ! 
+  //Serial.print(" UD2S: ");Serial.println(data); this version does not use the border for the height evaluation !
   static char msg[300] = { '\0' };
   char digits[30];
   char decimal[30];
@@ -370,15 +369,15 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   uint16_t TBw1, TBh1, TBw2, TBh2, TBw3, TBh3;
   int typingspaceH, typingspaceW;
   ////// buttton width and height are for the OVERALL box. subtract border! for sides only as this function may be used in lines..
-  typingspaceH = button.height -2;// (2 * button.bordersize);
-  typingspaceW = button.width - 2- (2 * button.bordersize);  // small one pixel inset either side
-  if (horizCenter ) {
+  typingspaceH = button.height - 2;                           // (2 * button.bordersize);
+  typingspaceW = button.width - 2 - (2 * button.bordersize);  // small one pixel inset either side
+  if (horizCenter) {
     gfx->setTextWrap(false);
   } else {
     gfx->setTextWrap(true);
   }
- gfx->setTextSize(magnify);//is now set in used in message buildup
-  va_list args;  // extract the fmt..
+  gfx->setTextSize(magnify);  //is now set in used in message buildup
+  va_list args;               // extract the fmt..
   va_start(args, fmt);
   vsnprintf(msg, 300, fmt, args);
   va_end(args);
@@ -398,33 +397,23 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
     strcpy(digits, msg);  // missing dp, so just put the whole message in 'digits'.
     decimal[0] = 0;
   }
-  setFont(bigfont);                                                // here so the text_offset is correct for bigger font
-  x = button.h + button.bordersize + 1;                            //starting point left..
-  y = button.v + button.bordersize +(magnify * text_offset)+ button.PrintLine;  // Printline here will be GFX pixels down inside.. not LINES starting bpoint 'down' allow for magnify !! bigger font for front half and use printline to set start
+  setFont(bigfont);                                                               // here so the text_offset is correct for bigger font
+  x = button.h + button.bordersize + 1;                                           //starting point left..
+  y = button.v + button.bordersize + (magnify * text_offset) + button.PrintLine;  // Printline here will be GFX pixels down inside.. not LINES starting bpoint 'down' allow for magnify !! bigger font for front half and use printline to set start
   //gfx->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  gfx->setTextBound(0, 0, 480, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
+  gfx->setTextBound(0, 0, Screen_Width, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
 
-  gfx->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
-   button.PrintLine=button.PrintLine+(magnify * text_offset)+button.bordersize; // do here before text offset gets set for smaller font! 
+  gfx->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);                       // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
+  button.PrintLine = button.PrintLine + (magnify * text_offset) + button.bordersize;  // do here before text offset gets set for smaller font!
   setFont(smallfont);
-  gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);    // get text bounds for decimal
-                                                                    // if (typingspaceW >=300){
-                                                                    //   Serial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
-                                                                    //   }
-  // if (((TBw1 + TBw2) >= typingspaceW) || (TBh1 >= typingspaceH)) {  // too big!!
-  //   if ((TBw1 <= typingspaceW) && (TBh1 <= typingspaceH)) {         //just print digits not decimals
-  //     TBw2 = 0;
-  //     decimal[0] = 0;
-  //     decimal[1] = 0;
-  //   } else {  // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
-  //             // Serial.print(decimal);Serial.println("> and was too big to print in box");
-  //     gfx->setTextBound(0, 0, 480, 480);
-  //     return;
-  //   }
-  // }
-  setFont(bigfont);                                                                                                // Reset to big font for Digits..
-  if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }                    //offset to horizontal center
- // if (vertCenter) { y = button.v + button.bordersize + (magnify * text_offset) + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
+  gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
+                                                                  // if (typingspaceW >=300){
+                                                                  //   Serial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
+                                                                  //   }
+
+  setFont(bigfont);                                                                              // Reset to big font for Digits..
+  if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }  //offset to horizontal center
+                                                                                                 // if (vertCenter) { y = button.v + button.bordersize + (magnify * text_offset) + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
   if (erase) {
     gfx->setTextColor(button.BackColor);
   } else {
@@ -441,7 +430,7 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
     gfx->print(decimal);
   }
   gfx->setTextColor(button.TextColor);
-  gfx->setTextBound(0, 0, 480, 480);  //MUST reset it for other functions that do not set it themselves!
+  gfx->setTextBound(0, 0, Screen_Width, 480);  //MUST reset it for other functions that do not set it themselves!
   gfx->setTextSize(1);
 }
 void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool erase, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
@@ -450,22 +439,28 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   char decimal[30];
   static char *token;
   const char delimiter[2] = ".";  // Or space, etc.
-  int16_t x, y, TBx1, TBy1, TBx2, TBy2, TBx3, TBy3,w,h,c;
+  int16_t x, y, TBx1, TBy1, TBx2, TBy2, TBx3, TBy3, w, h, c;
   uint16_t TBw1, TBh1, TBw2, TBh2, TBw3, TBh3;
   int typingspaceH, typingspaceW;
   bool recent = (data.updated >= millis() - 6000);
 
-  if (erase &&  (data.lastx>=2) && (data.lasty>=2) &&(data.lasth >=10) && (data.lastw>=10) ) { // make sure the last were set! dont print blue box in top left!! 
+  if (erase && (data.lastx >= 2) && (data.lasty >= 2) && (data.lasth >= 10) && (data.lastw >= 10)) {  // make sure the last were set! dont print blue box in top left!!
     //gfx->fillRect(data.lastx-5, data.lasty-data.lasth, data.lastw+25, data.lasth+20, button.BackColor);
-    x= data.lastx-5;
-    y= data.lasty-data.lasth;
-    w= data.lastw+30;
-    h= data.lasth+20;
-    c= button.BackColor;
+    x = data.lastx - 5;
+    y = data.lasty - data.lasth;
+    w = data.lastw + 30;
+    h = data.lasth + 20;
+    c = button.BackColor;
 
-    if (x+w>=button.h+button.width-(2*button.bordersize)) {h=button.width-(2*button.bordersize); x= button.h+button.bordersize;} 
-    if (y+h>=button.v+button.height-(2*button.bordersize)) {h=button.height-(2*button.bordersize); y= button.v+button.bordersize;} // do not overflow!
-     gfx->fillRect(x, y, w, h, c);
+    if (x + w >= button.h + button.width - (2 * button.bordersize)) {
+      h = button.width - (2 * button.bordersize);
+      x = button.h + button.bordersize;
+    }
+    if (y + h >= button.v + button.height - (2 * button.bordersize)) {
+      h = button.height - (2 * button.bordersize);
+      y = button.v + button.bordersize;
+    }  // do not overflow!
+    gfx->fillRect(x, y, w, h, c);
     return;
   }
 
@@ -504,20 +499,20 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   x = button.h + button.bordersize + 1;                            //starting point left..
   y = button.v + button.bordersize + 1 + (magnify * text_offset);  // starting bpoint 'down' allow for magnify !! bigger font for front half
   //gfx->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  gfx->setTextBound(0, 0, 480, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
+  gfx->setTextBound(0, 0, Screen_Width, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
 
   gfx->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
   setFont(smallfont);
-  gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);    // get text bounds for decimal
+  gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
 
   if (((TBw1 + TBw2) >= typingspaceW) || (TBh1 >= typingspaceH)) {  // too big //too tall!!
     if ((TBw1 <= typingspaceW) && (TBh1 <= typingspaceH)) {         //just print digits not decimals
       TBw2 = 0;
       decimal[0] = 0;
       decimal[1] = 0;
-    } else {  // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
-              // Serial.print(decimal);Serial.println("> and was too big to print in box");
-      gfx->setTextBound(0, 0, 480, 480);  //reset text bounds
+    } else {                                       // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
+                                                   // Serial.print(decimal);Serial.println("> and was too big to print in box");
+      gfx->setTextBound(0, 0, Screen_Width, 480);  //reset text bounds
       data.displayed = true;
       return;
     }
@@ -526,22 +521,22 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }                    //offset to horizontal center
   if (vertCenter) { y = button.v + button.bordersize + (magnify * text_offset) + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
   if (erase) {
-    gfx->setTextColor(button.BackColor,button.BackColor);
+    gfx->setTextColor(button.BackColor, button.BackColor);
   } else {
-    gfx->setTextColor(button.TextColor,button.BackColor);
+    gfx->setTextColor(button.TextColor, button.BackColor);
   }
   gfx->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);
   if (!recent) {
-    gfx->setTextColor(DARKGREY,button.BackColor);
+    gfx->setTextColor(DARKGREY, button.BackColor);
     data.greyed = true;
   }
   x = x - TBx1;  // NOTE TBx1 is normally zero for most fonts, but some print with offsets that will be corrected by TBx1.
   gfx->setCursor(x, y);
-  data.lastx=x;
-  data.lasty=y;
-  data.lastw=(TBw1 + TBw2);
-  data.lasth=(TBh1);
-  
+  data.lastx = x;
+  data.lasty = y;
+  data.lastw = (TBw1 + TBw2);
+  data.lasth = (TBh1);
+
   gfx->print(digits);
   x = gfx->getCursorX();
   if (TBw2 != 0) {
@@ -550,39 +545,43 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
     gfx->print(decimal);
   }
   gfx->setTextColor(button.TextColor);
-  gfx->setTextBound(0, 0, 480, 480);  //MUST reset it for other functions that do not set it themselves!
+  gfx->setTextBound(0, 0, Screen_Width, 480);  //MUST reset it for other functions that do not set it themselves!
 }
-void UpdateDataTwoSize(bool reset,const char *msg, const char *units,bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt) {
-  if (reset) {
+
+void ButtonMasterDisplay(bool reset, const char *msg, const char *units,int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt){
+   if (reset) {
     GFXBorderBoxPrintf(button, "");
     AddTitleInsideBox(9, 3, button, msg);
-    AddTitleInsideBox(9, 2, button, units); 
-    }
-  UpdateDataTwoSize(horizCenter, vertCenter, bigfont, smallfont, button, data, fmt);
-}
-void UpdateDataTwoSize(bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt) {
+    AddTitleInsideBox(9, 2, button, units);
+    data.lastx =0; // reset the last data print locations, which would otherwise be set in Sub_for_UpdateTwoSize
+    data.lasty =0;
+    data.lastw =0;
+    data.lasth =0;
+    return;
+  }
   if (data.data == NMEA0183DoubleNA) { return; }
-
   bool recent = (data.updated >= millis() - 6000);
   if (data.greyed) { return; }
   if (!data.displayed) {
-    gfx->setTextSize(1);
+    gfx->setTextSize(magnify);
     //  Serial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
-    Sub_for_UpdateTwoSize(1, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
-    Sub_for_UpdateTwoSize(1, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
+    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
+    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
     data.displayed = true;  //reset to false inside toNewStruct
+    gfx->setTextSize(1);
     return;
   }
   if (!recent && !data.greyed) {
-    gfx->setTextSize(1);
-    Sub_for_UpdateTwoSize(1, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
-    Sub_for_UpdateTwoSize(1, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
+    gfx->setTextSize(magnify);
+    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
+    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
     data.displayed = true;  //reset to false inside toNewStruct
+    gfx->setTextSize(1);
   }
 }
+
 void UpdateDataTwoSize(int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt) {
   if (data.data == NMEA0183DoubleNA) { return; }
-
   bool recent = (data.updated >= millis() - 6000);
   if (data.greyed) { return; }
   if (!data.displayed) {
@@ -634,17 +633,17 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
   int len = strlen(Title);
   gfx->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
   gfx->setTextColor(WHITE, button.BorderColor);
- // Serial.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
+  // Serial.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
   if ((button.v - TBh) >= 0) {  // text writes from point at bottom left .. have we room to draw 'above' the box?
-    gfx->setCursor(button.h, button.v); 
-    gfx->fillRect(button.h, button.v-TBh, TBw, TBh, button.BorderColor);
+    gfx->setCursor(button.h, button.v);
+    gfx->fillRect(button.h, button.v - TBh, TBw, TBh, button.BorderColor);
     //Serial.printf(" h v positioned\n");
-  } else { //Serial.printf(" moved down to TBH (%i) \n",TBh);
-    gfx->setCursor(button.h, TBh-2); 
-    gfx->fillRect(button.h, 2, TBw, TBh, button.BorderColor); 
+  } else {  //Serial.printf(" moved down to TBH (%i) \n",TBh);
+    gfx->setCursor(button.h, TBh - 2);
+    gfx->fillRect(button.h, 2, TBw, TBh, button.BorderColor);
     // move 'inside' box by moving down.. -2 just because this does not leave a gap with the small FreeMono8pt7b font (0) I normally chose
     // -2 still leaves gap (~2) with Font 8, but it also does not properly blank the background for the top two pixels..) ..
-    // (Font 3 is monobold 8, prints like font 0 ,but is less clear IMHO. 
+    // (Font 3 is monobold 8, prints like font 0 ,but is less clear IMHO.
   }
   gfx->print(Title);
   setFont(Font_Before);  //Serial.println("Font selected is %i",MasterFont);
@@ -762,132 +761,76 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
 //   DrawGraph(button, DATA, dmin, dmax, 8, " ", " ");
 // }
 
-// void DrawGraph(_sButton button, _sInstData &DATA, double dmin, double dmax, int font, const char *msg, const char *units) {
-//   if (DATA.displayed) { return; }
-//   if (DATA.data == NMEA0183DoubleNA) { return; }
-//   static int Displaypage = 0;  // where were we last called from ??
-//   #define Hmax 200               // how many points fill screen width
-//   static Phv graph[Hmax + 2];  //phv is a point H,V structure
-//   static int index, lastindex;
-//   static bool haslooped;
-//   int dotsize;
-//   double data;
-//   data = DATA.data;
-//   dotsize = 3;
-//   if (Displaypage != Display_Page) {
-//     Displaypage = Display_Page;
-//     haslooped = false;
-//     for (int x = 0; x <= Hmax; x++) {  //set all points mid screen (so it does not rub things out!)
-//       graph[x].v = (button.v + button.bordersize + (button.height / 2));
-//       graph[x].h = (button.h + button.bordersize + (button.width / 2));
-//     }
-//     // Serial.printf(" Debug Graph..'zeroed' to mid point of  h%i  v%i",graph[1].h,graph[1].v);
-//     //initial fill and border (same as writeinborder box codes )
-//     gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
-//     gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
-//                   button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
-//     index = 0;
-//     lastindex = 0;
-//     // I think this is better done explicitly when DrawGraph is called
-//     // AddTitleInsideBox(font,3, button, " %s", msg);
-//     // AddTitleInsideBox(font,1, button, " %4.0f%s", dmax,units);
-//     // AddTitleInsideBox(font,2, button, " %4.0f%s", dmin,units);
-//     // end of setup....
-//   }
-  
-//   if (index == 0) {  // redraw text in case it gets overwritten
-//     AddTitleInsideBox(font, 3, button, " %s", msg);
-//     AddTitleInsideBox(font, 1, button, " %4.0f%s", dmax, units);
-//     AddTitleInsideBox(font, 2, button, " %4.0f%s", dmin, units);
-//   }
-
-//   bool LINE = true; //Or just blobs.. 
-//   if (haslooped) {                                         // only erase if there is something to erase!
-//     PfillCircle(graph[index], dotsize, button.BackColor);  // blank the  circle that will be overwritten
-//     //Blank line from Current dot (about to be rewritten!) to next circle but not the 'flyback'
-//     if (LINE && (index <= Hmax - 1)) {
-//       if (index >= lastindex) { Pdrawline(graph[lastindex], graph[index], button.BackColor); }
-//       Pdrawline(graph[index], graph[index + 1], button.BackColor);
-//     }
-//   }
-//   //Serial.printf(" Graph Index %i\n", index);
-//   //get graph point.. V is 'data' horiz is 'index'
-//   graph[index].v = GraphRange(data, button.v + button.height - button.bordersize - dotsize, button.v + button.bordersize + dotsize, dmin, dmax);
-//   graph[index].h = GraphRange(index, button.h + button.bordersize + dotsize, button.h + button.width - button.bordersize - dotsize, 0, Hmax);
-
-//   // draw from Last circle to the new one
-//   if (LINE && (index >= 1)) {
-//     Pdrawline(graph[lastindex], graph[index], button.TextColor);
-//   }
-//   PfillCircle(graph[index], dotsize, button.TextColor);
-//   lastindex = index;
-//   index = Circular(index + 1, 0, Hmax);  //circular increment
-
-//   if (lastindex >= index) { haslooped = true; }
-
-//   DATA.displayed = true;  //reset to false inside toNewStruct   it is this that helps prevent multiple repeat runs of this function, but necessitates using the local copy of you want the data twice on a page
-// }
 
 
-void SCROLLGraph(bool reset,int instance, int dotsize, bool line, _sButton button, _sInstData &DATA, double dmin, double dmax, int font, const char *msg, const char *units) {
-  if (instance >> 1) {return;} // allow only instance 0 and 1
+void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton button, _sInstData &DATA, double dmin, double dmax, int font, const char *msg, const char *units) {
+  //if (instance >> 2) {return;} // allow only instance 0 and 1
   if (DATA.graphed) { return; }
   if (DATA.data == NMEA0183DoubleNA) { return; }
-  static int samplesread;
-  static int Displaypage[2] ;  // where were we last called from ??
-  #define Hmax 200              // how many points fill screen width
-  static Phv graph[Hmax + 2][2];  //phv is a point H,V structure
+  static int samplesread[6];
+  static int Displaypage[3];           // where were we last called from ??
+#define Hmax 200                       // how many points fill screen width
+  static Phv graphPoint[Hmax + 2][6];  //phv is a point H,V structure in the box size
+  static double _oldData[Hmax + 2][6];
   //int dotsize;
   double data;
+  int BoxLeft = (button.h + button.bordersize + (2 * dotsize));
+  int BoxRight = button.h + button.width - button.bordersize - (2 * dotsize);
+  int BoxTop = button.v + button.height - button.bordersize - (2 * dotsize);
+  int BoxBottom = button.v + button.bordersize + (2 * dotsize);
   data = DATA.data;
+  _oldData[Hmax][instance] = data;
   //dotsize = 3;
   if (reset) {
-    //Serial.printf(" RESETTING SCROLLGRAPH  %i  %i ",Display_Page, Displaypage[instance]); 
+    //Serial.printf(" RESETTING SCROLLGRAPH  %i  %i ",Display_Page, Displaypage[instance]);
+   for (int x = (Hmax - samplesread[instance])+1; x <= Hmax + 1; x++) { // set the graphPoint[x] based on  "_oldData[x]" for this (new) displaybutton
+    graphPoint[x][instance].h = GraphRange(x, BoxLeft, BoxRight, 0, Hmax);
+    graphPoint[x][instance].v = GraphRange( _oldData[x][instance] , BoxTop, BoxBottom, dmin, dmax);
+    }  
     Displaypage[instance] = Display_Page;
-  //  Serial.printf(" after..   %i  %i \n",Display_Page, Displaypage[instance]); 
-
-    // for (int x = 0; x <= Hmax; x++) {  //reset all points !!
-    //   graph[x][instance].v = (button.v + button.bordersize + (button.height / 2));
-    //   graph[x][instance].h = GraphRange(x, button.h + button.bordersize + (2*dotsize), button.h + button.width - button.bordersize - (2*dotsize), 0, Hmax);
-    // }
     gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
     gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
                   button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
-      // end of setup....
-   }
+    // end of reset / setup....
+  }
+  // Every redraw.. clear plot area and re-add every time titles as they may get overwritten
+  gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
+                button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
+  AddTitleInsideBox(font, 3, button, " %s", msg);
+  AddTitleInsideBox(font, 1, button, " %4.0f%s", dmax, units);
+  AddTitleInsideBox(font, 2, button, " %4.0f%s", dmin, units);
 
-  // clear plot area and re-add titles as they may get overwritten
-   gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
-                  button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
-    AddTitleInsideBox(font, 3, button, " %s", msg);
-    AddTitleInsideBox(font, 1, button, " %4.0f%s", dmax, units);
-    AddTitleInsideBox(font, 2, button, " %4.0f%s", dmin, units);
-  
-   int boxxtop =(button.h + button.bordersize + (2*dotsize));
-      //add the new data 
-  graph[Hmax][instance].v = GraphRange(data, button.v + button.height - button.bordersize - (2*dotsize), button.v + button.bordersize + (2*dotsize), dmin, dmax); 
-  samplesread= samplesread+1;
-  if (samplesread >= Hmax){samplesread=Hmax;}
+
+  //add the new data
+  graphPoint[Hmax][instance].v = GraphRange(data, BoxTop, BoxBottom, dmin, dmax);
+  graphPoint[Hmax][instance].h = GraphRange(Hmax, BoxLeft, BoxRight, 0, Hmax);
+  // Serial.printf(" Data is %f Sample %i -> v:%i h:%i   \n",data,samplesread[instance],graphPoint[Hmax][instance].v,graphPoint[Hmax][instance].h);
+
+  samplesread[instance] = samplesread[instance] + 1;
+  if (samplesread[instance] >= Hmax) { samplesread[instance] = Hmax; }
   // scroll the existing data values left:
-  for (int x = 1; x <= Hmax; x++) {
-         graph[x-1][instance].v=graph[x][instance].v;
-         if (graph[x-1][instance].v<=boxxtop){graph[x-1][instance].v=boxxtop;}
-         graph[x][instance].h = GraphRange(x, button.h + button.bordersize + (2*dotsize), button.h + button.width - button.bordersize - (2*dotsize), 0, Hmax);
-       } // slide the v VALUES only, just set the horizontal positions! 
+  for (int x = (Hmax - samplesread[instance])+1; x <= Hmax + 1; x++) {
+    _oldData[x - 1][instance] = _oldData[x][instance];
+    graphPoint[x - 1][instance] = graphPoint[x][instance];
+    graphPoint[x - 1][instance].h = GraphRange(x - 1, BoxLeft, BoxRight, 0, Hmax);// slide the v VALUES, but calculate the horizontal positions!
+    //  Serial.printf(" Data (%i) is %f Sample %i -> v:%i h:%i   \n",x-1,graphPoint[x-1][instance].v,graphPoint[x-1][instance].h);
+    }  
 
- 
-  //graph[Hmax].h = GraphRange(Hmax, button.h + button.bordersize + dotsize, button.h + button.width - button.bordersize - dotsize, 0, Hmax);
-     //for (int x =1; x<= Hmax-1;x++){
-      for (int x = Hmax-samplesread; x <= Hmax; x++) {
-     // Serial.printf(" SCROLLGRAPH (x) %i (h) %i (v)%i \n",x,graph[x][instance].h,graph[x][instance].v );
-     if (line && (x >= 2)) {
-      if((graph[x-1][instance].v>= boxxtop+2  ) && (graph[x][instance].v>= boxxtop+2 )){
-        Pdrawline(graph[x-1][instance], graph[x][instance], button.TextColor);}
-     }
-           
-     if (dotsize>=1) {   PfillCircle(graph[x][instance], dotsize, button.TextColor);}
-   }
-   DATA.graphed = true;  //reset to false inside o avoid confusion!.toNewStruct   it is this that helps prevent multiple repeat runs of this function, but necessitates using the local copy of you want the data twice on a page
+  for (int x = 1+Hmax - samplesread[instance]; x <= Hmax-1; x++) {
+    // Serial.printf(" SCROLLGRAPH (x) %i (h) %i (v)%i \n",x,graphPoint[x][instance].h,graphPoint[x][instance].v );
+    if (line && (x >= 2)) {
+      if (
+        // (graphPoint[x - 1][instance].v >= BoxTop) && (graphPoint[x - 1][instance].v <= BoxBottom) &&
+        //    (graphPoint[x][instance].v >= BoxTop) && (graphPoint[x][instance].v <= BoxBottom ) &&
+           (graphPoint[x - 1][instance].h >= BoxLeft) && (graphPoint[x - 1][instance].h <= BoxRight) &&
+           (graphPoint[x][instance].h >= BoxLeft) && (graphPoint[x][instance].h <= BoxRight)) {
+        Pdrawline(graphPoint[x - 1][instance], graphPoint[x][instance], button.TextColor);
+      }
+    }
+
+    if (dotsize >= 1) { PfillCircle(graphPoint[x][instance], dotsize, button.TextColor); }
+  }
+  DATA.graphed = true;  //reset to false inside o avoid confusion!.toNewStruct   it is this that helps prevent multiple repeat runs of this function, but necessitates using the local copy of you want the data twice on a page
 }
 
 
@@ -904,38 +847,28 @@ double Double_sInstDataAdd(_sInstData &data1, _sInstData &data) {
 //https://gist.github.com/xsleonard/7341172?permalink_comment_id=2372748
 int HexStringToBytes(const char *hexStr,
                      unsigned char *output,
-                     unsigned int *outputLen)
-{
-    size_t len = strlen(hexStr);
-    if (len % 2 != 0) {
+                     unsigned int *outputLen) {
+  size_t len = strlen(hexStr);
+  if (len % 2 != 0) {
+    return -1;
+  }
+  size_t finalLen = len / 2;
+  *outputLen = finalLen;
+  for (size_t inIdx = 0, outIdx = 0; outIdx < finalLen; inIdx += 2, outIdx++) {
+    if ((hexStr[inIdx] - 48) <= 9 && (hexStr[inIdx + 1] - 48) <= 9) {
+      goto convert;
+    } else {
+      if (((hexStr[inIdx] - 65) <= 5 && (hexStr[inIdx + 1] - 65) <= 5) || ((hexStr[inIdx] - 97) <= 5 && (hexStr[inIdx + 1] - 97) <= 5)) {
+        goto convert;
+      } else {
+        *outputLen = 0;
         return -1;
+      }
     }
-    size_t finalLen = len / 2;
-    *outputLen = finalLen;
-    for (size_t inIdx = 0, outIdx = 0; outIdx < finalLen; inIdx += 2, outIdx++) {
-        if ((hexStr[inIdx] - 48) <= 9 && (hexStr[inIdx + 1] - 48) <= 9) {
-            goto convert;
-        } else {
-            if (((hexStr[inIdx] - 65) <= 5 && (hexStr[inIdx + 1] - 65) <= 5) || ((hexStr[inIdx] - 97) <= 5 && (hexStr[inIdx + 1] - 97) <= 5)) {
-                goto convert;
-            } else {
-                *outputLen = 0;
-                return -1;
-            }
-        }
-    convert:
-        output[outIdx] =
-            (hexStr[inIdx] % 32 + 9) % 25 * 16 + (hexStr[inIdx + 1] % 32 + 9) % 25;
-    }
-    output[finalLen] = '\0';
-    return 0;
+convert:
+    output[outIdx] =
+      (hexStr[inIdx] % 32 + 9) % 25 * 16 + (hexStr[inIdx + 1] % 32 + 9) % 25;
+  }
+  output[finalLen] = '\0';
+  return 0;
 }
-
-
-
-
-
-
-
-
-
