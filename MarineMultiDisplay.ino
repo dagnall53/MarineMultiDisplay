@@ -10,8 +10,8 @@ const char soft_version[] = " V0.10";
 
 bool _WideDisplay;  // so that I can pass this to sub files
 
-//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for 
-#define WAVSHARE     // 4 inch but Touch untested and 
+//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for GUITRON (default or..)
+//#define WAVSHARE     // 4 inch but Touch untested and 
 //#define WIDEBOX    // 4.3inch 800 by 400 display 
 
 // must be before NmeA2000 library initiates!
@@ -66,7 +66,7 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 #include <ArduinoJson.h>
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
 
-//*********** DISPLAY selector *************
+//*********** DISPLAY Pin identifications selector *************
 #ifdef WAVSHARE
 #ifdef WIDEBOX
 #include "WAV_4.3inch.h"
@@ -83,13 +83,13 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 // some wifi stuff
 IPAddress gateway(0, 0, 0, 0);    // the IP address for Gateway in Station mode
 IPAddress subnet(0, 0, 0, 0);     // the SubNet Mask in Station mode
-IPAddress Null_ip(0, 0, 0, 0);    //  A null IP address for the gateway
+
 IPAddress ap_ip(192, 168, 4, 1);  // the IP address in AP mode. Default and can be changed!
 //These added in part to try and send data UDP when Serial is not working, for debug
 IPAddress udp_ap(0, 0, 0, 0);  // the IP address to send UDP data (AP mode)
 IPAddress udp_st(0, 0, 0, 0);  // the IP address to send UDP data (station mode)
 
-const IPAddress sub255(255, 255, 255, 0);  // the default Subnet Mask in in SoftAP mode
+
 
 boolean IsConnected = false;  // may be used in AP_AND_STA to flag connection success (got IP)
 boolean AttemptingConnect;    // to note that WIFI.begin has been started
@@ -149,7 +149,7 @@ TAMC_GT911 ts = TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, TOUCH_WID
 // for victron display pages
 #include "VICTRONBLE.h"
 int Num_Victron_Devices;
-int CommonDisplayWIdth;
+int CommonDisplayWidth;
 const char* VictronDevicesSetupfilename = "/vconfig.txt";  // <- SD library uses 8.3 filenames
 _sMyVictronDevices victronDevices;
 
@@ -167,14 +167,13 @@ bool dataUpdated;     // flag that Nmea Data has been updated
 //
 //Config.txt holds both Default and Display settings in one file
 const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
-_sDisplay_Config Default_JSON = { "0.5", 4, 0, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW" };  // many display stuff set default
 _sDisplay_Config Saved_Display_Config;
 _sDisplay_Config Display_Config;
 _sWiFi_settings_Config Saved_Settings;
 _sWiFi_settings_Config Current_Settings;
-_sWiFi_settings_Config Default_Settings_JSON = { 17, "GUESTBOAT", "12345678", "2002", false, false, true, true, false, 1000, false, false };
 
-
+_sDisplay_Config Default_JSON = { "0.5", 4, 1, "nmeadisplay", "12345678", "SOG", "DEPTH", "WIND", "STW","DGRAPH" };  // many display stuff set default
+_sWiFi_settings_Config Default_Settings_JSON = { 17, "GUESTBOAT", "12345678", "2002", false, false, true, true, false, 1000, false, true };
 
 int MasterFont;                             //global for font! Idea is to use to reset font after 'temporary' seletion of another
 String Fontname;
@@ -279,6 +278,58 @@ _sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK }; 
 //   listDir(SD, "/", 1);
 // }
 
+bool LoadConfigs(bool print,bool displ){
+  bool FilesOK = true;
+  if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
+   if(print){ DEBUG_PORT.println("USING FATS JSON for wifi and display settings");}
+   if(displ){ gfx->println(F("USING FATS JSON for WiFi and display settings"));}
+    Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
+    Display_Page = Display_Config.Start_Page;
+   } else {
+    FilesOK = false;
+    Display_Page = 4;  //here for clarity?
+    Display_Config = Default_JSON;
+    Current_Settings = Default_Settings_JSON;
+     if(print){ DEBUG_PORT.println(" USING  defaults for wifi and display settings");}
+    if(displ){gfx->println(F("Setting WiFi and Display settings to defaults"));}
+    SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings);
+  }
+  if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
+    if(print){  DEBUG_PORT.println("USING FATS JSON for Victron data settings");}
+     if(displ){gfx->println(F("USING FATS JSON for Victron settings"));}
+  } else {  // try to set a useful example
+    FilesOK = false;
+    if(print){  DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");}
+    if(displ){gfx->println(F("Setting Victron settings to defaults"));}
+    victronDevices.BLEDebug="FALSE";
+    Num_Victron_Devices = 2;
+    CommonDisplayWidth = 150;
+    victronDevices.Simulate="TRUE";
+    for (int index = 0; index < Num_Victron_Devices; index++) {
+      strlcpy(victronDevices.charMacAddr[index],"d044984433d2",sizeof(victronDevices.charMacAddr[index]));
+      strlcpy(victronDevices.charKey[index], "20bd18fc6ed74d9b6e40c83817d42fc8",sizeof(victronDevices.charKey[index]));
+      strlcpy(victronDevices.DisplayShow[index],"VL",sizeof(victronDevices.DisplayShow[index]));
+      victronDevices.VICTRON_BLE_RECORD_TYPE[index]=1;
+      }
+      victronDevices.displayH[0] =160;
+      victronDevices.displayV[0]=160;
+      victronDevices.displayH[1] =160;
+      victronDevices.displayV[1]=0;
+      strlcpy(victronDevices.FileCommentName[0], "Comment Example",sizeof(victronDevices.FileCommentName[0]));
+      strlcpy(victronDevices.FileCommentName[1] , "Another Example",sizeof(victronDevices.FileCommentName[1]));
+      SaveVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
+    }
+  if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
+    if(print){  DEBUG_PORT.println("USING FATS JSON for Colours data settings");}
+    if(displ){gfx->println(F("USING FATS JSON for Colours data settings"));}
+  } else {
+    FilesOK = false;
+     if(print){ DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");}
+    if(displ){gfx->println(F("Setting Victron settings to defaults"));}
+    SaveDisplayConfiguration(FFat, ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+  }
+return FilesOK;
+}
 
 
 void setup() {
@@ -331,48 +382,13 @@ void setup() {
   } else {
     gfx->println(F("***  NO Touch Sensor ***"));
   }
+ 
+  if (LoadConfigs(true,false)) {
+     beep(1, EX106);
+     gfx->println(F("*** All CONFIGS LOADED ***"));
+     DEBUG_PORT.println("All Configs Loaded ");
+   }else {gfx->println(F("*** DEFAULT CONFIG SET ***"));}
   delay(1000);
-  bool FilesOK = true;
-  if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
-    DEBUG_PORT.println("USING FATS JSON for wifi and display settings");
-    gfx->println(F("USING FATS JSON for WiFi and display settings"));
-    Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
-    Display_Page = Display_Config.Start_Page;
-   } else {
-    FilesOK = false;
-    Display_Page = 4;  //here for clarity?
-    Display_Config = Default_JSON;
-    Current_Settings = Default_Settings_JSON;
-    DEBUG_PORT.println(" USING  defaults for wifi and display settings");
-    gfx->println(F("Setting WiFi and Display settings to defaults"));
-    SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings);
-  }
-  if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
-    DEBUG_PORT.println("USING FATS JSON for Victron data settings");
-    gfx->println(F("USING FATS JSON for Victron settings"));
-  } else {
-    FilesOK = false;
-    DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");
-    gfx->println(F("Setting Victron settings to defaults"));
-    victronDevices.BLEDebug="FALSE";
-    Num_Victron_Devices = 6;
-    CommonDisplayWIdth = 150;
-    SaveVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
-  }
-  if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
-    DEBUG_PORT.println("USING FATS JSON for Colours data settings");
-    gfx->println(F("USING FATS JSON for Colours data settings"));
-  } else {
-    FilesOK = false;
-    DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");
-    gfx->println(F("Setting Victron settings to defaults"));
-    SaveDisplayConfiguration(FFat, ColorsFilename, ColorSettings);  // should write a default file if it was missing?
-  }
-  // if (!FilesOK) {
-  //   beep(1, EX106);
-  //   DEBUG_PORT.println("Sound to indicate a JSON settings to default ");
-  // }
-
 
   ConnectWiFiusingCurrentSettings();
   SetupWebstuff();
@@ -607,10 +623,18 @@ bool LoadVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
   }
   strlcpy(temp, doc["BLEDebug"] | "false", sizeof(temp));
   config.BLEDebug = (strcmp(temp, "false"));
+
+/// BLEDEBUG prints all victron / ble out on serial port 
+//******  SET FALSE regardless of what is in the Vic Config !
+  config.BLEDebug=false; 
+  config.Beacons=false;  // can switch in in the victron display 
+
   strlcpy(temp, doc["Simulate"] | "false", sizeof(temp));
-  config.Simulate = (strcmp(temp, "false"));
+  config.Simulate = (strcmp(temp, "false"));   
+
+
   Num_Victron_Devices = doc["Num_Devices"] | 4;
-  CommonDisplayWIdth = doc["CommonDisplayWIdth"] | 150;
+  CommonDisplayWidth = doc["CommonDisplayWidth"] | 150;
   for (int index = 0; index < Num_Victron_Devices; index++) {
     strlcpy(config.charMacAddr[index], doc["device" + String(index) + ".mac"] | "macaddress", sizeof(config.charMacAddr[index]));
     strlcpy(config.charKey[index], doc["device" + String(index) + ".key"] | "key", sizeof(config.charKey[index]));
@@ -648,8 +672,6 @@ void SaveVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
   doc[" "] = " 'v' second Battery Volts 'i' second Battery Current  (ac charger only)";
   doc[" "] = "'L' Load current 'S' State of charge 'E' error codes 'T' Temperature";
   doc[" "] = " 'A' Aux reading(t or starter) ";
-
-
   doc[" "] = "for SmartShunt, IAS will display current, State of charge and (starter V or temperature)";
   doc[" "] = "for Battery Monitor: V will display Voltage (only)";
   doc[" note"] = "Display height is also adjustable for each 'device', and devices can be duplicated";
@@ -657,7 +679,7 @@ void SaveVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
   doc["BLEDebug"] = config.BLEDebug True_False; //set.Debug True_False;
   doc["Simulate"] = config.Simulate True_False; 
   doc["Num_Devices"] = Num_Victron_Devices;
-  doc["Common_width"] = CommonDisplayWIdth;
+  doc["Common_width"] = CommonDisplayWidth;
   // doc[" Comment1"]= "for Shunt, VIA will display Battery Volts, Current, Additional data";
   // doc[" Comment2"]= "for SOLAR, PIA will display solar Power, battery Current, Additional data";
   for (int index = 0; index < Num_Victron_Devices; index++) {
@@ -715,8 +737,7 @@ void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   // doc["BoxW"] = set.BoxW;
   doc["FontH"] = set.FontH;
   doc["FontS"] = set.FontS;
- // doc["Simulate"] = set.Simulate True_False;
-  doc["Debug"] = set.Debug True_False;
+  doc["SERIAL_OUT"] = set.SerialOUT True_False;
 
   doc["ShowRawDecryptedDataFor"] = set.ShowRawDecryptedDataFor;
   doc["Frame"] = set.Frame True_False;
@@ -762,8 +783,8 @@ bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   // set.Simulate = (strcmp(temp, "false"));
   strlcpy(temp, doc["Frame"] | "false", sizeof(temp));
   set.Frame = (strcmp(temp, "false"));
-  strlcpy(temp, doc["Debug"] | "false", sizeof(temp));
-  set.Debug = (strcmp(temp, "false"));
+  strlcpy(temp, doc["SERIAL_OUT"] | "false", sizeof(temp));
+  set.SerialOUT = (strcmp(temp, "false"));
 
 
   set.ShowRawDecryptedDataFor = doc["ShowRawDecryptedDataFor"] | 1;
@@ -831,8 +852,16 @@ bool LoadConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   settings.N2K_ON = (strcmp(temp, "false"));
   strlcpy(temp, doc["LOG"] | "false", sizeof(temp));
   settings.Log_ON = (strcmp(temp, "false"));
-  strlcpy(temp, doc["NMEALOG"] | "false", sizeof(temp));
-  settings.NMEA_log_ON = (strcmp(temp, "false"));
+  strlcpy(temp, doc["DATALOG"] | "false", sizeof(temp));
+  settings.Data_Log_ON = (strcmp(temp, "false"));
+  //**************  SET ALL LOGGING FALSE on STARTUP - 
+  //  ***  There is not enough room on FFATS to simply store everything
+  //  MAYBE later add some tests for SD (not on waveshare!) and save to SD 
+  settings.Data_Log_ON=false;
+  settings.Log_ON=false;
+
+
+
   settings.log_interval_setting = doc["LogInterval"] | 60;
 
   strlcpy(temp, doc["BLE_enable"] | "false", sizeof(temp));
@@ -894,11 +923,12 @@ void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   doc["Mag_Var"] = buff;
  
   doc["Log settings"] = "LOG saves read data in SD file with date as name- BUT only when GPS date has been seen!";
-  doc["NMEALOG"] = "NMEALOG saves every message. Use NMEALOG only for debugging!";
-  doc["Be Careful"] = " the NMEALOG files will become huge";
+  doc["DATALOG"] = "DATALOG saves every message. Use DATALOG only for debugging!";
+  doc["Be Careful"] = " the DATALOG files will become huge";
   doc["LOG"] = settings.Log_ON True_False;
   doc["LogInterval"] = settings.log_interval_setting;
-  doc["NMEALOG"] = settings.NMEA_log_ON True_False;
+  doc["DATALOG"] = settings.Data_Log_ON True_False;
+
   // Serialize JSON to file
   if (serializeJsonPretty(doc, file) == 0) {  // use 'pretty format' with line feeds
     DEBUG_PORT.println(F("JSON: Failed to write to file"));
@@ -942,8 +972,8 @@ void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
   // 7 is smallest Bold Font
   UpdateLinef(7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>", Text, A.ssid, A.password, A.UDP_PORT);
   UpdateLinef(7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
-  UpdateLinef(7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.NMEA_log_ON On_Off);
-  // UpdateLinef(7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.NMEA_log_ON On_Off);
+  UpdateLinef(7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
+  // UpdateLinef(7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
 }
 void ShowToplinesettings(String Text) {
   ShowToplinesettings(Current_Settings, Text);
@@ -960,7 +990,7 @@ boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B) {  // Doe
   if (A.N2K_ON != B.N2K_ON) { same = false; }
   if (A.Serial_on != B.Serial_on) { same = false; }
   if (A.Log_ON != B.Log_ON) { same = false; }
-  if (A.NMEA_log_ON != B.NMEA_log_ON) { same = false; }
+  if (A.Data_Log_ON != B.Data_Log_ON) { same = false; }
 
   //DEBUG_PORT.print(" DEBUG ");DEBUG_PORT.print(A.ssid); DEBUG_PORT.print(" and ");DEBUG_PORT.println(B.ssid);
   // these are char strings, so need strcmp to compare ...if strcmp==0 they are equal
@@ -1093,8 +1123,11 @@ void DrawCompass(_sButton button) {
   for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, BLACK); }  // dots at 10 degrees
 }
 
-void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 
+
+//****************   ALL THE WIFI STUFF *********************************
+
+void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
   switch (event) {
     case ARDUINO_EVENT_WIFI_STA_CONNECTED:
       DEBUG_PORT.println("WiFi connected");
@@ -1283,9 +1316,12 @@ bool ScanAndConnect(bool display) {
   }
   return found;
 }
+
 void ConnectWiFiusingCurrentSettings() {
   bool result;
   uint32_t StartTime = millis();
+  const IPAddress sub255(255, 255, 255, 0);  // the default Subnet Mask in in SoftAP mode
+  const IPAddress Null_ip(0, 0, 0, 0);    //  A null IP address for the gateway
   // superceded by WIFI box display "setting up AP" gfx->println("Setting up WiFi");
   WiFi.softAPConfig(ap_ip, Null_ip, sub255);
   WiFi.disconnect(false, true);  // clean the persistent memory in case someone else set it !! eg ESPHOME!!
@@ -1322,6 +1358,11 @@ void ConnectWiFiusingCurrentSettings() {
   WiFi.mode(WIFI_AP_STA);
   // all Serial prints etc are now inside ScanAndConnect 'TRUE' will display them.
 }
+
+//***********************   END OF WIFI FUNCTIONS *****************************
+
+
+//SETUP THE WIRE /EXPANDER /SD 
 void Setup_Wire_Expander(int SDA, int SCL, int beepPin) {
   Wire.begin(SDA, SCL);
   #ifdef WAVSHARE
@@ -1397,6 +1438,7 @@ void SD_CS(bool state) {
     laststate = state;
 #endif
 }
+
 bool SDexists(const char* path) {  //SD_CS to be done before this is called ! (equivalent to SD_MMC . Exists() function )
   if (!hasSD) { return false; }
   File file = SD.open(path);
@@ -1406,13 +1448,7 @@ bool SDexists(const char* path) {  //SD_CS to be done before this is called ! (e
   }
   return false;
 }
-void timeupdate() {
-  static unsigned long tick;
-  while ((millis() >= tick)) {
-    tick = tick + 1000;  // not millis or you can get 'slip'
-    BoatData.LOCTime = BoatData.LOCTime + 1;
-  }
-}
+
 void FindI2CDevices(String text) {
   DEBUG_PORT.println(text);
   for (int i = 0; i < 256; i++) {
@@ -1451,7 +1487,7 @@ void scanI2CMatrix() {
   }
   DEBUG_PORT.println("\nScan complete.");
 }
-
+//***************** TOUCH SETUP 
 bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
   bool result = false;
   // is already started ! using Expander pin definition in setup() Wire.begin(TOUCH_SDA,TOUCH_SCL);                         // start the wire interface
@@ -1507,6 +1543,19 @@ bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
   }
   return result;
 }
+
+
+//*****************  TIME UPDATE (LOCAL ONLY: IF GPS FAILS GPS time will not update)
+
+void timeupdate() {
+  static unsigned long tick;
+  while ((millis() >= tick)) {
+    tick = tick + 1000;  // not millis or you can get 'slip'
+    BoatData.LOCTime = BoatData.LOCTime + 1;
+  }
+}
+
+
 void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi sources in sequence
   static unsigned long MAXScanInterval;
   MAXScanInterval = millis() + 500;
@@ -1530,6 +1579,8 @@ void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi source
     if (Test_U()) { UseNMEA(nmea_U, 2); }
   }
   //DEBUG_PORT.printf(" cd<%i>",millis()-Interval);Interval=millis();
+
+  // For printing Victrn debug messages 
   if (Current_Settings.BLE_enable) {
     if (VictronBuffer[0] != 0) { UseNMEA(VictronBuffer, 4); }
   }
@@ -1543,50 +1594,34 @@ void UseNMEA(char* buf, int type) {
     // type 4 is Victron data
     /*TIME: %02i:%02i:%02i",
                       int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60,*/
-    if (Current_Settings.NMEA_log_ON) {
+    if (Current_Settings.Data_Log_ON) {
       if (BoatData.GPSTime != NMEA0183DoubleNA) {
-        if (type == 1) { NMEALOG(" %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-        if (type == 2) { NMEALOG(" %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-        if (type == 3) { NMEALOG(" %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-        if (type == 4) { NMEALOG("\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
-
-
+        if (type == 1) { DATA_Log(FFat," %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 2) { DATA_Log(FFat," %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 3) { DATA_Log(FFat," %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 4) { DATA_Log(FFat,"\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
       } else {
-
-        if (type == 1) { NMEALOG("%.3f SER:%s", float(millis()) / 1000, buf); }
-        if (type == 2) { NMEALOG("%.3f UDP:%s", float(millis()) / 1000, buf); }
-        if (type == 3) { NMEALOG("%.3f ESP:%s", float(millis()) / 1000, buf); }
-        if (type == 4) { NMEALOG("\n %.3f VIC:%s", float(millis()) / 1000, buf); }
+        if (type == 1) { DATA_Log(FFat,"%.3f SER:%s", float(millis()) / 1000, buf); }
+        if (type == 2) { DATA_Log(FFat,"%.3f UDP:%s", float(millis()) / 1000, buf); }
+        if (type == 3) { DATA_Log(FFat,"%.3f ESP:%s", float(millis()) / 1000, buf); }
+        if (type == 4) { DATA_Log(FFat,"\n %.3f VIC:%s", float(millis()) / 1000, buf); }
       }
     }
     // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
-    // 7 is smallest
-    // 0 is 8pt mono thin,
-    //3 is 8pt mono bold
     if ((Display_Page == -86)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-      if (type == 4) {
-        UpdateLinef(BLACK, 8, Terminal, "V_Debugmsg%s", buf);  //8 readable ! 7 small enough to avoid line wrap issue?
-      }
+      if (type == 4) {UpdateLinef(BLACK, 8, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
     }
 
     if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-                                  //  if (type == 5) {  // done directly on data receipt!
-                                  //   UpdateLinef(BLACK, 8, Terminal, "N2K:%s", buf);  // 7 small enough to avoid line wrap issue?
-                                  // }
-      if (type == 4) {
-        UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);  // 7 small enough to avoid line wrap issue?
-      }
-
-      if (type == 2) {
-        UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);  // 7 small enough to avoid line wrap issue?
-      }
-      if (type == 3) {
-        UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);
-      }
-      if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf); }
+      if (type == 4) {UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
+      if (type == 2) {UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
+      if (type == 3) {UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);}
+      if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf);}
     }
     // now decode it for the displays to use
-    if (type != 4) {
+    if (ColorSettings.SerialOUT) {DEBUG_PORT.println(buf);}
+
+    if (type != 4) { // Now process the NMEA0183 messages into BoatData so we can use the data. (N2K is dealt with elsewhere!)
       pTOKEN = buf;                                               // pToken is used in processPacket to separate out the Data Fields
       if (processPacket(buf, BoatData)) { dataUpdated = true; };  // NOTE processPacket will search for CR! so do not remove it and then do page updates if true ?
     }
@@ -1595,6 +1630,7 @@ void UseNMEA(char* buf, int type) {
     return;
   }
 }
+
 bool Test_Serial_1() {  // UART0 port P1
   static bool LineReading_1 = false;
   static int Skip_1 = 1;
@@ -1630,6 +1666,7 @@ bool Test_Serial_1() {  // UART0 port P1
   line_1 = false;
   return false;
 }
+
 bool Test_U() {  // check if udp packet (UDP is sent in lines..) has arrived
   static int Skip_U = 1;
   // if (!line_U) {  // only process if we have dealt with the last line.
@@ -1656,49 +1693,7 @@ bool Test_U() {  // check if udp packet (UDP is sent in lines..) has arrived
   return false;
 }
 
-//*************** list dir..
-void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
-  #ifdef WAVSHARE
-  SD_CS(LOW);
-  #endif
-    DEBUG_PORT.printf("Listing directory: %s\n", dirname);
 
-    File root = fs.open(dirname);
-    if(!root){
-        DEBUG_PORT.println("Failed to open directory");
-  #ifdef WAVSHARE
-  SD_CS(HIGH);
-  #endif
-        return;
-    }
-    if(!root.isDirectory()){
-        DEBUG_PORT.println("Not a directory");
-  #ifdef WAVSHARE
-  SD_CS(HIGH);
-  #endif
-        return;
-    }
-
-    File file = root.openNextFile();
-    while(file){
-        if(file.isDirectory()){
-            DEBUG_PORT.print("  DIR : ");
-            DEBUG_PORT.println(file.name());
-            if(levels){
-                listDir(fs, file.path(), levels -1);
-            }
-        } else {
-            DEBUG_PORT.print("  FILE: ");
-            DEBUG_PORT.print(file.name());
-            DEBUG_PORT.print("  SIZE: ");
-            DEBUG_PORT.println(file.size());
-        }
-        file = root.openNextFile();
-    }
-  #ifdef WAVSHARE
-  SD_CS(HIGH);
-  #endif
-}
 
 void beep(int num, int beepPin) {
 #ifdef WAVSHARE

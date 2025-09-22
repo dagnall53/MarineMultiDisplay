@@ -21,7 +21,7 @@ struct _sDisplay_Config {  // will be Display_Config for the JSON set Defaults a
   char WideScreenCentral[10] ;
 };
 
-//  .ssid[25].password[25].UDP_PORT[5].UDP_ON .Serial_on .ESP_NOW_ON. N2K_ON .Log_ON. log_interval_setting. NMEA_log_ON. BLE_enable
+//  .ssid[25].password[25].UDP_PORT[5].UDP_ON .Serial_on .ESP_NOW_ON. N2K_ON .Log_ON. log_interval_setting. Data_Log_ON. BLE_enable
 struct _sWiFi_settings_Config {  // MAINLY WIFI AND DATA LOGGING key,ssid,PW,udpport, UDP,serial,Espnow
   int EpromKEY;      // Key is changed to allow check for clean EEprom and no data stored change in the default will result in eeprom being reset
                      //  int DisplayPage;   // start page after defaults
@@ -34,7 +34,7 @@ struct _sWiFi_settings_Config {  // MAINLY WIFI AND DATA LOGGING key,ssid,PW,udp
   bool N2K_ON;
   bool Log_ON;
   int log_interval_setting; //seconds
-  bool NMEA_log_ON;
+  bool Data_Log_ON;
   bool BLE_enable;
  };
 struct _MyColors {  // for later Day/Night settings
@@ -45,10 +45,10 @@ struct _MyColors {  // for later Day/Night settings
  // int BoxH;
   int FontH;
   int FontS;
-  bool Simulate;
+  //bool Simulate;
   int ShowRawDecryptedDataFor;
   bool Frame;
-  bool Debug;
+  bool SerialOUT;
 
 };
 
@@ -102,6 +102,7 @@ struct _sMyVictronDevices{   // equivalent to _sDisplay_Config all known victron
                 //10 index for multiple saved instrument settings first
   bool BLEDebug;
   bool Simulate;
+  bool Beacons;
   char charMacAddr[20][13];   // a 12 char (+1!) array  typ= "ea9df3ebc625"  
   char charKey [20][33];      //32 etc...
   char FileCommentName [20][32];  // name from file that will be used in Display

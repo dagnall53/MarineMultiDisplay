@@ -41,7 +41,7 @@ pHeadingCharacteristic -> setValue( mys );
 
 
 #include <aes/esp_aes.h>  // AES library for decrypting the Victron manufacturer data.
-extern int Num_Victron_Devices,CommonDisplayWIdth;
+extern int Num_Victron_Devices, CommonDisplayWidth;
 extern char VictronBuffer[];  // to get the data out as a string char
 extern _sDisplay_Config Display_Config;
 extern _sWiFi_settings_Config Current_Settings;
@@ -56,7 +56,7 @@ BLEScan *pBLEScan;
 // int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
 // generic button for displays to modify h,v width and height from Vconfig file. Will start with settings relative to Vic_Inst_Master :
 _sButton DisplayOuterbox;
-_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWIdth, 100, 5, ColorSettings.BackColor, ColorSettings.TextColor, ColorSettings.BorderColor };  //WHITE, BLACK, BLUE };
+_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, ColorSettings.BackColor, ColorSettings.TextColor, ColorSettings.BorderColor };  //WHITE, BLACK, BLUE };
   //
 #define socbar 20
 #define greyoutTime 12000
@@ -525,9 +525,9 @@ void DrawBar(_sButton box, char *title, uint16_t color, float data) {
 void Setup_N_Display(int i) {  // setsup the display box , but changes position and height colours  as required
   // use Vic_Inst_Master box master struct and ColorSettings for the colours border size etc, etc ...
   //pointers so we avoid stack crash?
-  DisplayOuterbox.bordersize= Vic_Inst_Master.bordersize;
-  
-  DisplayOuterbox.width = CommonDisplayWIdth;
+  DisplayOuterbox.bordersize = Vic_Inst_Master.bordersize;
+
+  DisplayOuterbox.width = CommonDisplayWidth;
   DisplayOuterbox.TextColor = ColorSettings.TextColor;
   DisplayOuterbox.BorderColor = ColorSettings.BorderColor;
   DisplayOuterbox.BackColor = ColorSettings.BackColor;
@@ -536,9 +536,9 @@ void Setup_N_Display(int i) {  // setsup the display box , but changes position 
   DisplayOuterbox.v = victronDevices.displayV[i];
   char borderdisplay[50];
   if (strlen(victronDevices.FileCommentName[i]) > 1) {
-    strncpy(borderdisplay, victronDevices.FileCommentName[i],30);
+    strncpy(borderdisplay, victronDevices.FileCommentName[i], 30);
   } else {
-    strncpy(borderdisplay, victronDevices.DeviceVictronName[i],30);
+    strncpy(borderdisplay, victronDevices.DeviceVictronName[i], 30);
   }
   GFXBorderBoxPrintf(DisplayOuterbox, "");  //Used to blank the previous stuff!
 }
@@ -575,21 +575,22 @@ int FoundMyDevices;
 
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice advertisedDevice) {
-    char debugMsg[200];                                           // No debug in (fast) callback unless in debugmode?
-    uint8_t manCharBuf[100];        manCharBuf[0]=0;              //local copy with "just in case" clear  
-    if (!advertisedDevice.haveManufacturerData()) { return; }     // ONLY bother with the message if it has "manufacturerdata" and then look to see if it's coming from a Victron device.
-    if (advertisedDevice.getManufacturerData().length() > 99) {  return; }
-    // get the manufacturer data into our local manCharBuf array.
-    #if ESP_ARDUINO_VERSION_MAJOR == 3
-    		uint8_t *pHex = (uint8_t*)advertisedDevice.getManufacturerData().c_str();  // not confirmed to work !
-    #else
-        uint8_t *pHex = (uint8_t *)advertisedDevice.getManufacturerData().data();  // works with 2.0.17  
-    #endif
-     for (int j = 0; j < advertisedDevice.getManufacturerData().length(); j++) {
-             manCharBuf[j]=pHex[j];  // save to our won array from pHex pointer for use in this function
-          }                          // NOTE: could use pHex[x] directly, but I noted some issues - probably with timing and Serial printf and (possibly) another call to this function while the printf was being done
+    char debugMsg[200];  // No debug in (fast) callback unless in debugmode?
+    uint8_t manCharBuf[100];
+    manCharBuf[0] = 0;                                         //local copy with "just in case" clear
+    if (!advertisedDevice.haveManufacturerData()) { return; }  // ONLY bother with the message if it has "manufacturerdata" and then look to see if it's coming from a Victron device.
+    if (advertisedDevice.getManufacturerData().length() > 99) { return; }
+// get the manufacturer data into our local manCharBuf array.
+#if ESP_ARDUINO_VERSION_MAJOR == 3
+    uint8_t *pHex = (uint8_t *)advertisedDevice.getManufacturerData().c_str();  // not confirmed to work !
+#else
+    uint8_t *pHex = (uint8_t *)advertisedDevice.getManufacturerData().data();  // works with 2.0.17
+#endif
+    for (int j = 0; j < advertisedDevice.getManufacturerData().length(); j++) {
+      manCharBuf[j] = pHex[j];  // save to our won array from pHex pointer for use in this function
+    }                           // NOTE: could use pHex[x] directly, but I noted some issues - probably with timing and Serial printf and (possibly) another call to this function while the printf was being done
 
-    if (victronDevices.BLEDebug) {  //SERIAL print shows ANY BLE with MFr data.
+    if (victronDevices.BLEDebug) {  //shows ANY BLE with MFr data.
       Serial.printf("BLE: mac<%s> type<%02X> <%s> ", advertisedDevice.getAddress().toString().c_str(),
                     manCharBuf[1], Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
       if (advertisedDevice.haveName()) {
@@ -601,8 +602,8 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 
     if ((manCharBuf[2] != 0x10)) { return; }  // is not a beacon, not interested! use saved value, just to make sure its consistent with debug
 
-    if (ColorSettings.Debug) {  // MFR DATA and IS BEACON, use saved values in case of corruption due to delays / interruptions in callbacks
-      snprintf(debugMsg, 120, "Beacon: mac<%s> <%s>", advertisedDevice.getAddress().toString().c_str(), Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
+    if (victronDevices.Beacons) {  // MFR DATA and IS BEACON, use saved values in case of corruption due to delays / interruptions in callbacks
+      snprintf(debugMsg, 120, "Beacon:mac<%s> <%s>", advertisedDevice.getAddress().toString().c_str(), Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
       strcat(VictronBuffer, debugMsg);
       if (advertisedDevice.haveName()) {
         snprintf(debugMsg, 120, " name<%s> len<%i> rssi %i", advertisedDevice.getName().c_str(), advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
@@ -619,7 +620,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
           victronDevices.greyed[i] = false;
           victronDevices.updated[i] = millis();
           if (advertisedDevice.haveName()) { strcpy(victronDevices.DeviceVictronName[i], advertisedDevice.getName().c_str()); }
-          if (ColorSettings.Debug) {  //  Serial.printf("Recognised as my device '%x'  building data \n", i);
+          if (victronDevices.BLEDebug) {  //  Serial.printf("Recognised as my device '%x'  building data \n", i);
             snprintf(debugMsg, 120, " is my device (%i)", i);
             strcat(VictronBuffer, debugMsg);
           }
@@ -631,7 +632,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
       }
     }
     //data now safely saved in my _sMyVictronDevices structured array[i] to be worked on later!
-    if ((ColorSettings.Debug) && (ColorSettings.ShowRawDecryptedDataFor == 100)) {  // just a random number I selected to allow me to read the actual (encrypted!)data in debug
+    if ((ColorSettings.SerialOUT) && (ColorSettings.ShowRawDecryptedDataFor == 100)) {  // just a random number I selected to allow me to read the actual (encrypted!)data in debug
       snprintf(debugMsg, 190, "manCharBuf len<%i> :", advertisedDevice.getManufacturerData().length());
       strcat(VictronBuffer, debugMsg);
       for (int i = 0; i < advertisedDevice.getManufacturerData().length(); i++) {
@@ -639,7 +640,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         strcat(VictronBuffer, debugMsg);
       }
     }
-    if (ColorSettings.Debug) {
+    if (ColorSettings.SerialOUT) {
       snprintf(debugMsg, 120, "\n");
       strcat(VictronBuffer, debugMsg);
       Serial.println(VictronBuffer);
@@ -650,6 +651,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a victronDevices structure with index i
   // we know the victronDevices data should be for one of our device MAC, and only victron data is accepted
   char debugMsg[200];
+
   if (victronDevices.greyed[i]) {  // Serial.printf("%i is Greyed\n",i);// added greying (outdated data) test
     return;
   }
@@ -662,31 +664,32 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   if (victronDevices.displayed[i]) {  //Serial.printf(" %i displayed already\n",i);
     return;
   }
-  // Serial.printf("Deal_With_BLE_<%i>_Data", i); 
-  if(victronDevices.BLEDebug){
-  snprintf(debugMsg, 120, "Victron<%i>,", i);
-  strcat(VictronBuffer, debugMsg);
-
-  if (victronDevices.greyed[i]) {
-    snprintf(debugMsg, 120, "-Greying-");  // not essential, but makes NMEAlog and data display tidier
+  // Serial.printf("Deal_With_BLE_<%i>_Data", i);
+  if (victronDevices.BLEDebug) {  // setup VictronBuffer messages for debug
+    snprintf(debugMsg, 120, "Victron<%i>,", i);
     strcat(VictronBuffer, debugMsg);
-  }
+
+    if (victronDevices.greyed[i]) {
+      snprintf(debugMsg, 120, "-Greying-");  // not essential, but makes DATALOG and data display tidier
+      strcat(VictronBuffer, debugMsg);
+    }
   }
   // Now let's use a struct to get to the data more cleanly we saved the raw data in the BLE callback
   victronManufacturerData *vicData = (victronManufacturerData *)victronDevices.manCharBuf[i];
   // // for record type list see line 300 on https://github.com/Fabian-Schmidt/esphome-victron_ble/blob/main/components/victron_ble/victron_ble.h
   // Product mapping in decimal: https://github.com/keshavdv/victron-ble/blob/main/Victron_ProductId_mapping.txt
 
-  if (victronDevices.Simulate) {  // // now.. 4.31, Use the value written as part of the device data in vconfig.txt
+  if (victronDevices.Simulate) {  // // Just use the value written as part of the device data in vconfig.txt
     vicData->VICTRON_BLE_RECORD_TYPE = victronDevices.VICTRON_BLE_RECORD_TYPE[i];
     vicData->product_id = 1000;  // just a dummy
-
   } else {
     victronDevices.VICTRON_BLE_RECORD_TYPE[i] = vicData->VICTRON_BLE_RECORD_TYPE;
-  }  //save it to our config file to save us having to do it manually      }
-  if(victronDevices.BLEDebug){
-   snprintf(debugMsg, 120, " Type<%s>,ProductID(%i),", RecordTypeToChar(vicData->VICTRON_BLE_RECORD_TYPE), vicData->product_id);
-   strcat(VictronBuffer, debugMsg);}
+  }  //save it to our debug file to save us having to write it manually ???     }
+
+  if (victronDevices.BLEDebug) {
+    snprintf(debugMsg, 120, " Type<%s>,ProductID(%i),", RecordTypeToChar(vicData->VICTRON_BLE_RECORD_TYPE), vicData->product_id);
+    strcat(VictronBuffer, debugMsg);
+  }
   //Serial.println(debugMsg);
   int KnownDataType;
   KnownDataType = -1;
@@ -696,13 +699,19 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   //Decode / decrypt..
   unsigned char localbyteKey[17];
   hexCharStrToByteArray(victronDevices.charKey[i], localbyteKey);
-  if (!victronDevices.Simulate) {  //disable for simulate
-    if (vicData->encryption_key_0 != localbyteKey[0]) {
-      snprintf(debugMsg, 120, "BUT key is MIS-MATCHED %x Localbyte(0)%x\n", localbyteKey[0]);  //Serial.println(debugMsg);
-      strcat(VictronBuffer, debugMsg);
+  if (!victronDevices.Simulate) {
+    if ((vicData->encryption_key_0 != localbyteKey[0])) {
+      if (victronDevices.BLEDebug) {
+        snprintf(debugMsg, 120, "Key is MIS-MATCHED %x Localbyte(0)%x\n", localbyteKey[0]);  //Serial.println(debugMsg); without the debug, sends this for greying after simulation OFF ?
+        strcat(VictronBuffer, debugMsg);
+      }
       victronDevices.displayed[i] = true;  // stop trying again until we get better data!
       return;
     }
+  }
+  if (!victronDevices.BLEDebug) {  // identify which index and device type
+    snprintf(debugMsg, 120, "My Device<%i>: ", i);
+    strcat(VictronBuffer, debugMsg);
   }
   // Now that the packet received and has met all the criteria for being displayed, let's decrypt and decode the manufacturer data.
   unsigned char inputData[16];
@@ -767,7 +776,12 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     if (Display_Page == -87) {
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
-      if (victronDevices.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
+      if (victronDevices.Simulate) {
+        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.FileCommentName[i]);
+        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.DeviceVictronName[i]);
+        AddTitleInsideBox(7, 4, DisplayOuterbox, "-simulated-");
+        AddTitleInsideBox(7, 3, DisplayOuterbox, " %i ", i);
+      }  
       DisplayOuterbox.PrintLine = 5;
       if (strstr(victronDevices.DisplayShow[i], "P")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%3dw", pv_power); }
       if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV", battery_voltage); }
@@ -801,12 +815,21 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
       DisplayOuterbox.PrintLine = 5;
-      if (victronDevices.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
+      if (victronDevices.Simulate) {
+               AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.FileCommentName[i]);
+        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.DeviceVictronName[i]);
+        AddTitleInsideBox(7, 4, DisplayOuterbox, "-simulated-");
+        AddTitleInsideBox(7, 3, DisplayOuterbox, " %i ", i);
+      } 
       if (strstr(victronDevices.DisplayShow[i], "S")) { DrawBar(DisplayOuterbox, victronDevices.FileCommentName[i], GREEN, state_of_charge); }
       if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FV", battery_voltage); }
-      if (strstr(victronDevices.DisplayShow[i], "I")) { if (abs(battery_current)>=9.9){UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA", battery_current);}
-      else{UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%1.2FA", battery_current);}
+      if (strstr(victronDevices.DisplayShow[i], "I")) {
+        if (abs(battery_current) >= 9.9) {
+          UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA", battery_current);
+        } else {
+          UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%1.2FA", battery_current);
         }
+      }
       if (strstr(victronDevices.DisplayShow[i], "A")) {
         if (auxtype == 2) {
           UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "");                               //temperature 3rd line // use DisplayShow ?? config.DisplayShow[index]
@@ -844,7 +867,13 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
       DisplayOuterbox.PrintLine = 5;
-      if (victronDevices.Simulate) { AddTitleInsideBox(7, 2, DisplayOuterbox, "-simulated-"); }
+      if (victronDevices.Simulate) {
+               AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.FileCommentName[i]);
+        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.DeviceVictronName[i]);
+        AddTitleInsideBox(7, 4, DisplayOuterbox, "-sim-");
+        AddTitleInsideBox(7, 3, DisplayOuterbox, " %i ", i);
+      }
+      
       if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV1", battery_voltage_1); }
       if (strstr(victronDevices.DisplayShow[i], "I")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA1", battery_current_1); }
       if (strstr(victronDevices.DisplayShow[i], "v")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV2", battery_voltage_2); }
@@ -855,7 +884,6 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       if (strstr(victronDevices.DisplayShow[i], "E")) { UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", ErrorCodeToChar(charger_error)); }
     }
   }
-if(victronDevices.BLEDebug){  Serial.println(VictronBuffer);}
   victronDevices.displayed[i] = true;
 }
 
@@ -898,7 +926,7 @@ void BLEloop() {
     // snprintf(debugMsg, 120, "BLE Scan Commence");
     // strcat(VictronBuffer, debugMsg);
     if (victronDevices.Simulate) {  // pull the simulate trigger on all listed in sequence !
-      VictronSimulateIndex++;
+      VictronSimulateIndex++;       // slower than it can normally
       if (VictronSimulateIndex >= Num_Victron_Devices) { VictronSimulateIndex = 0; }
 
       victronDevices.displayed[VictronSimulateIndex] = false;
@@ -906,13 +934,13 @@ void BLEloop() {
       victronDevices.updated[VictronSimulateIndex] = millis();
       //Serial.printf(" Simulating reception of :<%i>", VictronSimulateIndex);
     } else {
-    #if ESP_ARDUINO_VERSION_MAJOR == 3
+#if ESP_ARDUINO_VERSION_MAJOR == 3
       pBLEScan->start(1, scanCompleteCB);
-    #else
-      BLEScanResults foundDevices = pBLEScan->start(1, false);  //scanTime>0 is essential or it locks in continuous!, true);  // what does the iscontinue do? (the true/false is set false in examples. )
-                                                                // Serial.printf("Found %i BLE and %i are myVictrons \n", foundDevices.getCount(), FoundMyDevices);
-      pBLEScan->clearResults();                                 // delete results fromBLEScan buffer to release memory
-    #endif
+#else
+      BLEScanResults foundDevices = pBLEScan->start(1, false);                 //scanTime>0 is essential or it locks in continuous!, true);  // what does the iscontinue do? (the true/false is set false in examples. )
+                                                                               // Serial.printf("Found %i BLE and %i are myVictrons \n", foundDevices.getCount(), FoundMyDevices);
+      pBLEScan->clearResults();                                                // delete results fromBLEScan buffer to release memory
+#endif
     }
     BLESCANINTERVAL = millis() + _BLESCANINTERVAL;  // wait scan interval AFTER the finish!!
                                                     // Serial.printf("  Scan Finished \n");
@@ -921,6 +949,7 @@ void BLEloop() {
   }
 
   for (int i = 0; i < Num_Victron_Devices; i++) {
+    if (victronDevices.Simulate) { delay(100); }
     Deal_With_BLE_Data(i);
     delay(10);  // give it a little time to print debug messages etc!!
   }

@@ -41,11 +41,11 @@ extern void SD_CS(bool state);
 extern bool hasFS;
 extern bool hasSD;
 static bool INSTlogFileStarted = false;
-static bool NMEAINSTlogFileStarted = false;
+static bool DATA_Log_FILE_Started = false;
 
 
 extern const char *Setupfilename;
-extern bool LoadConfiguration(fs::FS &fs,const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings);
+extern bool LoadConfiguration(fs::FS &fs, const char *filename, _sDisplay_Config &config, _sWiFi_settings_Config &settings);
 extern void SaveConfiguration(fs::FS &fs, const char *filename, _sDisplay_Config &config, _sWiFi_settings_Config &settings);
 extern _sWiFi_settings_Config Current_Settings;
 extern _sDisplay_Config Saved_Display_Config;
@@ -88,7 +88,7 @@ WebServer server(80);
 File SDuploadFile;
 char SavedFile[30];
 char InstLogFileName[25];
-char NMEALogFileName[25];
+char DATALOGFileName[25];
 
 extern bool SDexists(const char *path);  // only for SD library
 
@@ -107,12 +107,62 @@ void writeFile(fs::FS &fs, const char *path, const char *message) {
   }
   file.close();
 }
+//*************** list dir..
+void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
+#ifdef WAVSHARE
+  SD_CS(LOW);
+#endif
+  DEBUG_PORT.printf("Listing directory: %s\n", dirname);
 
+  File root = fs.open(dirname);
+  if (!root) {
+    DEBUG_PORT.println("Failed to open directory");
+#ifdef WAVSHARE
+    SD_CS(HIGH);
+#endif
+    return;
+  }
+  if (!root.isDirectory()) {
+    DEBUG_PORT.println("Not a directory");
+#ifdef WAVSHARE
+    SD_CS(HIGH);
+#endif
+    return;
+  }
 
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      DEBUG_PORT.print("  DIR : ");
+      DEBUG_PORT.println(file.name());
+      if (levels) {
+        listDir(fs, file.path(), levels - 1);
+      }
+    } else {
+      DEBUG_PORT.print("  FILE: ");
+      DEBUG_PORT.print(file.name());
+      DEBUG_PORT.print("  SIZE: ");
+      DEBUG_PORT.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+#ifdef WAVSHARE
+  SD_CS(HIGH);
+#endif
+}
+// Append data to the SD card (DON'T MODIFY THIS FUNCTION)
+void appendFile(fs::FS &fs, const char *path, const char *message) {
+  // Serial.printf("Appending to file: %s\n", path);
+  File file = fs.open(path, FILE_APPEND);
+  if (file.print(message)) {
+    //  DEBUG_PORT.print("**Message appended");
+  } else {
+    //  DEBUG_PORT.print("**Append failed");
+  }
+  file.close();
+}
 
 // //***************************************************
-
-
 // Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
 String html_Question() {
   String st = "<!DOCTYPE html>\r\n";
@@ -131,21 +181,21 @@ String html_Question() {
   st += String(esp_get_idf_version());
   st += ")</center><br><center>Code Comments</b><br></center><left>";
   st += "<title>NavDisplay ";
-  st += String(_device);  st += String(soft_version);
+  st += String(_device);
+  st += String(soft_version);
   st += "</title>";
   st += " </head>";
   st += "<body><center><h1 ><a>This device's panel name is ";
   st += String(Display_Config.PanelName);
   st += "</h1><br>\r\n</a><h1>Software :";
-  st += String(_device);  st += String(soft_version);
+  st += String(_device);
+  st += String(soft_version);
   st += "</h1><br> I may add user help instructions here:<br>";
   st += "</center></body></html>";
   return st;
 }
 // So I can modify the Display Panel Name! but also so that OTA works even without SD card present
-//
-/*the main html web page, with modified names etc    */
-//prettified version
+//prettified version/*the main html web page, with modified names etc    */
 String html_startws() {
   String logs, filename;
   String st =
@@ -169,12 +219,13 @@ String html_startws() {
     "<body>"
     //"<img src='/v3small.jpg'><br>"
     "<div class='title'>";
-  
-      
+
+
   st += String(Display_Config.PanelName);
   st += "</div>"
         "<div class='version'>";
-  st += String(_device);  st += String(soft_version);
+  st += String(_device);
+  st += String(soft_version);
   st += "</div>"
         "<h1><a class='button-link' href='http://";
   st += String(Display_Config.PanelName);
@@ -189,7 +240,7 @@ String html_startws() {
   st += String(Display_Config.PanelName);
   st += ".local:8080'> File Editor</a></h1><br>"
         "<div class='version'>Saved Log files on SD </div>";
-        SD_CS(LOW);
+  SD_CS(LOW);
   File dir = SD.open("/logs");
   for (int cnt = 0; true; ++cnt) {
     File entry = dir.openNextFile();
@@ -212,8 +263,8 @@ String html_startws() {
 }
 
 
-/* Style  Noted: Arduino will mis-colour some parts*/
 
+/* Style  Noted: Arduino will mis-colour some parts*/
 String style =
   "<style>#file-input,input{width:100%;height:44px;border-radius:4px;margin:10px auto;font-size:15px}"
   "input{background:#f1f1f1;border:0;padding:0 15px}body{background:#3498db;font-family:sans-serif;font-size:14px;color:#777}"
@@ -295,8 +346,8 @@ void handleQuestion() {
   server.client().stop();
 }
 
-bool MDNS_START(){ 
-  delay(10) ;
+bool MDNS_START() {
+  delay(10);
   if (MDNS.begin(Display_Config.PanelName)) {
     MDNS.addService("http", "tcp", 80);
     Serial.println("MDNS responder started");
@@ -304,10 +355,11 @@ bool MDNS_START(){
     Serial.print(Display_Config.PanelName);
     Serial.println(".local");
     return true;
-   //WifiGFXinterrupt(8, WifiStatus, "MDNS Started: http://%s.local", WiFi.SSID(),Display_Config.PanelName);
-  }else{
-    return false;}
+    //WifiGFXinterrupt(8, WifiStatus, "MDNS Started: http://%s.local", WiFi.SSID(),Display_Config.PanelName);
+  } else {
+    return false;
   }
+}
 
 void SetupWebstuff() {
   // do in events ?MDNS_START();
@@ -320,36 +372,33 @@ void SetupWebstuff() {
   });
 
   server.on("/Reload", HTTP_GET, []() {
+    WifiGFXinterrupt(8, WifiStatus, "Re-Loading Configurations");
     if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
-    DEBUG_PORT.println("USING FATS JSON for wifi and display settings");
-    gfx->println(F("USING FATS JSON for WiFi and display settings"));
-    Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
-    Display_Page = Display_Config.Start_Page;
-   } 
-  if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
-    DEBUG_PORT.println("USING FATS JSON for Victron data settings");
-    gfx->println(F("USING FATS JSON for Victron settings"));
-  } 
-  if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
-    DEBUG_PORT.println("USING FATS JSON for Colours data settings");
-    gfx->println(F("USING FATS JSON for Colours data settings"));
-  } 
-
+      DEBUG_PORT.println("Reloading wifi and display settings");
+      //gfx->println(F("USING FATS JSON for WiFi and display settings"));
+      Saved_Display_Config = Display_Config;
+      Saved_Settings = Current_Settings;
+      Display_Page = Display_Config.Start_Page;
+    }
+    if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
+      DEBUG_PORT.println("Reloading Victron data settings");
+      // gfx->println(F("USING FATS JSON for Victron settings"));
+    }
+    if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
+      DEBUG_PORT.println("Reloading Colours data settings");
+      // gfx->println(F("USING FATS JSON for Colours data settings"));
+    }
     delay(100);
-    WifiGFXinterrupt(8, WifiStatus, "Reloading configs");
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
-
-    delay(150);
-
   });
 
   server.on("/Reset", HTTP_GET, []() {
     handleRoot();
-    if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) { EEPROM_WRITE(Display_Config, Current_Settings); }  // stops overwrite with bad JSON data!!
-    // Victron is never set up by the touchscreen only via SD editor so NOT needed? but makes sure construct is our usual one   
-    SaveVictronConfiguration(FFat,VictronDevicesSetupfilename,victronDevices);// save config with bytes ??
+    if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) { EEPROM_WRITE(Display_Config, Current_Settings); }  // stops overwrite with bad JSON data!!
+    // Victron is never set up by the touchscreen only via SD editor so NOT needed? but makes sure construct is our usual one
+    SaveVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices);  // save config with bytes ??
     delay(100);
-    WifiGFXinterrupt(8, WifiStatus, "RESTARTING");
+    WifiGFXinterrupt(9, WifiStatus, "RESTARTING");
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
     server.sendHeader("Connection", "close");
     delay(150);
@@ -358,19 +407,19 @@ void SetupWebstuff() {
   });
   server.on("/Save", HTTP_GET, []() {
     handleRoot();
-    if (LoadConfiguration(FFat,Setupfilename, Display_Config, Current_Settings)) {
+    if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
       Serial.println("***Updating EEPROM from ");
       EEPROM_WRITE(Display_Config, Current_Settings);
     }  // stops overwrite with bad JSON data!!
-    if (LoadVictronConfiguration(FFat,VictronDevicesSetupfilename, victronDevices)) {
+    if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
       PrintJsonFile(" Check Updated Victron settings after Web initiated SAVE ", VictronDevicesSetupfilename);
       Serial.println("***Updated Victron data settings");
     }
-    if (LoadDisplayConfiguration(FFat,ColorsFilename, ColorSettings)) {
+    if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
       Serial.println(" USING JSON for Colours data settings");
     } else {
       Serial.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT and Making File on SD****\n\n");
-      SaveDisplayConfiguration(FFat,ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+      SaveDisplayConfiguration(FFat, ColorsFilename, ColorSettings);  // should write a default file if it was missing?
     }
     delay(50);
     Display(true, Display_Page);
@@ -400,8 +449,8 @@ void SetupWebstuff() {
     []() {
       HTTPUpload &upload = server.upload();
       if (upload.status == UPLOAD_FILE_START) {
-        HaltOtherOperations=true;
-         setFont(9);
+        HaltOtherOperations = true;
+        setFont(9);
         gfx->setTextColor(BLACK);
         gfx->fillScreen(BLUE);
         delay(10);
@@ -410,8 +459,8 @@ void SetupWebstuff() {
         gfx->setTextWrap(true);
         gfx->printf("Update: %s\n", upload.filename.c_str());
         // Does not know total size here!gfx->printf("Total size: %u\n", upload.totalSize);
-       // Serial.printf("Update: %s\n", upload.filename.c_str());
-       // Serial.printf("   current size: %u   total size %u\n", upload.currentSize, upload.totalSize);
+        // Serial.printf("Update: %s\n", upload.filename.c_str());
+        // Serial.printf("   current size: %u   total size %u\n", upload.currentSize, upload.totalSize);
         if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {  //start with max available size
           Update.printError(Serial);
         }
@@ -424,14 +473,14 @@ void SetupWebstuff() {
         uint16_t chunk_size = 51200;
         static uint32_t next = 51200;
         if (upload.totalSize >= next) {
-         gfx->printf(" %dk ", next / 1024);
-         //Serial.printf("%dk ", next / 1024);
+          gfx->printf(" %dk ", next / 1024);
+          //Serial.printf("%dk ", next / 1024);
           next += chunk_size;
         }
       } else if (upload.status == UPLOAD_FILE_END) {
-        if (Update.end(true)) {             //true to set the size to the current progress
-        WifiGFXinterrupt(9, WifiStatus, "SW UPDATED");
-        //Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+        if (Update.end(true)) {  //true to set the size to the current progress
+          WifiGFXinterrupt(9, WifiStatus, "SW UPDATED");
+          //Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
           delay(500);
         } else {
           Update.printError(Serial);
@@ -447,92 +496,28 @@ void SetupWebstuff() {
   Serial.println("HTTP server started");
 }
 
-
-
-// Append data to the SD card (DON'T MODIFY THIS FUNCTION)
-void appendFile(fs::FS &fs, const char *path, const char *message) {
-  // Serial.printf("Appending to file: %s\n", path);
-  if (!hasSD){return;}
-  SD_CS(LOW);
-  File file = fs.open(path, FILE_APPEND);
-  if (!file) {SD_CS(HIGH);
-    // DEBUG_PORT.println("Failed to open file for appending");
-    return;
-  }
-  if (file.print(message)) {
-    //  DEBUG_PORT.println("Message appended");
-  } else {
-    //  DEBUG_PORT.println("Append failed");
-  }
-  file.close();
-  SD_CS(HIGH);
-}
-
-
-
-
-void StartInstlogfile() {
-  INSTlogFileStarted = false;
-  if (!hasSD) { return; }
-  // If the data.txt file doesn't exist
-  // Create a file on the SD card and write the data labels
-  if (BoatData.GPSDate == 0) { return; }
-  if (BoatData.GPSDate == NMEA0183DoubleNA) { return; }  // and check for NMEA0183DoubleNA
-  //We have a date so we can use this for the file name!
-  // DEBUG_PORT.printf("  ***** LOG FILE DEBUG ***  use: <%6i>  to make name..  ",int(BoatData.GPSDate));
-  snprintf(InstLogFileName, 25, "/logs/%6i.log", int(BoatData.GPSDate));
-  //  DEBUG_PORT.printf("  <%s> \n",InstLogFileName);
-  SD_CS(LOW);
-  File file = SD.open(InstLogFileName);
-  SD_CS(HIGH);
-  if (!file) {
-    //DEBUG_PORT.println("File doesn't exist");
-    INSTlogFileStarted = true;
-    DEBUG_PORT.printf("Creating <%s> Instrument LOG file. and header..\n", InstLogFileName);
-    // data will be added by a see the  LOG( fmt ...) in the main loop at 5 sec intervals
-    /*    int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60,
-        BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
-        */
-    SD_CS(LOW);
-    writeFile(SD, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
-    SD_CS(HIGH);
-    file.close();
-    return;
-  } else {
-    INSTlogFileStarted = true;
-    DEBUG_PORT.println("Log File already exists.. appending");
-  }
-  file.close();
-}
-
-void StartNMEAlogfile() {
-  if (!hasSD) {
-    NMEAINSTlogFileStarted = false;
-    return;
-  }
+void DATA_Log_File_Create(fs::FS &fs) {
   // If the data.txt file doesn't exist
   // Create a (FIXED NAME!) file on the SD card and write the data labels
-  SD_CS(LOW);
-  File file = SD.open("/logs/NMEA.log");
+  strcpy(DATALOGFileName, "/logs/DATA.log");
+  File file = fs.open(DATALOGFileName);
   if (!file) {
-    //DEBUG_PORT.println("File doens't exist");
-    NMEAINSTlogFileStarted = true;
-    DEBUG_PORT.printf("Creating NMEA LOG file. and header..\n");
-    writeFile(SD, "/logs/NMEA.log", "NMEA data headings\r\nTime(s): Source:NMEA......\r\n");
+    //DEBUG_PORT.println("File does'nt exist");
+    DATA_Log_FILE_Started = true;
+    //DEBUG_PORT.printf("Creating DATA LOG file. and header..\n");
+    writeFile(FFat, DATALOGFileName, "....DATA as received...\n");
     file.close();
-    SD_CS(HIGH);
     return;
   } else {
-    NMEAINSTlogFileStarted = true;
-    DEBUG_PORT.println("NMEA log File already exists.. appending");
+    DATA_Log_FILE_Started = true;
+    //DEBUG_PORT.println("DATA log File already exists.. appending");
   }
-  SD_CS(HIGH);
   file.close();
 }
 
-void NMEALOG(const char *fmt, ...) {
-  if (!NMEAINSTlogFileStarted) {
-    StartNMEAlogfile();
+void DATA_Log(fs::FS &fs, const char *fmt, ...) {
+  if (!DATA_Log_FILE_Started) {
+    DATA_Log_File_Create(fs);
     return;
   }
   static char msg[800] = { '\0' };  // used in message buildup VICTRON log can be well in excess of 128 as it can have multiple devices showing
@@ -541,15 +526,43 @@ void NMEALOG(const char *fmt, ...) {
   vsnprintf(msg, 799, fmt, args);
   va_end(args);
   int len = strlen(msg);
-  // DEBUG_PORT.printf("  Logging to:<%s>", NMEALogFileName);
-  // DEBUG_PORT.print("  Log  data: ");
+  // DEBUG_PORT.printf("DATA  Logging to:<%s>", DATALOGFileName);
+  // DEBUG_PORT.print(" data: ");
   // DEBUG_PORT.println(msg);
-  appendFile(SD, "/logs/NMEA.log", msg);
+  appendFile(fs, DATALOGFileName, msg);
 }
 
-void INSTLOG(const char *fmt, ...) {
+void StartInstlogfile(fs::FS &fs) {
+  INSTlogFileStarted = false;
+  // If the data.txt file doesn't exist
+  // Create a file on the SD card and write the data labels
+  if (BoatData.GPSDate == 0) { return; }
+  if (BoatData.GPSDate == NMEA0183DoubleNA) { return; }  // CAN ONLY Write a Inst LOG file if we have GPS data for the date
+  //We have a date so we can use this for the file name!
+  // DEBUG_PORT.printf("  ***** LOG FILE DEBUG ***  use: <%6i>  to make name..  ",int(BoatData.GPSDate));
+  snprintf(InstLogFileName, 25, "/logs/%6i.log", int(BoatData.GPSDate));
+  //  DEBUG_PORT.printf("  <%s> \n",InstLogFileName);
+  File file = fs.open(InstLogFileName);
+  if (!file) {
+    //DEBUG_PORT.println("File doesn't exist");
+    INSTlogFileStarted = true;
+    DEBUG_PORT.printf("Creating <%s> Instrument LOG file. and header..\n", InstLogFileName);
+    // data will be added by a see the  LOG( fmt ...) in the main loop at 5 sec intervals
+    /*    int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60,
+        BoatData.STW.data,  BoatData.WaterDepth.data, BoatData.WindSpeedK.data,BoatData.WindAngleApp);
+        */
+    writeFile(fs, InstLogFileName, "LOG data headings\r\n Local Time ,STW ,MagHdg, SOG, COG,Depth ,Windspeed,WindAngleApp\r\n");
+    file.close();
+    return;
+  } else {
+    INSTlogFileStarted = true;
+    DEBUG_PORT.println("Log File already exists.. appending");
+  }
+  file.close();
+}
+void INSTLOG(fs::FS &fs, const char *fmt, ...) {  // CAN ONLY Write a Inst LOG file if we have GPS data for the date
   if (!INSTlogFileStarted) {
-    StartInstlogfile();
+    StartInstlogfile(fs);
     return;
   }
   static char msg[300] = { '\0' };  // used in message buildup
@@ -558,14 +571,11 @@ void INSTLOG(const char *fmt, ...) {
   vsnprintf(msg, 128, fmt, args);
   va_end(args);
   int len = strlen(msg);
-  // DEBUG_PORT.printf("  Logging to:<%s>", InstLogFileName);
+  DEBUG_PORT.printf(" INST Logging to:<%s>", InstLogFileName);
   // DEBUG_PORT.print("  Log  data: ");
   // DEBUG_PORT.println(msg);
-  appendFile(SD, InstLogFileName, msg);
+  appendFile(FFat, InstLogFileName, msg);
 }
-
-
-
 
 // void ShowFreeSpace() {
 //   // Calculate free space (volume free clusters * blocks per clusters / 2)

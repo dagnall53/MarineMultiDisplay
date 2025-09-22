@@ -18,6 +18,8 @@ extern _sWiFi_settings_Config Current_Settings;
 extern _sDisplay_Config Display_Config;
 extern _sWiFi_settings_Config Saved_Settings;
 extern _sBoatData BoatData;  // BoatData values, int double etc
+extern _sMyVictronDevices victronDevices;
+extern _MyColors ColorSettings;
 extern const char* Setupfilename;
 
 extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
@@ -33,6 +35,7 @@ extern void DrawCompass(_sButton button);
 extern char* LongtoString(double data);
 extern char* LattoString(double data);
 
+extern void DATA_Log_File_Create(fs::FS &fs);
 
 
 extern boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B);
@@ -82,7 +85,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
   }
   if (reset) {
     WIFIGFXBoxdisplaystarted = false;
-    LoadConfiguration();               //Reload configuration in case new data stored
+    LoadConfiguration();  //Reload configuration in case new data stored
     RunSetup = true;
   }
   //generic setup stuff for ALL pages
@@ -95,12 +98,12 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
   if ((millis() >= flashinterval)) {
     flashinterval = millis() + 1000;
     StatusBox.PrintLine = 0;  // always start / only use / the top line 0  of this box
-    UpdateLinef(3, StatusBox, "%s page:%i  Log Status %s NMEA %s  ", Display_Config.PanelName, Display_Page,
-                Current_Settings.Log_ON On_Off, Current_Settings.NMEA_log_ON On_Off);
-    if (Current_Settings.Log_ON || Current_Settings.NMEA_log_ON) {
+    UpdateLinef(3, StatusBox, "%s page:%i  BoatLOG %s DATALOG %s  ", Display_Config.PanelName, Display_Page,
+                Current_Settings.Log_ON On_Off, Current_Settings.Data_Log_ON On_Off);
+    if (Current_Settings.Log_ON || Current_Settings.Data_Log_ON) {
       flash = !flash;
       if (!flash) {
-        UpdateLinef(3, StatusBox, "%s page:%i  Log Status     NMEA     ", Display_Config.PanelName, Display_Page);
+        UpdateLinef(3, StatusBox, "%s page:%i  BoatLOG     DATALOG      ", Display_Config.PanelName, Display_Page);
       }
     }
   }
@@ -108,17 +111,17 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
   if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
   // Now specific stuff for each page
 
-  switch (page) {  // just show the logos 
-    case -99:  // page for just a blank
+  switch (page) {  // A page just to blank.
+    case -99:      // page for just a blank
       if (RunSetup) {
-          gfx->fillScreen(BLACK);
+        gfx->fillScreen(BLACK);
       }
-         gfx->fillScreen(BLACK);
+      gfx->fillScreen(BLACK);
       break;
 
 
     case -200:
-      if (RunSetup) {
+      if (RunSetup) {  //logo examples
         showPicture("/logo.jpg");
         // jpegDraw("/logo.jpg", jpegDrawCallback, true /* useBigEndian */,
         //          0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
@@ -207,13 +210,14 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
 
 
       break;
+
+      //************** VICTRON PAGES - different way to displa, Single 'button is altered (V H Height ) for each variable display
     case -87:  // page for graphic display of Vicron data
       if (RunSetup) {
         jpegDraw("/vicback.jpg", jpegDrawCallback, true /* useBigEndian */,
                  0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-       // Serial.println("redrawing background");
+        // Serial.println("redrawing background");
       }
-       
       // all graphics done in VICTRONBLE
       if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
       if (CheckButton(FullTopCenter)) { Display_Page = -86; }
@@ -228,11 +232,56 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         } else {
           AddTitleBorderBox(0, Terminal, "-paused-");
         }
+        GFXBorderBoxPrintf(Switch6, Current_Settings.Data_Log_ON On_Off);
+        AddTitleBorderBox(0, Switch6, " LOG ");
+
+        GFXBorderBoxPrintf(Switch7, victronDevices.Beacons On_Off);
+        AddTitleBorderBox(0, Switch7, "Beacons");
+        GFXBorderBoxPrintf(Switch8, victronDevices.BLEDebug On_Off);
+        AddTitleBorderBox(0, Switch8, "V-Debug");
+        GFXBorderBoxPrintf(Switch9, victronDevices.Simulate On_Off);
+        AddTitleBorderBox(0, Switch9, " Sim.");
+        GFXBorderBoxPrintf(Switch10, Current_Settings.BLE_enable On_Off);
+        AddTitleBorderBox(0, Switch10, "BLE-ON");
+        GFXBorderBoxPrintf(Switch11, ColorSettings.SerialOUT On_Off);
+        AddTitleBorderBox(0, Switch11, "Copy>serial");
         DataChanged = false;
       }
       // if (millis() > slowdown + 500) {
       //   slowdown = millis();
       // }
+
+      if (CheckButton(Switch6)) {
+        Current_Settings.Data_Log_ON = !Current_Settings.Data_Log_ON;
+       if (Current_Settings.Data_Log_ON) {DATA_Log_File_Create(FFat); }
+        DataChanged = true;
+      };
+      if (CheckButton(Switch7)) {
+        victronDevices.Beacons = !victronDevices.Beacons;
+        DataChanged = true;
+      };
+
+      if (CheckButton(Switch8)) {
+        victronDevices.BLEDebug = !victronDevices.BLEDebug;
+        DataChanged = true;
+      };
+      if (CheckButton(Switch9)) {
+        victronDevices.Simulate = !victronDevices.Simulate;
+        DataChanged = true;
+      };
+      if (CheckButton(Switch10)) {
+        Current_Settings.BLE_enable = !Current_Settings.BLE_enable;
+        DataChanged = true;
+      };
+            if (CheckButton(Switch11)) {
+        ColorSettings.SerialOUT = !ColorSettings.SerialOUT;
+        DataChanged = true;
+      };
+
+
+
+
+
       if (CheckButton(FullTopCenter)) { Display_Page = -87; }
       if (CheckButton(Terminal)) {
         Terminal.debugpause = !Terminal.debugpause;
@@ -319,7 +368,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
         // GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
         // AddTitleBorderBox(0, Switch6, "B LOG");
-        // GFXBorderBoxPrintf(Switch7, Current_Settings.NMEA_log_ON On_Off);
+        // GFXBorderBoxPrintf(Switch7, Current_Settings.Data_Log_ON On_Off);
         // AddTitleBorderBox(0, Switch7, "N LOG");
         GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON On_Off);
         AddTitleBorderBox(0, Switch8, "UDP");
@@ -356,8 +405,8 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       // };
 
       // if (CheckButton(Switch7)) {
-      //   Current_Settings.NMEA_log_ON = !Current_Settings.NMEA_log_ON;
-      //  //  NO LOGGING YET if (Current_Settings.NMEA_log_ON) { StartNMEAlogfile(); }
+      //   Current_Settings.Data_Log_ON = !Current_Settings.Data_Log_ON;
+      //  //  NO LOGGING YET if (Current_Settings.Data_Log_ON) { DATA_Log_File_Create(FFat); }
       //   DataChanged = true;
       // };
 
@@ -678,13 +727,15 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       ButtonDataSelect(topRightquarter, 1, Display_Config.FourWayTR, RunSetup);
       ButtonDataSelect(bottomRightquarter, 2, Display_Config.FourWayBR, RunSetup);
       ButtonDataSelect(bottomLeftquarter, 3, Display_Config.FourWayBL, RunSetup);
-    if (_WideDisplay)  {ButtonDataSelect(WideScreenCentral, 4, Display_Config.WideScreenCentral, RunSetup);}
+      if (_WideDisplay) { ButtonDataSelect(WideScreenCentral, 4, Display_Config.WideScreenCentral, RunSetup); }
 
       if (CheckButton(topLeftquarter)) { Display_Page = 20; }     //stw
       if (CheckButton(bottomLeftquarter)) { Display_Page = 23; }  //depth
       if (CheckButton(topRightquarter)) { Display_Page = 21; }    // Wind
       if (CheckButton(bottomRightquarter)) { Display_Page = 22; }
-    if (_WideDisplay)  {  if (CheckButton(WideScreenCentral)) { Display_Page = 24; }}
+      if (_WideDisplay) {
+        if (CheckButton(WideScreenCentral)) { Display_Page = 24; }
+      }
 
       break;
     case 20:  // full screen display (new)
@@ -704,34 +755,10 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }
       break;
     case 24:  // full screen display (new)
-    if (!_WideDisplay) {return;}
+      if (!_WideDisplay) { return; }
       ButtonDataSelect(FullScreen, 4, Display_Config.WideScreenCentral, RunSetup);
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }  
+      if (CheckButton(BigSingleDisplay)) { Display_Page = 4; }
       break;
-
-
-    case 5:  // wind instrument
-      if (RunSetup) {
-        setFont(10);
-        GFXBorderBoxPrintf(BigSingleDisplay, "");
-        GFXBorderBoxPrintf(BigSingleTopRight, "");
-        AddTitleInsideBox(8, 2, BigSingleTopRight, " deg");
-        DrawCompass(BigSingleDisplay);
-        AddTitleInsideBox(8, 3, BigSingleDisplay, "WIND Apparent ");
-      }
-      if (millis() > slowdown + 500) {
-        slowdown = millis();
-      }
-
-      WindArrow2(BigSingleDisplay, BoatData.WindSpeedK, BoatData.WindAngleApp);
-      UpdateDataTwoSize(1, true, true, 12, 10, BigSingleTopRight, BoatData.WindAngleApp, "%.1f");
-      if (CheckButton(BigSingleDisplay)) { Display_Page = 15; }
-      if (CheckButton(topLeftquarter)) { Display_Page = 4; }
-      break;
-
-
-
-
     case 9:  // GPS page
       if (RunSetup) {
         setFont(8);
@@ -852,6 +879,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (CheckButton(topLeftquarter)) { Display_Page = 4; }
       if (CheckButton(BigSingleDisplay)) { Display_Page = 5; }
       break;
+
     default:
       Display_Page = 0;
       break;
@@ -1068,15 +1096,16 @@ void ShowGPSinBox(int font, _sButton button) {
 }
 void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSetup) {  //replaces all the code in earlier versions
   // set text size depending on the button Height
-  int magnify; int timefont;
-  timefont=12;
+  int magnify;
+  int timefont;
+  timefont = 12;
   static unsigned int slowdown;
   magnify = 1;
   if (Position.height >= 250) {
     magnify = 3;
-    timefont=13;
+    timefont = 13;
   }
-  if(RunSetup) slowdown=0;
+  if (RunSetup) slowdown = 0;
 
   if (Choice == "SOG") { ButtonMasterDisplay(RunSetup, "SOG", " Kts", magnify, true, true, 13, 11, Position, BoatData.SOG, "%.1f"); }
   if (Choice == "STW") { ButtonMasterDisplay(RunSetup, "STW", " Kts", magnify, true, true, 13, 11, Position, BoatData.STW, "%.1f"); }
@@ -1088,18 +1117,22 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
   if (Choice == "GPS") { ShowGPSinBox(9, Position); }
   if (Choice == "TIME") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
-      slowdown = millis();setFont(timefont);
+      slowdown = millis();
+      setFont(timefont);
       GFXBorderBoxPrintf(Position, "%02i:%02i",
                          int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
-      AddTitleInsideBox(9, 3, Position, "UTC ");setFont(10);
+      AddTitleInsideBox(9, 3, Position, "UTC ");
+      setFont(10);
     }
   }
   if (Choice == "TIMEL") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
-      slowdown = millis();setFont(timefont);
+      slowdown = millis();
+      setFont(timefont);
       GFXBorderBoxPrintf(Position, "%02i:%02i",
                          int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
-      AddTitleInsideBox(9, 3, Position, "LOCAL ");setFont(10);
+      AddTitleInsideBox(9, 3, Position, "LOCAL ");
+      setFont(10);
     }
   }
 

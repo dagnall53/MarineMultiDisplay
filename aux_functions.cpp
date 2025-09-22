@@ -94,7 +94,7 @@ boolean FillTokenLast(char *ptr) {
 
 
 extern void EventTiming(String input);  // to permit timing functions here during development
-
+// looks for index where three characters match my "haystack" of known NMEA messages;
 bool NeedleinHaystack(char ch1, char ch2, char ch3, char *haystack, int &compareOffset) {
   // Serial.printf("\n Looking for<%c%c%c> in strlen(%i) %s \n", ch1, ch2, ch3, strlen(haystack), haystack);
   compareOffset = 0;
@@ -154,8 +154,8 @@ void toNewStruct(double field, _sInstData &data) {  // allow update of struct wi
 
 
 
-
-bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array buf and places (updates) data if found in stringND
+// reads char array buf and places (updates) data if found in stringND
+bool processPacket(const char *buf, _sBoatData &BoatData) {  
   char *p;
   int Index;
   int Num_Conversions = 0;
@@ -170,12 +170,12 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {  // reads char array
   //Serial.printf("  Found  <%i> Fields Field0<%s> Field1<%s> Field2<%s> Field3<%s>\n", Num_DataFields, Field[0],Field[1], Field[2], Field[3]);
   //NeedleInHaystack/4/will (should !) identify the command.  Note Nul to prevent zero ! being passed to Switch or Div4
   //                  0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19....
-  char nmeafunct[] = "NUL,DBT,DPT,DBK,MWV,VHW,RMC,APB,GLL,HDG,HDM,MTW,MWD,NOP,XS,,AK,,ALK,BWC,WPL,GSV ";  // more can be added to
-  // Not using Field[0] as some commands have only two characters. so we can look for (eg) 'XS,' from $IIXS, =13
+  char nmeafunct[] = "NUL,DBT,DPT,DBK,MWV,VHW,RMC,APB,GLL,HDG,HDM,MTW,MWD,NOP,XS,,AK,,ALK,BWC,WPL,GSV ";  // more can be added..
+  // Not using Field[0] as some commands have only two characters. so we can look for (eg) 'XS,' from $IIXS, =14
   if (NeedleinHaystack(buf[3], buf[4], buf[5], nmeafunct, Index) == false) { return false; }
-  // Serial.printf(" Using case %i \n", Index / 4);
+  // NOTE  I coul have missed out the commas in the nmeafunct[]] "haystack", and divided by 3.. but that would make it harder to read. 
+  //Serial.printf(" Using case %i \n", Index / 4);
   // Serial.println(" Fields:");for(int x=0 ;int <Num_DataFields;int++){Serial.print(Field[x]);Serial.print(",");} Serial.println("> ");
-
   switch (Index / 4) {
     case 1:  //dbt
       toNewStruct(Field[3], BoatData.WaterDepth);
@@ -648,6 +648,7 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
   gfx->print(Title);
   setFont(Font_Before);  //Serial.println("Font selected is %i",MasterFont);
 }
+// Pos 1 2 3 4 for top right, botom right etc. add a top left title to the box
 void AddTitleInsideBox(int font, int pos, _sButton button, const char *fmt, ...) {  // Pos 1 2 3 4 for top right, botom right etc. add a top left title to the box
   int Font_Before;
   //Serial.println("Font at start is %i",MasterFont);
@@ -764,9 +765,18 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
 
 
 void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton button, _sInstData &DATA, double dmin, double dmax, int font, const char *msg, const char *units) {
-  //if (instance >> 2) {return;} // allow only instance 0 and 1
-  if (DATA.graphed) { return; }
-  if (DATA.data == NMEA0183DoubleNA) { return; }
+  //if (instance >> 2) {return;} // allow only instance 0 and 1  
+   if (DATA.graphed) { return; }
+   if (reset ) { // redraw on reset even if data is not valid 
+    gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
+    gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
+                  button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
+    AddTitleInsideBox(font, 3, button, " %s", msg);
+    AddTitleInsideBox(font, 1, button, " %4.0f%s", dmax, units);
+    AddTitleInsideBox(font, 2, button, " %4.0f%s", dmin, units);
+  }
+
+  if (DATA.data == NMEA0183DoubleNA) {DATA.graphed = true;  return; }
   static int samplesread[6];
   static int Displaypage[3];           // where were we last called from ??
 #define Hmax 200                       // how many points fill screen width
@@ -788,9 +798,6 @@ void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton butt
     graphPoint[x][instance].v = GraphRange( _oldData[x][instance] , BoxTop, BoxBottom, dmin, dmax);
     }  
     Displaypage[instance] = Display_Page;
-    gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
-    gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
-                  button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
     // end of reset / setup....
   }
   // Every redraw.. clear plot area and re-add every time titles as they may get overwritten
