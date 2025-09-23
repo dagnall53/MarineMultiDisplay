@@ -1,8 +1,16 @@
 echo "This bat file will download the essential files to program the MarineMultiDisplay Hardware. You will first need to Plug the display into a COM port and enter the Com port for the device"
 set /p NUM=Enter Com port number:
 echo  "The program will now make local copies of the Binaries needed to program the board"
-echo " Select 1 for GUITRON display  Select 2 for WAVshare module"
-set /p choice=Enter 1 or 2:
+echo " Select 1 for GUITRON display  Select 2 for WAVshare module 3 for Wide Waveshare '4.3' board"
+set /p choice=Enter 1 2 or 3:
+if "%choice%"=="3" (
+echo " Seleced WIDE (4.3') WAVSHARE VERSION"
+powershell -Command "(New-Object Net.WebClient).DownloadFile('https://dagnall53.github.io/MarineMultiDisplay/build/esp32.esp32.esp32s3/WAVWIDEMMD.ino.bin', 'WAVWIDEMMD.ino.bin')"
+echo " renaming for programming"
+ren WAVWIDEMMD.ino.bin MarineMultiDisplay.ino.bin
+)
+
+
 if "%choice%"=="2" (
 echo " Seleced WAVSHARE VERSION"
 powershell -Command "(New-Object Net.WebClient).DownloadFile('https://dagnall53.github.io/MarineMultiDisplay/build/esp32.esp32.esp32s3/WAVMMD.ino.bin', 'WAVMMD.ino.bin')"

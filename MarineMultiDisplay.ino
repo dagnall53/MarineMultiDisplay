@@ -5,13 +5,13 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.10";
+const char soft_version[] = " V0.11";
 
 
 bool _WideDisplay;  // so that I can pass this to sub files
 
 //**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for GUITRON (default or..)
-//#define WAVSHARE     // 4 inch but Touch untested and 
+#define WAVSHARE     // 4 inch but Touch untested and 
 //#define WIDEBOX    // 4.3inch 800 by 400 display 
 
 // must be before NmeA2000 library initiates!
@@ -93,6 +93,7 @@ IPAddress udp_st(0, 0, 0, 0);  // the IP address to send UDP data (station mode)
 
 boolean IsConnected = false;  // may be used in AP_AND_STA to flag connection success (got IP)
 boolean AttemptingConnect;    // to note that WIFI.begin has been started
+int ScanChannelFound;
 int NetworksFound;            // used for scan Networks result. Done at start up!
 WiFiUDP Udp;
 #define BufferLength 500
@@ -104,7 +105,7 @@ char nmea_EXT[BufferLength];  // buffer for ESP_now received data
 bool EspNowIsRunning = false;
 char* pTOKEN;
 int StationsConnectedtomyAP;
-#define scansearchinterval 30000
+#define scansearchinterval 5000  // 5 secs for tests 30000 for running? 
 // assists for wifigfx interrupt  box that shows status..  to help turn it off after a time
 uint32_t WIFIGFXBoxstartedTime;
 bool WIFIGFXBoxdisplaystarted;
@@ -231,6 +232,7 @@ _sButton Switch2 = { 100, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
 _sButton Switch3 = { 180, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
 _sButton Switch5 = { 260, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
 _sButton Switch4 = { 345, 180, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
+_sButton Switch4a = { 345, 140, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
 //switches at line 60
 _sButton Switch6 = { 20, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
 _sButton Switch7 = { 100, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
@@ -406,26 +408,34 @@ void loop() {
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchTimer;
-
+  static int WiFiChannel;
+  //EventTiming("Timeing ",10); // place start and stop where I want timing 
   delay(1);
- 
+ // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
                           // SD_CS("HIGH");
   if (!HaltOtherOperations) { 
     SD_CS("LOW");
     filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
     SD_CS("HIGH");
+    //approx 2ms to here
     if(Touch_available){ts.read();}
-    EXTHeartbeat();
-    CheckAndUseInputs();
+    //~3.2ms
+    EXTHeartbeat();//~3.3ms
+    
+    CheckAndUseInputs(); 
+    //505ms! 
     Display(Display_Page);
+       
     if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  // repeat at intervals to connect to station.
       SSIDSearchTimer = millis() + scansearchinterval;                          //
-      if (StationsConnectedtomyAP == 0) {                                          // avoid scanning if we have someone connected to AP as it will/may disconnect!
-        ScanAndConnect(true);
-      }  // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
+      if (StationsConnectedtomyAP == 0) { 
+       WiFiChannel++;                                         // avoid scanning if we have someone connected to AP as it will/may disconnect!
+       ScanAndConnect(Current_Settings.ssid, WiFiChannel,true); // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
+       if (WiFiChannel >= 12) { WiFiChannel = 1; }
+      }  
     }
-
+       
     // switch off WIFIGFXBox after timed interval
     if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
       WIFIGFXBoxdisplaystarted = false;
@@ -1154,7 +1164,7 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
         DEBUG_PORT.println("WiFi disconnected");
         DEBUG_PORT.print("WiFi lost reason: ");
         DEBUG_PORT.println(disconnectreason(info.wifi_sta_disconnected.reason));
-        if (ScanAndConnect(true)) {  // is the required SSID to be found?
+        if (ScanAndConnect(true,true)) {  // is the required SSID to be found? FULL SCAN
           WifiGFXinterrupt(8, WifiStatus, "Attempting Reconnect to\n<%s>", Current_Settings.ssid);
           DEBUG_PORT.println("Attempting Reconnect");
         }
@@ -1261,20 +1271,48 @@ String disconnectreason(int reason) {
   return "Unknown";
 }
 
-bool ScanAndConnect(bool display) {
+void ScanAndConnect(char* look_for, int ScanChannel,bool print) { // single channel scan  - less disruptive 
+  ScanChannelFound = 0;
+  unsigned long Updated = millis();
+  int n = WiFi.scanNetworks(false, false, false, 50, ScanChannel, nullptr, nullptr);
+  for (int i = 0; i < n; ++i) {
+    if (String(look_for) == String(WiFi.SSID(i))) {
+      ScanChannelFound = WiFi.channel(i);
+      IsConnected = false;
+      AttemptingConnect = true;
+        if (print) { WifiGFXinterrupt(8, WifiStatus, "WIFI found <%s>\n Channel %i \nSignal:%i\n begin...",  
+                                     Current_Settings.ssid,ScanChannelFound, String(WiFi.RSSI(i))); }
+       WiFi.begin(Current_Settings.ssid, Current_Settings.password, ScanChannelFound);
+    }
+  }
+  // if (ScanChannel != 0) { return ; }     // only repports the full scan
+  if(print){if(ScanChannelFound) { DEBUG_PORT.printf("   FOUND <%s> on Ch<%d> in %ums\r\n", look_for, ScanChannelFound, (millis() - Updated)); }
+  else { DEBUG_PORT.printf("   not found <%s> on Ch<%d> in %ums\r\n", look_for, ScanChannel, (millis() - Updated)); }   
+
+  }
+}
+
+
+bool ScanAndConnect(bool display){
+ return ScanAndConnect(display,false);
+}
+bool ScanAndConnect(bool display,bool forceFull) {
   static unsigned long ScanInterval;
   static bool found;
   unsigned long ConnectTimeout;
   // do the WIfI/scan(i) and it is independently stored somewhere!!
   // but do not call too often - give it time to run!!
-  if (millis() >= ScanInterval) {
-    ScanInterval = millis() + 20000;
+  if ((millis() >= ScanInterval)||forceFull) {
+   //     EventTiming("START");
+    ScanInterval = millis() + 20000;  //FULL WIFi rescan at 20 sec interval 
     found = false;
     NetworksFound = WiFi.scanNetworks(false, false, true, 250, 0, nullptr, nullptr);
-    delay(100);
-    DEBUG_PORT.printf(" Scan found <%i> networks:\n", NetworksFound);
+   // EventTiming("STOP");
+    delay(1);
+   if(display) {DEBUG_PORT.printf(" Scan found <%i> networks:\n", NetworksFound);}
+    
   } else {
-    DEBUG_PORT.printf(" Using saved Scan of <%i> networks:\n", NetworksFound);
+    if(display) {DEBUG_PORT.printf(" Using saved Scan of <%i> networks:\n", NetworksFound);}
   }
 
   WiFi.disconnect(false);  // Do NOT turn off wifi if the network disconnects
@@ -1282,16 +1320,16 @@ bool ScanAndConnect(bool display) {
   long rssiValue;
   for (int i = 0; i < NetworksFound; ++i) {
     if (WiFi.SSID(i).length() <= 25) {
-      DEBUG_PORT.printf(" <%s> ", WiFi.SSID(i));
+      if(display) {DEBUG_PORT.printf(" <%s> ", WiFi.SSID(i));}
     } else {
-      DEBUG_PORT.printf(" <name too long> ");
+      if(display) {DEBUG_PORT.printf(" <name too long> ");}
     }
     if (WiFi.SSID(i) == Current_Settings.ssid) {
       found = true;
       channel = i;
       rssiValue = WiFi.RSSI(i);
     }
-    DEBUG_PORT.printf("CH:%i signal:%i \n", WiFi.channel(i), WiFi.RSSI(i));
+    if(display) {DEBUG_PORT.printf("CH:%i signal:%i \n", WiFi.channel(i), WiFi.RSSI(i));}
   }
   if (found) {
     if (display) { WifiGFXinterrupt(8, WifiStatus, "WIFI scan found <%i> networks\n Connecting to <%s> signal:%i\nplease wait", NetworksFound, Current_Settings.ssid, rssiValue); }
@@ -1563,11 +1601,12 @@ void CheckAndUseInputs() {  //multiinput capable, will check serial /wifi source
   if ((Current_Settings.ESP_NOW_ON)) {  // ESP_now can work even if not actually 'connected', so for now, do not risk the while loop!
                                         // old.. only did one line of nmea_EXT..
                                         // if (nmea_EXT[0] != 0) { UseNMEA(nmea_EXT, 3); }
-    while (Test_ESP_NOW() && (millis() <= MAXScanInterval)) {
-      UseNMEA(nmea_EXT, 3);
-      // runs multiple times to clear the buffer.. use delay to allow other things to work.. print to show if this is the cause of start delays while debugging!
-      vTaskDelay(1);
-    }
+    // while (Test_ESP_NOW() && (millis() <= MAXScanInterval)) {
+    //   UseNMEA(nmea_EXT, 3);
+    //   // runs multiple times to clear the buffer.. use delay to allow other things to work.. print to show if this is the cause of start delays while debugging!
+    //   vTaskDelay(1);
+    // }
+    if (Test_ESP_NOW()) {UseNMEA(nmea_EXT, 3);}
   }
   // DEBUG_PORT.printf(" ca<%i>",millis()-Interval);Interval=millis();
   //N2K is directly converted to display structures  only use for debugging
@@ -1775,8 +1814,35 @@ IPAddress Get_UDP_IP(IPAddress ip, IPAddress mk) {
   return ip;
 }
 
-// Reset the touch screen
+//************ TIMING FUNCTIONS FOR TESTING PURPOSES ONLY ******************
+//Note this is also an example of how useful Function overloading can be!! 
+void EventTiming(String input ){
+  EventTiming(input,1); // 1 should be ignored as this is start or stop! but will also give immediate print!
+}
 
-
-
+void EventTiming(String input, int number){//.. prints when string !=start or Stop! so print can be somewhere else Event timing, Usage START, STOP , 'Descrption text'   Number waits for the Nth call before serial.printing results (Description text + results).  
+  static unsigned long Start_time;
+  static unsigned long timedInterval;
+  static unsigned long _MaxInterval;
+  static unsigned long SUMTotal;
+  static int calls = 0;  static int reads = 0;
+  long NOW=micros();
+  if (input == "START") { Start_time = NOW; return ;}
+  if (input == "STOP") {timedInterval= NOW- Start_time; SUMTotal=SUMTotal+timedInterval;
+                       if (timedInterval >= _MaxInterval){_MaxInterval=timedInterval;}
+                       reads++;  
+                       return; }
+  calls++; 
+  if (calls < number){return;}
+  if (reads>=2){ 
+   // if (OutOfSetup) { SetSerialFor_115200();}
+    if (calls >= 1) {DEBUG_PORT.print("\r\n TIMING ");DEBUG_PORT.print(input); DEBUG_PORT.print(" Using ("); DEBUG_PORT.print(reads);DEBUG_PORT.print(") Samples"); 
+        DEBUG_PORT.print(" last: ");DEBUG_PORT.print(timedInterval);
+        DEBUG_PORT.print("us Average: ");DEBUG_PORT.print(SUMTotal/reads);
+        DEBUG_PORT.print("us  Max: ");DEBUG_PORT.print(_MaxInterval);DEBUG_PORT.print("uS ="); DEBUG_PORT.print(_MaxInterval/1000);DEBUG_PORT.println("mS");delay(100);}
+    else {DEBUG_PORT.print("\r\n TIMED ");DEBUG_PORT.print(input); DEBUG_PORT.print(" was :");DEBUG_PORT.print(timedInterval);DEBUG_PORT.println("uS");delay(100);}
+    _MaxInterval=0;SUMTotal=0;reads=0; calls=0;
+  //  if (OutOfSetup) { SetSerialFor_DefaultBaud(); }
+  }
+}
 

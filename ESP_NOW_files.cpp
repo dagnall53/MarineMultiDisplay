@@ -9,7 +9,7 @@
 
 
 #include <vector>
-
+#include "debug_port.h"
 
 //byte peerAddress[6];
 //const byte peerAddress_def[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };  // all receive
@@ -25,7 +25,6 @@ wifi_second_chan_t* secondch;
  enumerator WIFI_SECOND_CHAN_ABOVE  the channel width is HT40 and the secondary channel is above the primary channel
  enumerator WIFI_SECOND_CHAN_BELOW the channel width is HT40 and the secondary channel is below the primary channel
  */
-
 
 
 bool donotdisturb; // a semaphore to tell Update_ESPNOW NOT to accept and overwrite nmea_ext_buffer
@@ -54,24 +53,22 @@ char nmea_ext_buffer[1000];
    if (!donotdisturb){ 
    if (strlen(nmea_ext_buffer)<=752){
       memcpy(&rxdata,incomingData,sizeof(rxdata));
-           //  Serial.print(" **Esp nmea_Ext is<");Serial.print(strlen(nmea_EXT));Serial.print("> rxdata is<");Serial.print(strlen(rxdata));Serial.print(">long  NMEAext isnow <");
+           //  DEBUG_PORT.print(" **Esp nmea_Ext is<");DEBUG_PORT.print(strlen(nmea_EXT));DEBUG_PORT.print("> rxdata is<");DEBUG_PORT.print(strlen(rxdata));DEBUG_PORT.print(">long  NMEAext isnow <");
       strcat(nmea_ext_buffer, rxdata);}
    }
-           // Serial.print(nmea_EXT);Serial.print("> length now<");Serial.print(strlen(nmea_EXT));Serial.println(">");
+           // DEBUG_PORT.print(nmea_EXT);DEBUG_PORT.print("> length now<");DEBUG_PORT.print(strlen(nmea_EXT));DEBUG_PORT.println(">");
   }
 #else
   void Update_ESPNOW(const uint8_t* mac, const uint8_t* incomingData, int len) {
     EspNowIsRunning = true;
     char rxdata[249];//incoming ESP seem to be always 248 long, so make sre we are big enough
-    //OLD.. no buffer, just overwrites  nmea_EXT 
-    // memcpy(&rxdata,incomingData,sizeof(rxdata));  strcat(nmea_EXT, rxdata); 
    if (!donotdisturb){ 
    if (strlen(nmea_ext_buffer)<=752){
       memcpy(&rxdata,incomingData,sizeof(rxdata));
-           //  Serial.print(" **Esp nmea_Ext is<");Serial.print(strlen(nmea_EXT));Serial.print("> rxdata is<");Serial.print(strlen(rxdata));Serial.print(">long  NMEAext isnow <");
+           //  DEBUG_PORT.print(" **Esp nmea_Ext is<");DEBUG_PORT.print(strlen(nmea_EXT));DEBUG_PORT.print("> rxdata is<");DEBUG_PORT.print(strlen(rxdata));DEBUG_PORT.print(">long  NMEAext isnow <");
       strcat(nmea_ext_buffer, rxdata);}
    }
-           // Serial.print(nmea_EXT);Serial.print("> length now<");Serial.print(strlen(nmea_EXT));Serial.println(">");
+          //  DEBUG_PORT.print(nmea_EXT);DEBUG_PORT.print("> length now<");DEBUG_PORT.print(strlen(nmea_EXT));DEBUG_PORT.println(">");
   }
 #endif
 
@@ -89,31 +86,28 @@ bool Start_ESP_EXT() {  // start espnow and set interrupt to function Update_ESP
   #endif
   if (esp_now_add_peer(&peerInfo) == ESP_OK) { success = true; }
   esp_wifi_get_channel(espnowchannel,secondch);
-  Serial.println(" ESP-Now setup completed"); 
+  DEBUG_PORT.println(" ESP-Now setup completed"); 
   return success;
 }
 
-
 bool Test_ESP_NOW() {    // Run in main loop ..returns true if it extracts a line of text into nmea_EXT from nmea_ext_buffer
+  if (nmea_ext_buffer[0] == 0 ){return false;}  // nothing received and saved in big buffer yet 
   bool _gotFirstLine ;
   int offset ;
-  // DO NOT WANT interrupt to corrupt/add to nmea_ext_buffer whilst we are fiddling with it
+  // use donotdisturb  ..DO NOT WANT interrupt to corrupt/add to nmea_ext_buffer whilst we are fiddling with it
   if (nmea_EXT[0] == 0) {  // nmea_EXT EMPTY..  get another line from buffer?
-    if (nmea_ext_buffer[0] != 0 ) { 
     donotdisturb=true; 
     _gotFirstLine=false;
     offset =0;
      for (int i = 0; i <= sizeof(nmea_ext_buffer); i++) {                       
       if (_gotFirstLine) {nmea_ext_buffer[offset] = nmea_ext_buffer[i]; offset++;}    // copy the rest back into the buffer, but shifted 'forwards/left' 
       else {nmea_EXT[i] = nmea_ext_buffer[i];              // will be this on first loop..(!_gotfirstLine)  // build nmea_EXT..
-       if (nmea_ext_buffer[i] == 0x0A){    //DebugBufChars(nmea_ext_buffer, i); // got end of line.. set i for next 
+       if (nmea_ext_buffer[i] == 0x0A){    // got end of line.. set i for next 
          _gotFirstLine = true,nmea_EXT[i] = 0; // add eof 0?
          if ((nmea_ext_buffer[i+1] == 0x0D) && (nmea_ext_buffer[i+2] == 0x0A)){i=i+2;}// sometimes we get CRLF CRLF.. ignore it 
          }
         }
     }nmea_ext_buffer[offset]=0;  // add eof
-  }
-    //DebugBufChars(nmea_ext_buffer, temp-offset);
     ///if (strlen(nmea_ext_buffer)<=4){nmea_ext_buffer[0]=0;} // remove any strange remaining bits..  An '$' sometimes get left over in [0]!  
     donotdisturb=false;
     return _gotFirstLine;
@@ -127,7 +121,7 @@ extern struct _sDisplay_Config Display_Config;
 void EXTHeartbeat() {
   if (!EspNowIsRunning) { return; }
   if (Last_EXT_Sent + 10000 <= millis()) {  // 10 sec.
-  //Serial.println("Sending heartbeat");
+  //DEBUG_PORT.println("Sending heartbeat");
     Last_EXT_Sent = millis();               // but we also update Last_EXT_Sent in the EXT send..
                                             //EXTSENDf("_%s_:ch%d_\r\n", Project, WiFi.channel());  
                                             // BUT We must send with a \r\n!!
@@ -145,7 +139,7 @@ void EXTSEND(const char* buf) {  // same format as TCP send etc..  83 size for N
   //sendAdvicef(" esp-now Sending: (length %i) Wifich<%i>  peer_ch<%i> ", strlen(myData), WiFi.channel(), peerInfo.channel);
   Last_EXT_Sent = millis();
   esp_err_t result = esp_now_send(peerInfo.peer_addr, (uint8_t*)&myData, sizeof(myData));
-  //if (result == ESP_OK) {Serial.println(" esp-now SENT");}// <%s> (%i long) in msg max [%i] long \n",myData,strlen(myData), sizeof(myData));}else{Serial.println(" ESP failed to send");}
+  //if (result == ESP_OK) {DEBUG_PORT.println(" esp-now SENT");}// <%s> (%i long) in msg max [%i] long \n",myData,strlen(myData), sizeof(myData));}else{DEBUG_PORT.println(" ESP failed to send");}
   //if (result != ESP_OK) {EspNowIsRunning=false;}   // but then we need something in Loop to re-establish the link ??
 }
 

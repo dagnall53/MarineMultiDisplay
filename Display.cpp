@@ -25,6 +25,7 @@ extern const char* Setupfilename;
 extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
 extern void SaveConfiguration();
 extern void LoadConfiguration();  // replacement for EEPROM READ
+extern bool ScanAndConnect(bool display,bool forceFull);
 
 extern void ShowToplinesettings(String Text);
 extern void ShowToplinesettings(_sWiFi_settings_Config A, String Text);
@@ -519,8 +520,8 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
             if (WiFi.SSID(i).length() > 20) { gfx->print("..(toolong).."); }
             gfx->print(WiFi.SSID(i).substring(0, 20));
             if (WiFi.SSID(i).length() > 20) { gfx->print(".."); }
-            Serial.print(WiFi.SSID(i));
-            Serial.println(WiFi.channel(i));
+           // Serial.print(WiFi.SSID(i));
+           // Serial.println(WiFi.channel(i));
             gfx->print(" (");
             gfx->print(WiFi.RSSI(i));
             gfx->print(")");
@@ -539,6 +540,8 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (millis() > slowdown + 1000) {
         slowdown = millis();
         //other stuff?
+        GFXBorderBoxPrintf(Switch4a, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+        AddTitleBorderBox(0, Switch4a, "EEPROM");
       }
       if (Touch_available) {
         if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
@@ -563,15 +566,22 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (CheckButton(TopRightbutton)) {
         GFXBorderBoxPrintf(SecondRowButton, " Starting WiFi re-SCAN / reconnect ");
         AttemptingConnect = false;  // so that Scan can do a full scan..
-                                    // ScanAndConnect(false);
+        ScanAndConnect(false,true);
+        AttemptingConnect = true; // so scanandconnect in main loop does not run again! (updates networks and makes screen wrong!)
         DataChanged = true;
       }  // do the scan again
+
+      if (CheckButton(Switch4a)) {
+        SaveConfiguration();  //(Display_Config, Current_Settings);
+        delay(50);
+        // Display_Page = 0;
+        DataChanged = true;
+      };
       if (CheckButton(SecondRowButton)) {
         // Serial.printf(" * Debug wifissidpointer=%i \n",wifissidpointer);
         if ((NetworksFound >= 1) && (wifissidpointer <= NetworksFound)) {
-          //   WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
+            WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
           //   Serial.printf("Update ssid to <%s> \n", Current_Settings.ssid);
-          Display_Page = -1;
         } else {
           Serial.println("Update ssid via keyboard");
           Display_Page = -2;
@@ -649,7 +659,7 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         AddTitleBorderBox(0, Switch2, "UDP");
         GFXBorderBoxPrintf(Switch3, Current_Settings.ESP_NOW_ON On_Off);
         AddTitleBorderBox(0, Switch3, "ESP-Now");
-        Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+       // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
         GFXBorderBoxPrintf(Switch4, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
         AddTitleBorderBox(0, Switch4, "EEPROM");
         GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
