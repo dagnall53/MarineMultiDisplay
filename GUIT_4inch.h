@@ -94,6 +94,7 @@ using //(deleted), 00 60 Good results == type9 default
 #define USBRX_PIN 44
 #define USBTX_PIN 43 
 
+#define TOUCH_ROTATION ROTATION_INVERTED
 
 // for ease of code compatibility with Wavshare that has Expander  
 #define EX106 -1 //pins on expander   

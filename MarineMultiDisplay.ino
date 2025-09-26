@@ -9,7 +9,7 @@ const char soft_version[] = " V0.11";
 
 //**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
 #define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-#define WIDEBOX    // 4.3inch 800 by 400 display Setup
+//#define WIDEBOX    // 4.3inch 800 by 400 display Setup
 //**********  SET DEFINES
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -25,8 +25,22 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <ArduinoJson.h>
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
 #include "FS.h"
-#include "FFat.h"
+#include <FFat.h>  // plan to use FATFS for local files
 #include <SPIFFS.h>
+#include <SD_MMC.h>
+#include <LittleFS.h>
+#include <TAMC_GT911.h>
+
+//MAGIC TREK style File viewer see https://github.com/holgerlembke/
+#include <ESPFMfGK.h>  // the thing.
+const word filemanagerport = 8080;
+// we want a different port than the webserver
+ESPFMfGK filemgr(filemanagerport);
+
+const esp_partition_t* ffat_partition = esp_partition_find_first(
+  ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);// helps find if we have a fats 
+
+bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 
 //*********** DISPLAY Pin identifications selector *************
 #ifdef WAVSHARE
@@ -38,36 +52,9 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #else
 #include "GUIT_4inch.h"
 #endif
+
 #include "debug_port.h"
 #include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
-
-// Serial port is differently exposed on the two boards, making serial. print not compatible, and debug hard!
-// #ifdef WAVSHARE
-// #define DEBUG_PORT Serial
-// #else
-// #define DEBUG_PORT Serial0
-// #endif
-// must be before NmeA2000 library initiates!
-// #ifdef WAVSHARE 
-// #ifdef WIDEBOX
-
-
-// const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B (wide) box";
-//   #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards!
-//   #define ESP32_CAN_RX_PIN GPIO_NUM_16  // 
-//  // #define SCREEN_WIDTH  800
-// #else
-// const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
-//   #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
-//   #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
-//  // #define SCREEN_WIDTH  480
-// #endif
-// #else
-//  const char _device[]=  "Guitron 4inch";
-//  #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
-//  #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
-// #endif
-
 
 int Screen_Width;     // Solution to pass OUCH_WIDTH to stuff that does not see module data until later!
 
@@ -77,25 +64,13 @@ int Screen_Width;     // Solution to pass OUCH_WIDTH to stuff that does not see 
 #include <N2kMessages.h>
 tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 
-
-
-
-
-
-
-#include <TAMC_GT911.h>
-
 // some wifi stuff
 IPAddress gateway(0, 0, 0, 0);    // the IP address for Gateway in Station mode
 IPAddress subnet(0, 0, 0, 0);     // the SubNet Mask in Station mode
-
 IPAddress ap_ip(192, 168, 4, 1);  // the IP address in AP mode. Default and can be changed!
 //These added in part to try and send data UDP when Serial is not working, for debug
 IPAddress udp_ap(0, 0, 0, 0);  // the IP address to send UDP data (AP mode)
 IPAddress udp_st(0, 0, 0, 0);  // the IP address to send UDP data (station mode)
-
-
-
 boolean IsConnected = false;  // may be used in AP_AND_STA to flag connection success (got IP)
 boolean AttemptingConnect;    // to note that WIFI.begin has been started
 int ScanChannelFound;
@@ -116,18 +91,6 @@ uint32_t WIFIGFXBoxstartedTime;
 bool WIFIGFXBoxdisplaystarted;
 
 
-
-//MAGIC TREK style File viewer see https://github.com/holgerlembke/
-#include <ESPFMfGK.h>  // the thing.
-const word filemanagerport = 8080;
-// we want a different port than the webserver
-ESPFMfGK filemgr(filemanagerport);
-
-#include <FFat.h>  // plan to use FATFS for local files
-const esp_partition_t* ffat_partition = esp_partition_find_first(
-  ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);// helps find if we have a fats 
-
-bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 
 
 // my sub files
@@ -1455,7 +1418,7 @@ void Setup_Wire_Expander(int SDA, int SCL, int beepPin) {
   #ifdef WAVSHARE
   expander.portMode(ALLOUTPUT);  //Set the port as all output
   DEBUG_PORT.println("Confirm expander connected via double Beep ");
- // beep(2, beepPin);
+  beep(1, beepPin);
   #endif
 }
 
@@ -1625,8 +1588,15 @@ bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
                // }
   if (result) {
     DEBUG_PORT.println("Device found: begin");
-    ts.begin();  // remove address for wavshare? 
-    ts.setRotation(ROTATION_INVERTED);
+    ts.begin(GT911_ADDR1);  // remove address for wavshare? 
+    delay(100);
+    /*#define ROTATION_LEFT      (uint8_t)0
+#define ROTATION_INVERTED  (uint8_t)1
+#define ROTATION_RIGHT     (uint8_t)2
+#define ROTATION_NORMAL    (uint8_t)3*/
+    ts.setRotation(TOUCH_ROTATION);
+    //ts.setRotation(ROTATION_INVERTED);
+
   }
  if (result) {DEBUG_PORT.println("TOUCH setup OK");
       } else {DEBUG_PORT.println("* NO TOUCH");

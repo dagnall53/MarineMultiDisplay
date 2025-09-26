@@ -108,6 +108,7 @@ to get Serial.print working
 #define TOUCH_MAP_Y1 480
 #define TOUCH_MAP_Y2 0
 
+#define TOUCH_ROTATION ROTATION_NORMAL
 
 
 //***         waveshare has a port expander ******************
