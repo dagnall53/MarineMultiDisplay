@@ -1,5 +1,6 @@
 // Adds the file systems
 
+#include "debug_port.h"
 void addFileSystems(void) {  // not used!! 
   // set configTzTime() in setup() to get valid file dates. Otherwise they are kaputt[tm].
 
@@ -7,33 +8,33 @@ void addFileSystems(void) {  // not used!!
   // If you don't, begin() will fail. Because a Filemanager without files is useless.
 
   /**/  //<-- Addd space there like this /** /
-  if (FFat.begin(true)) {
-    if (!filemgr.AddFS(FFat, "Flash/FFat", false)) {
-      Serial.println(F("Adding FFAT failed."));
-    }
-  } else {
-    Serial.println(F("FFat File System not inited."));
-  }
+  // if (FFat.begin(true)) {
+  //   if (!filemgr.AddFS(FFat, "Flash/FFat", false)) {
+  //     DEBUG_PORT.println(F("Adding FFAT failed."));
+  //   }
+  // } else {
+  //   DEBUG_PORT.println(F("FFat File System not initiated."));
+  // }
   /**/
 
   // /**/
   // if (SD_MMC.begin("/sdcard", true)) {
   //   if (!filemgr.AddFS(SD_MMC, "SD-MMC-Card", false)) {
-  //     Serial.println(F("Adding SD_MMC failed."));
+  //     DEBUG_PORT.println(F("Adding SD_MMC failed."));
   //   }
   // } else {
-  //   Serial.println(F("SD_MMC File System not inited."));
+  //   DEBUG_PORT.println(F("SD_MMC File System not inited."));
   // }
   // /**/
 
   // /**/
-  // const byte SS = 5;  // D8 chip select 
-  // if (SD.begin(SS)) {
+  // const byte SS = 5;  // D8 chip select SDCS for my 
+  // if (SD.begin(SCDS)) {
   //   if (!filemgr.AddFS(SD, "SD-Card", false)) {
-  //     Serial.println(F("Adding SD failed."));
+  //     DEBUG_PORT.println(F("Adding SD failed."));
   //   }
   // } else {
-  //   Serial.println(F("SD File System not inited."));
+  //   DEBUG_PORT.println(F("SD File System not inited."));
   // }
   // /**/
 }
@@ -43,12 +44,12 @@ uint32_t checkFileFlags(fs::FS &fs, String filename, uint32_t flags) {
   // filenames start without "/", pathnames start with "/"
   if (flags & (ESPFMfGK::flagCheckIsFilename | ESPFMfGK::flagCheckIsPathname)) {
     /** /
-    Serial.print("flagCheckIsFilename || flagCheckIsPathname check: ");
-    Serial.println(filename);
+    DEBUG_PORT.print("flagCheckIsFilename || flagCheckIsPathname check: ");
+    DEBUG_PORT.println(filename);
     /**/
     if (flags | ESPFMfGK::flagCheckIsFilename) {
       if (filename.startsWith(".")) {
-        // Serial.println(filename + " flagIsNotVisible");
+        // DEBUG_PORT.println(filename + " flagIsNotVisible");
         return ESPFMfGK::flagIsNotVisible;
       }
     }
@@ -58,7 +59,7 @@ uint32_t checkFileFlags(fs::FS &fs, String filename, uint32_t flags) {
     */
     if (flags | ESPFMfGK::flagCheckIsPathname) {
       if (filename.startsWith("/.")) {
-        // Serial.println(filename + " flagIsNotVisible");
+        // DEBUG_PORT.println(filename + " flagIsNotVisible");
         return ESPFMfGK::flagIsNotVisible;
       }
     }
@@ -100,16 +101,16 @@ void setupFilemanager(void) {
  // NOTE WIFI BEGIN IS ELSEWHERE! just start filemgr  
 // if ((WiFi.status() == WL_CONNECTED) && (filemgr.begin())) {
    if (filemgr.begin()) {
-     Serial.print(F("Open Filemanager with http://(ip)"));
-    //Serial.print(WiFi.localIP());
-    Serial.print(F(":"));
-    Serial.print(filemanagerport);
-    Serial.print(F("/"));
-    Serial.println();
+     DEBUG_PORT.print(F("Open Filemanager with http://(ip)"));
+    //DEBUG_PORT.print(WiFi.localIP());
+    DEBUG_PORT.print(F(":"));
+    DEBUG_PORT.print(filemanagerport);
+    DEBUG_PORT.print(F("/"));
+    DEBUG_PORT.println();
     // WifiGFXinterrupt(9, WifiStatus, "To run Filemanager\n http://                                                                   %i.%i.%i.%i:%i\n", WiFi.SSID(),
     //                    WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3],filemanagerport);
   } else {
-    Serial.print(F("Filemanager: did not start"));
+    DEBUG_PORT.print(F("Filemanager: did not start"));
   }
 }
 

@@ -29,7 +29,7 @@ my work here is based on example in Examples  N2KdataRX.cpp
 #include <N2kTypes.h>
 #include <math.h>
 #include <string.h>
-
+#include "debug_port.h"
 const double radToDeg = 180.0 / M_PI;
 #include "aux_functions.h"
 #include "Structures.h"
@@ -195,10 +195,10 @@ void WaterDepth(const tN2kMsg &N2kMsg) { // original name in datatdisplay exampl
 void HandlePosition(const tN2kMsg &N2kMsg) {
 
   if (ParseN2kPGN129025(N2kMsg, Latitude, Longitude)) {
-  // Serial.print(" In HandlePosition lat:");
-  // Serial.print(Latitude);
-  // Serial.print(" Lon:");
-  // Serial.println(Longitude);
+  // DEBUG_PORT.print(" In HandlePosition lat:");
+  // DEBUG_PORT.print(Latitude);
+  // DEBUG_PORT.print(" Lon:");
+  // DEBUG_PORT.println(Longitude);
 // needs toNewStruct ??
       // BoatData.Latitude.data = Latitude*1e-07;   // N2000 lat is double at 1e-7 resolution
       // BoatData.Longitude.data = Longitude*1e-07;
@@ -419,13 +419,13 @@ bool ParseN2kPGN60928(const tN2kMsg &N2kMsg, uint64_t &NAME) {
 }
 
 void HandleMFRData(const tN2kMsg &N2kMsg) {
-  //Serial.println("*********parse MFR data 126996 or 60928 *********");
+  //DEBUG_PORT.println("*********parse MFR data 126996 or 60928 *********");
 
   if (N2kMsg.PGN == 60928) {
     uint64_t NAME = 0;
     if (ParseN2kPGN60928(N2kMsg, NAME)) {
-      // Serial.println("PGN 60928 - ISO Address Claim:");
-      // Serial.print("  Source Address: "); Serial.println(Source);
+      // DEBUG_PORT.println("PGN 60928 - ISO Address Claim:");
+      // DEBUG_PORT.print("  Source Address: "); DEBUG_PORT.println(Source);
       // Optional: decode fields from NAME
       uint8_t industryGroup = (NAME >> 60) & 0x07;
       uint8_t deviceClass    = (NAME >> 56) & 0x0F;
@@ -433,15 +433,15 @@ void HandleMFRData(const tN2kMsg &N2kMsg) {
       uint16_t manufacturer  = (NAME >> 21) & 0x7FF;
       uint32_t uniqueID      = NAME & 0x1FFFFF;
 
-      //Serial.print("  Industry Group: "); Serial.println(industryGroup);
-      Serial.print("  Device Source:   "); Serial.println(N2kMsg.Source);
-      Serial.print("  Device Class:   "); Serial.println(deviceClass);
-      Serial.print("  Function Code:  "); Serial.println(deviceFunction);
-      Serial.print("  Manufacturer:   "); Serial.println(manufacturer);
-      Serial.print("  Unique ID:      "); Serial.println(uniqueID);
+      //DEBUG_PORT.print("  Industry Group: "); DEBUG_PORT.println(industryGroup);
+      DEBUG_PORT.print("  Device Source:   "); DEBUG_PORT.println(N2kMsg.Source);
+      DEBUG_PORT.print("  Device Class:   "); DEBUG_PORT.println(deviceClass);
+      DEBUG_PORT.print("  Function Code:  "); DEBUG_PORT.println(deviceFunction);
+      DEBUG_PORT.print("  Manufacturer:   "); DEBUG_PORT.println(manufacturer);
+      DEBUG_PORT.print("  Unique ID:      "); DEBUG_PORT.println(uniqueID);
       //RequestProductInformation(N2kMsg.Source);
     } else {
-      Serial.println("Failed to parse PGN 60928");
+      DEBUG_PORT.println("Failed to parse PGN 60928");
     }
   }
   if (N2kMsg.PGN == 126996) {
@@ -473,17 +473,17 @@ void HandleMFRData(const tN2kMsg &N2kMsg) {
                           CertificationLevel,
                           LoadEquivalency)) {
 
-      Serial.println("PGN 126996 - Product Information:");
-      Serial.print("  NMEA 2000 Version: "); Serial.println(N2kVersion);
-      Serial.print("  Product Code: "); Serial.println(ProductCode);
-      Serial.print("  Model ID: "); Serial.println(ModelID);
-      Serial.print("  Software Code: "); Serial.println(SwCode);
-      Serial.print("  Model Version: "); Serial.println(ModelVersion);
-      Serial.print("  Serial Code: "); Serial.println(ModelSerialCode);
-      Serial.print("  Certification Level: "); Serial.println(CertificationLevel);
-      Serial.print("  Load Equivalency: "); Serial.println(LoadEquivalency);
+      DEBUG_PORT.println("PGN 126996 - Product Information:");
+      DEBUG_PORT.print("  NMEA 2000 Version: "); DEBUG_PORT.println(N2kVersion);
+      DEBUG_PORT.print("  Product Code: "); DEBUG_PORT.println(ProductCode);
+      DEBUG_PORT.print("  Model ID: "); DEBUG_PORT.println(ModelID);
+      DEBUG_PORT.print("  Software Code: "); DEBUG_PORT.println(SwCode);
+      DEBUG_PORT.print("  Model Version: "); DEBUG_PORT.println(ModelVersion);
+      DEBUG_PORT.print("  Serial Code: "); DEBUG_PORT.println(ModelSerialCode);
+      DEBUG_PORT.print("  Certification Level: "); DEBUG_PORT.println(CertificationLevel);
+      DEBUG_PORT.print("  Load Equivalency: "); DEBUG_PORT.println(LoadEquivalency);
     } else {
-      Serial.println("Failed to parse PGN 126996");
+      DEBUG_PORT.println("Failed to parse PGN 126996");
     }
   }
 }

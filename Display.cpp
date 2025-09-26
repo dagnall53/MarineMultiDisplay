@@ -22,9 +22,8 @@ extern _sMyVictronDevices victronDevices;
 extern _MyColors ColorSettings;
 extern const char* Setupfilename;
 
-extern void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A);
 extern void SaveConfiguration();
-extern void LoadConfiguration();  // replacement for EEPROM READ
+extern bool LoadConfiguration();  // replacement for EEPROM READ
 extern bool ScanAndConnect(bool display,bool forceFull);
 
 extern void ShowToplinesettings(String Text);
@@ -299,7 +298,6 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
     case -22:                                              //  "EXPERIMENT in N2K data"
       if (RunSetup) { GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        //LoadConfiguration();//(Display_Config, Current_Settings);  // makes sure eeprom update data is latest and synchronised!
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
@@ -364,7 +362,6 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         GFXBorderBoxPrintf(Terminal, "");
       }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        //LoadConfiguration();//((Display_Config, Current_Settings); // makes sure eeprom update data is latest and synchronised!
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
         // GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
@@ -640,7 +637,6 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
         gfx->fillScreen(BLACK);
         gfx->setTextColor(BLACK);
         gfx->setTextSize(1);
-        //LoadConfiguration();//((Display_Config, Current_Settings);
         ShowToplinesettings(Saved_Settings, "EEPROM");
         setFont(4);
         GFXBorderBoxPrintf(SecondRowButton, "SSID <%s>", Current_Settings.ssid);

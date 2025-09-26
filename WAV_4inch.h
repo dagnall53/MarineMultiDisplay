@@ -18,6 +18,10 @@ to get Serial.print working
 #ifndef _WAV_DEF_H
 #define _WAV_DEF_H
 
+const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
+  #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
+  #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
+
 Arduino_DataBus *bus = new Arduino_SWSPI(
   GFX_NOT_DEFINED /* DC */,
   42 /* CS /12*/,                // Chip Select pin

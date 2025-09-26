@@ -7,53 +7,12 @@
 
 const char soft_version[] = " V0.11";
 
+//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for GUITRON (default or..)
+//#define WAVSHARE     // 4 inch but Touch untested and 
+//#define WIDEBOX    // 4.3inch 800 by 400 diSetup(play 
+//**********  SET DEFINES
 
 bool _WideDisplay;  // so that I can pass this to sub files
-
-//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for GUITRON (default or..)
-#define WAVSHARE     // 4 inch but Touch untested and 
-//#define WIDEBOX    // 4.3inch 800 by 400 display 
-
-// must be before NmeA2000 library initiates!
-#ifdef WAVSHARE 
-#ifdef WIDEBOX
-const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B box";
-  #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards!
-  #define ESP32_CAN_RX_PIN GPIO_NUM_16  // 
- // #define SCREEN_WIDTH  800
-#else
-const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
-  #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
-  #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
- // #define SCREEN_WIDTH  480
-#endif
-#else
- const char _device[]=  "Guitron 4inch";
- #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
- #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
-#endif
-
-#include "debug_port.h"
-#include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
-
-int Screen_Width;     // temporary solution until I can find why I am not passing this to aux_functions.cpp
-
-// Serial port is differently exposed on the two boards, making serial. print not compatible, and debug hard!
-// #ifdef WAVSHARE
-// #define DEBUG_PORT Serial
-// #else
-// #define DEBUG_PORT Serial0
-// #endif
-
-
-
-#include "N2kMsg.h"
-#include "NMEA2000.h"
-#include <NMEA2000_esp32xx.h>
-#include <N2kMessages.h>
-tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
-
-
 
 //Include libraries..
 #include <WiFi.h>
@@ -65,6 +24,9 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
+#include "FS.h"
+#include "FFat.h"
+#include <SPIFFS.h>
 
 //*********** DISPLAY Pin identifications selector *************
 #ifdef WAVSHARE
@@ -76,6 +38,49 @@ tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 #else
 #include "GUIT_4inch.h"
 #endif
+#include "debug_port.h"
+#include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
+
+// Serial port is differently exposed on the two boards, making serial. print not compatible, and debug hard!
+// #ifdef WAVSHARE
+// #define DEBUG_PORT Serial
+// #else
+// #define DEBUG_PORT Serial0
+// #endif
+// must be before NmeA2000 library initiates!
+// #ifdef WAVSHARE 
+// #ifdef WIDEBOX
+
+
+// const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B (wide) box";
+//   #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards!
+//   #define ESP32_CAN_RX_PIN GPIO_NUM_16  // 
+//  // #define SCREEN_WIDTH  800
+// #else
+// const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
+//   #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
+//   #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
+//  // #define SCREEN_WIDTH  480
+// #endif
+// #else
+//  const char _device[]=  "Guitron 4inch";
+//  #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
+//  #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
+// #endif
+
+
+int Screen_Width;     // Solution to pass OUCH_WIDTH to stuff that does not see module data until later!
+
+#include "N2kMsg.h"
+#include "NMEA2000.h"
+#include <NMEA2000_esp32xx.h>
+#include <N2kMessages.h>
+tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
+
+
+
+
+
 
 
 #include <TAMC_GT911.h>
@@ -105,7 +110,7 @@ char nmea_EXT[BufferLength];  // buffer for ESP_now received data
 bool EspNowIsRunning = false;
 char* pTOKEN;
 int StationsConnectedtomyAP;
-#define scansearchinterval 5000  // 5 secs for tests 30000 for running? 
+#define scansearchinterval 30000  // 5 secs for tests 30000 for running? 
 // assists for wifigfx interrupt  box that shows status..  to help turn it off after a time
 uint32_t WIFIGFXBoxstartedTime;
 bool WIFIGFXBoxdisplaystarted;
@@ -122,7 +127,7 @@ ESPFMfGK filemgr(filemanagerport);
 const esp_partition_t* ffat_partition = esp_partition_find_first(
   ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, NULL);// helps find if we have a fats 
 
-bool hasSD, hasFATS, Touch_available;
+bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 
 
 // my sub files
@@ -282,9 +287,9 @@ _sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK }; 
 
 bool LoadConfigs(bool print,bool displ){
   bool FilesOK = true;
-  if (LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings)) {
+  if (LoadConfiguration()) {
    if(print){ DEBUG_PORT.println("USING FATS JSON for wifi and display settings");}
-   if(displ){ gfx->println(F("USING FATS JSON for WiFi and display settings"));}
+   //if(displ){ gfx->println(F("FATS JSON (WiFi and display settings"));}
     Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
     Display_Page = Display_Config.Start_Page;
    } else {
@@ -292,17 +297,17 @@ bool LoadConfigs(bool print,bool displ){
     Display_Page = 4;  //here for clarity?
     Display_Config = Default_JSON;
     Current_Settings = Default_Settings_JSON;
-     if(print){ DEBUG_PORT.println(" USING  defaults for wifi and display settings");}
-    if(displ){gfx->println(F("Setting WiFi and Display settings to defaults"));}
-    SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings);
+    if(print){ DEBUG_PORT.println(" USING  defaults for wifi and display settings");}
+ //   if(displ){gfx->println(F("Setting WiFi and Display settings to defaults"));}
+    SaveConfiguration(SPIFFS, Setupfilename, Display_Config, Current_Settings);
   }
-  if (LoadVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices)) {
+  if (LoadVictronConfiguration()) {
     if(print){  DEBUG_PORT.println("USING FATS JSON for Victron data settings");}
-     if(displ){gfx->println(F("USING FATS JSON for Victron settings"));}
+   //  if(displ){gfx->println(F("USING FATS JSON for Victron settings"));}
   } else {  // try to set a useful example
     FilesOK = false;
     if(print){  DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");}
-    if(displ){gfx->println(F("Setting Victron settings to defaults"));}
+  //  if(displ){gfx->println(F("Setting Victron settings to defaults"));}
     victronDevices.BLEDebug="FALSE";
     Num_Victron_Devices = 2;
     CommonDisplayWidth = 150;
@@ -319,90 +324,72 @@ bool LoadConfigs(bool print,bool displ){
       victronDevices.displayV[1]=0;
       strlcpy(victronDevices.FileCommentName[0], "Comment Example",sizeof(victronDevices.FileCommentName[0]));
       strlcpy(victronDevices.FileCommentName[1] , "Another Example",sizeof(victronDevices.FileCommentName[1]));
-      SaveVictronConfiguration(FFat, VictronDevicesSetupfilename, victronDevices);  // should write a default file if it was missing?
+      SaveVictronConfiguration();  // should write a default file if it was missing?
     }
-  if (LoadDisplayConfiguration(FFat, ColorsFilename, ColorSettings)) {
+  if (LoadDisplayConfiguration()) {
     if(print){  DEBUG_PORT.println("USING FATS JSON for Colours data settings");}
-    if(displ){gfx->println(F("USING FATS JSON for Colours data settings"));}
+   // if(displ){gfx->println(F("USING FATS JSON for Colours data settings"));}
   } else {
     FilesOK = false;
      if(print){ DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");}
-    if(displ){gfx->println(F("Setting Victron settings to defaults"));}
-    SaveDisplayConfiguration(FFat, ColorsFilename, ColorSettings);  // should write a default file if it was missing?
+  //  if(displ){gfx->println(F("Setting Victron settings to defaults"));}
+    SaveDisplayConfiguration();  // should write a default file if it was missing?
   }
+
+ // if ( FilesOK && displ){gfx->println(F("FFATS files read"));}
 return FilesOK;
 }
 
 
 void setup() {
-  Screen_Width=TOUCH_WIDTH;  // temporary!
+  DEBUG_PORT.begin(115200);
+  Screen_Width=TOUCH_WIDTH;  // difficult to pass TOUCH_WIDTH to aux functions 
   _WideDisplay =false;
   #ifdef WIDEBOX 
    _WideDisplay = true;
   #endif
+  HaltOtherOperations = false;
   delay(100);
-   DEBUG_PORT.begin(115200);
- //Serial0.begin(115200);  // If available
-//  if (_debug) {  DEBUG_PORT.print("Using DEBUG (small) startup NMEA Display");   setup2();    return;  }  // break here to try simpler setups
-
   DEBUG_PORT.print("Starting NMEA Display");
   DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
   // Serial.println(F(" Using Serial.print "));
   // Serial0.println(F(" Using Serial0.print "));
   DEBUG_PORT.println(_device);DEBUG_PORT.println(soft_version); 
-  Init_GFX(); // must be before SD setup (at least for Guitron) 
-  Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
-  if (TestFATSPartition()) {// TestFATSFormatted();//DEBUG_PORT.println("FATFs should be ok");
-    Fatfs_Setup(); }  // set up FATFS
-  SD_Setup(SD_SCK, SD_MISO, SD_MOSI, SDCS);  // NOTE SDCS not SD_CS, which is a function! set up SD card (for logs etc)
-    // FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices   scanI2CMatrix();
-  delay(10);
-  Touch_available = Touchsetup();if (Touch_available) { DEBUG_PORT.println("TOUCH setup OK");}else{DEBUG_PORT.println("* NO TOUCH");}
-  delay(10);
-  InitNMEA2000();
-  keyboard(-1);  //just reset keyboard's static variables
+  Display_Config = Default_JSON;
+  Current_Settings = Default_Settings_JSON;
+  Init_GFX(); // must be before SD setup (at least for Guitron)
   DEBUG_PORT.println(F(" Printing to screen  "));
-  gfx->println(_device);
-  gfx->println(soft_version);
-  gfx->println();
-
-  if (hasFATS) {
-    gfx->println(F("***  FATFS setup ***"));
-    beep(3, EX106);
-  } else {
-    gfx->println(F("***  NO FATFS ***"));
-  }
-  if (hasSD) {
-    gfx->println(F("***  SD CARD found ***"));
-    beep(3, EX106);
-  } else {
-    gfx->println(F("***  NO SD CARD ***"));
-  }
-  if (Touch_available) {
-    gfx->println(F("***  Touch Sensor ON ***"));
-    beep(4, EX106);
-  } else {
-    gfx->println(F("***  NO Touch Sensor ***"));
-  }
- 
-  if (LoadConfigs(true,false)) {
-     beep(1, EX106);
+  gfx->print(_device);
+  gfx->println(soft_version);delay(100);
+  //Fatfs_Setup();   // set up FATFS // includes gfx prints
+  SPIFFS_Setup(); 
+    delay(100);listDir(SPIFFS,"/",1);  delay(500);
+  Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
+  Touch_available = Touchsetup(); // if before ffats? stops ffats reading!
+  delay(100);listDir(SPIFFS,"/",1);  delay(500);
+  if (LoadConfigs(true,true)) {
      gfx->println(F("*** All CONFIGS LOADED ***"));
      DEBUG_PORT.println("All Configs Loaded ");
    }else {gfx->println(F("*** DEFAULT CONFIG SET ***"));}
-  delay(1000);
-
-  ConnectWiFiusingCurrentSettings();
-  SetupWebstuff();
+  delay(10);
+  SD_Setup(SD_SCK, SD_MISO, SD_MOSI, SDCS);  // NOTE SDCS not SD_CS, which is a function! set up SD card (for logs etc)
+    if (hasSD) {
+    gfx->println(F("***  SD CARD found ***"));
+  } else {
+    gfx->println(F("***  NO SD CARD ***"));
+  }
+    // for tests !readFile(FFat,"/config.txt");
+    // FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices   scanI2CMatrix();
+  InitNMEA2000();
+  keyboard(-1);  //just reset keyboard's static variables
+  ConnectWiFiusingCurrentSettings(); // listDir(FFat,"/",1); readFile(FFat,"/config.txt");delay(500);
+  SetupWebstuff();  
   Udp.begin(atoi(Current_Settings.UDP_PORT));
-  Start_ESP_EXT();              //  Sets esp_now links to the current WiFi.channel etc.
-  BLEsetup();                   // setup Victron BLE interface (does not do much!!)
-  Display(true, Display_Page);  // does reset on Display
-  // once wifi working..
-  setupFilemanager();
-  HaltOtherOperations = false;  // token is set only during OTA to avoid other tasks causing problems
-                                // esp_task_wdt_reset();  // Reset watchdog if loop completes
-}
+  Start_ESP_EXT();             //  Sets esp_now links to the current WiFi.channel etc.
+  BLEsetup();                  // listDir(FFat,"/",1);  delay(500);                   // setup Victron BLE interface (does not do much!!)
+  setupFilemanager();          // listDir(FFat,"/",1); delay(500);  
+  DEBUG_PORT.println("Setup Completed");  delay(500); 
+ }
 
 void loop() {
   static unsigned long LogInterval;
@@ -422,13 +409,12 @@ void loop() {
     if(Touch_available){ts.read();}
     //~3.2ms
     EXTHeartbeat();//~3.3ms
-    
     CheckAndUseInputs(); 
-    //505ms! 
+
     Display(Display_Page);
        
     if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  // repeat at intervals to connect to station.
-      SSIDSearchTimer = millis() + scansearchinterval;                          //
+      SSIDSearchTimer = millis() + scansearchinterval;   if (millis()<= 30000){SSIDSearchTimer = millis() + 200;}                       // fast scan for first 30 secs
       if (StationsConnectedtomyAP == 0) { 
        WiFiChannel++;                                         // avoid scanning if we have someone connected to AP as it will/may disconnect!
        ScanAndConnect(Current_Settings.ssid, WiFiChannel,true); // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
@@ -490,7 +476,7 @@ void InitNMEA2000() {  // make it display device Info on start up..
 
  DEBUG_PORT.print("NMEA2000 using RX pin ");DEBUG_PORT.println(ESP32_CAN_RX_PIN);
  DEBUG_PORT.print("NMEA2000 using TX pin ");DEBUG_PORT.println(ESP32_CAN_TX_PIN);
- gfx->println(F("Setting uo NMEA2000 interface"));
+ gfx->println(F("Setting up NMEA2000 interface"));
  delay(10);
   NMEA2000.SetN2kCANMsgBufSize(8);
   NMEA2000.SetN2kCANReceiveFrameBufSize(100);
@@ -499,7 +485,7 @@ void InitNMEA2000() {  // make it display device Info on start up..
   uint32_t SerialNumber;
   SerialNumber = 9999;
   snprintf(SnoStr, 32, "%lu", SerialNumber);
-  DEBUG_PORT.println(".. Initializing ...");
+  DEBUG_PORT.println("   Initializing ...");
   DEBUG_PORT.printf("   Unique ID: <%i> \r\n", SerialNumber);
   NMEA2000.SetDeviceInformation(SerialNumber,  // Unique number. Use e.g. Serial number.
                                 130,           // Device function=Display. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
@@ -572,52 +558,111 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
 
 //**********  Drivers 
 void Fatfs_Setup() {
+  bool FMsetup=false;
   hasFATS = false;
-  DEBUG_PORT.println("FFAT  START");
+  DEBUG_PORT.print("FFAT  START");
   if (FFat.begin(true)) {
     hasFATS = true;
     /*size_t totalBytes();
     size_t usedBytes();
     size_t freeBytes();*/
     uint64_t cardSize = FFat.totalBytes() / (1024 * 1024);
-    DEBUG_PORT.printf("  FFat Size: %lluMB\n", cardSize);
+    DEBUG_PORT.printf("  FFat Size: %lluMB", cardSize);
     uint64_t FreeSize = FFat.freeBytes() / (1024 * 1024);
-    DEBUG_PORT.printf("FFat freeBytes: %lluMB\n", FreeSize);
-    delay(1500);
+    DEBUG_PORT.printf("FFat freeBytes: %lluMB", FreeSize);
+    if ( FFat.totalBytes() == FFat.freeBytes()) {gfx->print("EMPTY - formatting \n");FFat.format();}
+    gfx->printf("FFat free: %lluMB ", FreeSize);
+    delay(500);
     if (!filemgr.AddFS(FFat, "Flash/FFat", false)) {
       DEBUG_PORT.println(F("Adding FFAT to Filemanager failed."));
-    } else {
-      DEBUG_PORT.println(F("  Adding FFAT to Filemanager"));
+    } else { FMsetup=true;
+      DEBUG_PORT.println(F("  Added FFAT to Filemanager"));
     }
   } else {
     DEBUG_PORT.println(F("FFat File System not initiated."));
   }
+  
+  if (!hasFATS) {
+      gfx->print(F("---  NO FATFS ---"));
+  }
+  if (FMsetup){
+    DEBUG_PORT.println(F("+ Filemanager*"));
+    gfx->println(F("+ Filemanager*"));
+  } else {
+    gfx->println(F(""));
+  }
 }
-//*********** EEPROM functions *********
-void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
-  DEBUG_PORT.printf("SAVING CONFIG\n");
-  SaveConfiguration(FFat, Setupfilename, B, A);
+void SPIFFS_Setup() {
+  bool FMsetup=false;
+  hasSPIFFS = false;
+  DEBUG_PORT.print("FFAT  START");
+  if (SPIFFS.begin(true)) {
+    hasSPIFFS = true;
+  size_t totalBytes = SPIFFS.totalBytes();
+  size_t usedBytes = SPIFFS.usedBytes();
+  size_t freeBytes = totalBytes - usedBytes;
+
+   
+    gfx->printf("SPIFFS initiated: %i free",freeBytes);
+    delay(500);
+    if (!filemgr.AddFS(SPIFFS, "Flash/SPIFFS", false)) {
+      DEBUG_PORT.println(F("Adding SPIFFS to Filemanager failed."));
+    } else { FMsetup=true;
+      DEBUG_PORT.println(F("  Added SPIFFS to Filemanager"));
+    }
+  } else {
+    DEBUG_PORT.println(F("FFat File System not initiated."));
+  }
+  
+  if (!hasSPIFFS) {
+      gfx->print(F("---  NO SPIFFS ---"));
+  }
+  if (FMsetup){
+    DEBUG_PORT.println(F("+ Filemanager*"));
+    gfx->println(F("+ Filemanager*"));
+  } else {
+    gfx->println(F(""));
+  }
 }
+//*********** FLASH OVERLOAD  functions So can just be called from sub routines*********
+// void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
+//   DEBUG_PORT.printf("SAVING CONFIG\n");
+//   SaveConfiguration(SPIFFS, Setupfilename, B, A);
+// }
+
+//***********  Overload for save and load that keeps file type here for easy change if needed
+// I started with FFat but could not overcome crash 
 void SaveConfiguration(){//overload of Save configuration in case new data stored 
-  SaveConfiguration(FFat, Setupfilename, Display_Config, Current_Settings); 
-}
+  SaveConfiguration(SPIFFS, Setupfilename, Display_Config, Current_Settings); 
+ }
+void SaveVictronConfiguration(){
+    SaveVictronConfiguration(SPIFFS, VictronDevicesSetupfilename, victronDevices);
+ }
+void SaveDisplayConfiguration(){
+  SaveDisplayConfiguration(SPIFFS, ColorsFilename, ColorSettings);
+ }
+bool LoadConfiguration(){//overload of Reload configuration with standard file names in case new data stored 
+  return LoadConfiguration(SPIFFS, Setupfilename, Display_Config, Current_Settings); 
+ }
 
-void LoadConfiguration(){//overload of Reload configuration in case new data stored 
-  LoadConfiguration(FFat, Setupfilename, Display_Config, Current_Settings); 
-}
+bool LoadVictronConfiguration(){
+  return LoadVictronConfiguration(SPIFFS, VictronDevicesSetupfilename, victronDevices);
+ }
+bool LoadDisplayConfiguration(){
+  return LoadDisplayConfiguration(SPIFFS, ColorsFilename, ColorSettings);
+ }
+void PrintJsonFile(const char* comment, const char* filename){
+  PrintJsonFile(SPIFFS,comment, filename);
+ }
 
-void EEPROM_READ(_sDisplay_Config B, _sWiFi_settings_Config A) {
-  LoadConfiguration(FFat, Setupfilename, B, A);
-  return;
-
-}
 //***********  JSON for configurations ****************
 bool LoadVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevices& config) {
   // Open SD file for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
-  File file;
+  
   if (&fs == &SD) { SD_CS(LOW); }
-  file = fs.open(filename, FILE_READ);
+
+  File file = fs.open(filename, FILE_READ);
   if (!file) {
     DEBUG_PORT.println(F("**Failed to read Victron JSON file"));
     fault = true;
@@ -634,8 +679,8 @@ bool LoadVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
   strlcpy(temp, doc["BLEDebug"] | "false", sizeof(temp));
   config.BLEDebug = (strcmp(temp, "false"));
 
-/// BLEDEBUG prints all victron / ble out on serial port 
-//******  SET FALSE regardless of what is in the Vic Config !
+  /// BLEDEBUG prints all victron / ble out on serial port 
+  //******  SET FALSE regardless of what is in the Vic Config !
   config.BLEDebug=false; 
   config.Beacons=false;  // can switch in in the victron display 
 
@@ -710,7 +755,7 @@ void SaveVictronConfiguration(fs::FS& fs, const char* filename, _sMyVictronDevic
   // Close the file, //but print serial as a check
   file.close();
   if (&fs == &SD) { SD_CS(HIGH); }
-  PrintJsonFile("Check after Saving configuration ", filename);
+ // PrintJsonFile("Check after Saving configuration ", filename);
 }
 void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) {
   // Delete existing file, otherwise the configuration is appended to the file
@@ -758,14 +803,22 @@ void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   // Close the file, but print serial as a check
   file.close();
   if (&fs == &SD) { SD_CS(HIGH); }
-  PrintJsonFile("Check after Saving configuration ", filename);
+ // PrintJsonFile("Check after Saving configuration ", filename);
 }
 bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) {
   // Openfile for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
-  File file;
   if (&fs == &SD) { SD_CS(LOW); }
-  file = fs.open(filename, FILE_READ);
+   DEBUG_PORT.printf("Free heap before open: %d\n", ESP.getFreeHeap());
+   DEBUG_PORT.printf("Internal heap: %d\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+   DEBUG_PORT.printf("PSRAM heap: %d\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+
+  DEBUG_PORT.println(filename); // Confirm it's correct
+  DEBUG_PORT.println(fs.exists(filename) ? "Exists" : "Missing");
+  File test = fs.open("/test.txt", FILE_READ);
+  DEBUG_PORT.println(" TEST file loads");delay(100);
+  File file = fs.open(filename, FILE_READ);
+
   if (!file) {
     DEBUG_PORT.println(F("**Failed to read JSON file"));
     fault = true;
@@ -803,23 +856,21 @@ bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   if (&fs == &SD) { SD_CS(HIGH); }
   return !fault;
 }
-
 bool LoadConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Open file from fs for reading  //Active filesystems are:  SD: SD-Card  FFat: Flash/FFat .
   // Allocate a temporary JsonDocument
   bool fault = false;
   char temp[15];
-  JsonDocument doc;
-  File file;
+  JsonDocument doc; 
   if (&fs == &SD) { SD_CS(LOW); }
-  file = fs.open(filename, FILE_READ);
+  File file = fs.open(filename, FILE_READ);
   if (!file) {
-    DEBUG_PORT.println(F("**Failed to read CONFIGURATION JSON file"));
+    //DEBUG_PORT.println(F("**Failed to read CONFIGURATION JSON file"));
     fault = true;
   }
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    DEBUG_PORT.println(F("**Failed to deserialise JSON file"));
+    //DEBUG_PORT.println(F("**Failed to deserialise JSON file"));
     fault = true;
   }
   // Copy values (or defaults) from the JsonDocument to the config / settings
@@ -865,13 +916,10 @@ bool LoadConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   strlcpy(temp, doc["DATALOG"] | "false", sizeof(temp));
   settings.Data_Log_ON = (strcmp(temp, "false"));
   //**************  SET ALL LOGGING FALSE on STARTUP - 
-  //  ***  There is not enough room on FFATS to simply store everything
+  //  ***  There is not enough room on Flash to simply store everything
   //  MAYBE later add some tests for SD (not on waveshare!) and save to SD 
   settings.Data_Log_ON=false;
   settings.Log_ON=false;
-
-
-
   settings.log_interval_setting = doc["LogInterval"] | 60;
 
   strlcpy(temp, doc["BLE_enable"] | "false", sizeof(temp));
@@ -882,6 +930,7 @@ bool LoadConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
   //if (!error) { return true; }
   return !fault;
 }
+
 void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& config, _sWiFi_settings_Config& settings) {
   // Save  file to fs   //Active filesystems are:  SD: SD-Card  FFat: Flash/FFat .
   // need to work with SD some time
@@ -950,14 +999,14 @@ void SaveConfiguration(fs::FS& fs, const char* filename, _sDisplay_Config& confi
  // PrintJsonFile("Check after Saving configuration ", filename);
 }
 
-void PrintJsonFile(const char* comment, const char* filename) {
+void PrintJsonFile(fs::FS& fs,const char* comment, const char* filename) {
   // Open file for reading
-  SD_CS(LOW);
-  File file = SD.open(filename, FILE_READ);
+  if (&fs==&SD){SD_CS(LOW);}
+  File file = fs.open(filename, FILE_READ);
   DEBUG_PORT.printf(" %s JSON FILE %s is.", comment, filename);
   if (!file) {
     DEBUG_PORT.println(F("Failed to read file"));
-    SD_CS(HIGH);
+    if (&fs==&SD){SD_CS(HIGH);}
     return;
   }
   DEBUG_PORT.println();
@@ -968,7 +1017,7 @@ void PrintJsonFile(const char* comment, const char* filename) {
   DEBUG_PORT.println();
   // Close the file
   file.close();
-  SD_CS(HIGH);
+  if (&fs==&SD){SD_CS(HIGH);}
 }
 
 void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
@@ -1579,6 +1628,9 @@ bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
     ts.begin(GT911_ADDR1);
     ts.setRotation(ROTATION_INVERTED);
   }
+ if (result) {DEBUG_PORT.println("TOUCH setup OK");
+      } else {DEBUG_PORT.println("* NO TOUCH");
+    }
   return result;
 }
 

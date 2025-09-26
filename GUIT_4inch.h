@@ -5,6 +5,11 @@ Pins and defines for GFX - various versions!
 #ifndef _ESPGFDEF_H_
 #define _ESPGFDEF_H_
 
+ const char _device[]=  "Guitron 4inch";
+ #define ESP32_CAN_TX_PIN GPIO_NUM_1  // for the esp32_4 spare pins on Guitron board 8 way connector!
+ #define ESP32_CAN_RX_PIN GPIO_NUM_2  // for the esp32_4 spare pins on Guitron board 8 way connector
+
+
 //****  Later  GFX VERSIONS HAVE this Refactored  *BUS config and miss the ips (colour inversion??) setup  
 #define GFX_BL 38
 Arduino_DataBus *bus = new Arduino_SWSPI(

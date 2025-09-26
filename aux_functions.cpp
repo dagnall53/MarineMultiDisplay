@@ -96,12 +96,12 @@ boolean FillTokenLast(char *ptr) {
 extern void EventTiming(String input);  // to permit timing functions here during development
 // looks for index where three characters match my "haystack" of known NMEA messages;
 bool NeedleinHaystack(char ch1, char ch2, char ch3, char *haystack, int &compareOffset) {
-  // Serial.printf("\n Looking for<%c%c%c> in strlen(%i) %s \n", ch1, ch2, ch3, strlen(haystack), haystack);
+  // DEBUG_PORT.printf("\n Looking for<%c%c%c> in strlen(%i) %s \n", ch1, ch2, ch3, strlen(haystack), haystack);
   compareOffset = 0;
   // if (needle[0] == '\0') { return false; }
   for (compareOffset = 0; (compareOffset <= strlen(haystack)); compareOffset++) {
     if ((ch1 == haystack[compareOffset]) && (ch2 == haystack[compareOffset + 1]) && (ch3 == haystack[compareOffset + 2])) {
-      //    Serial.printf("Found at %i\n", compareOffset);
+      //    DEBUG_PORT.printf("Found at %i\n", compareOffset);
       return true;
     }
   }
@@ -110,12 +110,12 @@ bool NeedleinHaystack(char ch1, char ch2, char ch3, char *haystack, int &compare
 }
 
 //********* Add this if needed in the case statements to help sort bugs!
-// Serial.println(" Fields:");
+// DEBUG_PORT.println(" Fields:");
 // for (int x = 0; x <= Num_DataFields; x++) {
-//   Serial.print(Field[x]);
-//   Serial.print(",");
+//   DEBUG_PORT.print(Field[x]);
+//   DEBUG_PORT.print(",");
 // }
-// Serial.println("> ");
+// DEBUG_PORT.println("> ");
 /* ref  from TL functions..
 double NMEA0183GetDouble(const char *data) {
   double val = NMEA0183DoubleNA;
@@ -167,15 +167,15 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {
   }
   p = Field[Num_DataFields];  // searches for '*' and if not found, looks for a CR
   if (!FillTokenLast(Field[Num_DataFields])) { return false; }
-  //Serial.printf("  Found  <%i> Fields Field0<%s> Field1<%s> Field2<%s> Field3<%s>\n", Num_DataFields, Field[0],Field[1], Field[2], Field[3]);
+  //DEBUG_PORT.printf("  Found  <%i> Fields Field0<%s> Field1<%s> Field2<%s> Field3<%s>\n", Num_DataFields, Field[0],Field[1], Field[2], Field[3]);
   //NeedleInHaystack/4/will (should !) identify the command.  Note Nul to prevent zero ! being passed to Switch or Div4
   //                  0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19....
   char nmeafunct[] = "NUL,DBT,DPT,DBK,MWV,VHW,RMC,APB,GLL,HDG,HDM,MTW,MWD,NOP,XS,,AK,,ALK,BWC,WPL,GSV ";  // more can be added..
   // Not using Field[0] as some commands have only two characters. so we can look for (eg) 'XS,' from $IIXS, =14
   if (NeedleinHaystack(buf[3], buf[4], buf[5], nmeafunct, Index) == false) { return false; }
   // NOTE  I coul have missed out the commas in the nmeafunct[]] "haystack", and divided by 3.. but that would make it harder to read. 
-  //Serial.printf(" Using case %i \n", Index / 4);
-  // Serial.println(" Fields:");for(int x=0 ;int <Num_DataFields;int++){Serial.print(Field[x]);Serial.print(",");} Serial.println("> ");
+  //DEBUG_PORT.printf(" Using case %i \n", Index / 4);
+  // DEBUG_PORT.println(" Fields:");for(int x=0 ;int <Num_DataFields;int++){DEBUG_PORT.print(Field[x]);DEBUG_PORT.print(",");} DEBUG_PORT.println("> ");
   switch (Index / 4) {
     case 1:  //dbt
       toNewStruct(Field[3], BoatData.WaterDepth);
@@ -242,13 +242,13 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {
       break;
 
     case 19:  //GSV
-      // Serial.printf("\n Debug GSV ? numdatafields<%i>  ", Num_DataFields);
+      // DEBUG_PORT.printf("\n Debug GSV ? numdatafields<%i>  ", Num_DataFields);
       //          if (Num_DataFields < 10) { return false; }
-      //        Serial.println("Fields<");                  // un copy this lot to assist debugging!!
+      //        DEBUG_PORT.println("Fields<");                  // un copy this lot to assist debugging!!
       //        for (int x = 0; x <= Num_DataFields; x++) {
-      //          Serial.printf("%i=<%s>,",x,Field[x]);
+      //          DEBUG_PORT.printf("%i=<%s>,",x,Field[x]);
       //        }
-      //        Serial.println(" ");
+      //        DEBUG_PORT.println(" ");
       //  Not new struct, sats in view is just a double. not an inststruct. toNewStruct(Field[3], BoatData.SatsInView);
       BoatData.SatsInView = NMEA0183GetDouble(Field[3]);
 
@@ -338,7 +338,7 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
 
 void UpdateLinef(uint16_t color, int font, _sButton &button, const char *fmt, ...) {  // Types sequential lines in the button space '&' for button to store printline?
   if (button.screenfull && button.debugpause) { return; }
-  //Serial.printf(" lines  TypingspaceH =%i  number of lines=%i printing line <%i>\n",typingspaceH,LinesOfType,button.PrintLine);
+  //DEBUG_PORT.printf(" lines  TypingspaceH =%i  number of lines=%i printing line <%i>\n",typingspaceH,LinesOfType,button.PrintLine);
   static char msg[600] = { '\0' };
   va_list args;
   va_start(args, fmt);
@@ -359,7 +359,7 @@ void UpdateLinef(int font, _sButton &button, const char *fmt, ...) {  // Types s
 }
 
 void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
-  //Serial.print(" UD2S: ");Serial.println(data); this version does not use the border for the height evaluation !
+  //DEBUG_PORT.print(" UD2S: ");DEBUG_PORT.println(data); this version does not use the border for the height evaluation !
   static char msg[300] = { '\0' };
   char digits[30];
   char decimal[30];
@@ -384,7 +384,7 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   int len = strlen(msg);
   // split msg at the decimal point .. so must have decimal point!
   // if (typingspaceW >=300){
-  // Serial.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
+  // DEBUG_PORT.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
 
   if (strcspn(msg, delimiter) != strlen(msg)) {
     token = strtok(msg, delimiter);
@@ -408,7 +408,7 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   setFont(smallfont);
   gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
                                                                   // if (typingspaceW >=300){
-                                                                  //   Serial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
+                                                                  //   DEBUG_PORT.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
                                                                   //   }
 
   setFont(bigfont);                                                                              // Reset to big font for Digits..
@@ -482,7 +482,7 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   int len = strlen(msg);
   // split msg at the decimal point .. so must have decimal point!
   // if (typingspaceW >=300){
-  // Serial.printf("** Debug Msg is <%s> typingspacew=%i ",msg,typingspaceW);}
+  // DEBUG_PORT.printf("** Debug Msg is <%s> typingspacew=%i ",msg,typingspaceW);}
 
   if (strcspn(msg, delimiter) != strlen(msg)) {
     token = strtok(msg, delimiter);
@@ -510,8 +510,8 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
       TBw2 = 0;
       decimal[0] = 0;
       decimal[1] = 0;
-    } else {                                       // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
-                                                   // Serial.print(decimal);Serial.println("> and was too big to print in box");
+    } else {                                       // DEBUG_PORT.print("***DEBUG <"); DEBUG_PORT.print(msg);DEBUG_PORT.print("> became <");DEBUG_PORT.print(digits);
+                                                   // DEBUG_PORT.print(decimal);DEBUG_PORT.println("> and was too big to print in box");
       gfx->setTextBound(0, 0, Screen_Width, 480);  //reset text bounds
       data.displayed = true;
       return;
@@ -564,7 +564,7 @@ void ButtonMasterDisplay(bool reset, const char *msg, const char *units,int magn
   if (data.greyed) { return; }
   if (!data.displayed) {
     gfx->setTextSize(magnify);
-    //  Serial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
+    //  DEBUG_PORT.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
     data.displayed = true;  //reset to false inside toNewStruct
@@ -586,7 +586,7 @@ void UpdateDataTwoSize(int magnify, bool horizCenter, bool vertCenter, int bigfo
   if (data.greyed) { return; }
   if (!data.displayed) {
     gfx->setTextSize(magnify);
-    //  Serial.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
+    //  DEBUG_PORT.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
     data.displayed = true;  //reset to false inside toNewStruct
@@ -620,7 +620,7 @@ void GFXBorderBoxPrintf(_sButton button, const char *fmt, ...) {
 
 void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // add a top left title to the box Best used with FONT 0 ,FreeMono8pt7b
   int Font_Before;
-  //Serial.println("Font at start is %i",MasterFont);
+  //DEBUG_PORT.println("Font at start is %i",MasterFont);
   Font_Before = MasterFont;
   setFont(font);
   static char Title[300] = { '\0' };
@@ -633,12 +633,12 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
   int len = strlen(Title);
   gfx->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
   gfx->setTextColor(WHITE, button.BorderColor);
-  // Serial.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
+  // DEBUG_PORT.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
   if ((button.v - TBh) >= 0) {  // text writes from point at bottom left .. have we room to draw 'above' the box?
     gfx->setCursor(button.h, button.v);
     gfx->fillRect(button.h, button.v - TBh, TBw, TBh, button.BorderColor);
-    //Serial.printf(" h v positioned\n");
-  } else {  //Serial.printf(" moved down to TBH (%i) \n",TBh);
+    //DEBUG_PORT.printf(" h v positioned\n");
+  } else {  //DEBUG_PORT.printf(" moved down to TBH (%i) \n",TBh);
     gfx->setCursor(button.h, TBh - 2);
     gfx->fillRect(button.h, 2, TBw, TBh, button.BorderColor);
     // move 'inside' box by moving down.. -2 just because this does not leave a gap with the small FreeMono8pt7b font (0) I normally chose
@@ -646,12 +646,12 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
     // (Font 3 is monobold 8, prints like font 0 ,but is less clear IMHO.
   }
   gfx->print(Title);
-  setFont(Font_Before);  //Serial.println("Font selected is %i",MasterFont);
+  setFont(Font_Before);  //DEBUG_PORT.println("Font selected is %i",MasterFont);
 }
 // Pos 1 2 3 4 for top right, botom right etc. add a top left title to the box
 void AddTitleInsideBox(int font, int pos, _sButton button, const char *fmt, ...) {  // Pos 1 2 3 4 for top right, botom right etc. add a top left title to the box
   int Font_Before;
-  //Serial.println("Font at start is %i",MasterFont);
+  //DEBUG_PORT.println("Font at start is %i",MasterFont);
   Font_Before = MasterFont;
   setFont(font);
   static char Title[300] = { '\0' };
@@ -691,7 +691,7 @@ void AddTitleInsideBox(int font, int pos, _sButton button, const char *fmt, ...)
       break;
   }
   gfx->print(Title);
-  setFont(Font_Before);  //Serial.println("Font selected is %i",MasterFont);
+  setFont(Font_Before);  //DEBUG_PORT.println("Font selected is %i",MasterFont);
 }
 
 int Circular(int x, int min, int max) {  // returns circulated data in range min to max
@@ -792,7 +792,7 @@ void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton butt
   _oldData[Hmax][instance] = data;
   //dotsize = 3;
   if (reset) {
-    //Serial.printf(" RESETTING SCROLLGRAPH  %i  %i ",Display_Page, Displaypage[instance]);
+    //DEBUG_PORT.printf(" RESETTING SCROLLGRAPH  %i  %i ",Display_Page, Displaypage[instance]);
    for (int x = (Hmax - samplesread[instance])+1; x <= Hmax + 1; x++) { // set the graphPoint[x] based on  "_oldData[x]" for this (new) displaybutton
     graphPoint[x][instance].h = GraphRange(x, BoxLeft, BoxRight, 0, Hmax);
     graphPoint[x][instance].v = GraphRange( _oldData[x][instance] , BoxTop, BoxBottom, dmin, dmax);
@@ -811,7 +811,7 @@ void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton butt
   //add the new data
   graphPoint[Hmax][instance].v = GraphRange(data, BoxTop, BoxBottom, dmin, dmax);
   graphPoint[Hmax][instance].h = GraphRange(Hmax, BoxLeft, BoxRight, 0, Hmax);
-  // Serial.printf(" Data is %f Sample %i -> v:%i h:%i   \n",data,samplesread[instance],graphPoint[Hmax][instance].v,graphPoint[Hmax][instance].h);
+  // DEBUG_PORT.printf(" Data is %f Sample %i -> v:%i h:%i   \n",data,samplesread[instance],graphPoint[Hmax][instance].v,graphPoint[Hmax][instance].h);
 
   samplesread[instance] = samplesread[instance] + 1;
   if (samplesread[instance] >= Hmax) { samplesread[instance] = Hmax; }
@@ -820,11 +820,11 @@ void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton butt
     _oldData[x - 1][instance] = _oldData[x][instance];
     graphPoint[x - 1][instance] = graphPoint[x][instance];
     graphPoint[x - 1][instance].h = GraphRange(x - 1, BoxLeft, BoxRight, 0, Hmax);// slide the v VALUES, but calculate the horizontal positions!
-    //  Serial.printf(" Data (%i) is %f Sample %i -> v:%i h:%i   \n",x-1,graphPoint[x-1][instance].v,graphPoint[x-1][instance].h);
+    //  DEBUG_PORT.printf(" Data (%i) is %f Sample %i -> v:%i h:%i   \n",x-1,graphPoint[x-1][instance].v,graphPoint[x-1][instance].h);
     }  
 
   for (int x = 1+Hmax - samplesread[instance]; x <= Hmax-1; x++) {
-    // Serial.printf(" SCROLLGRAPH (x) %i (h) %i (v)%i \n",x,graphPoint[x][instance].h,graphPoint[x][instance].v );
+    // DEBUG_PORT.printf(" SCROLLGRAPH (x) %i (h) %i (v)%i \n",x,graphPoint[x][instance].h,graphPoint[x][instance].v );
     if (line && (x >= 2)) {
       if (
         // (graphPoint[x - 1][instance].v >= BoxTop) && (graphPoint[x - 1][instance].v <= BoxBottom) &&

@@ -9,6 +9,7 @@
 
 #include <JPEGDEC.h>
 #include "aux_functions.h"
+#include <SPIFFS.h>
 
 static JPEGDEC _jpeg;
 static File _f;
@@ -19,32 +20,32 @@ static int _x, _y, _x_bound, _y_bound;
 // pixel drawing callback
 static int jpegDrawCallback(JPEGDRAW *pDraw)
 {
-  // Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+  // DEBUG_PORT.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
   gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
   return 1;
 }
 
 static void *jpegOpenFile(const char *szFilename, int32_t *pFileSize)
-{
-    // Serial.println("jpegOpenFile");
+ {
+    // DEBUG_PORT.println("jpegOpenFile");
 
-#if defined(ESP32)
+ #if defined(ESP32)
     // _f = FFat.open(szFilename, "r");
     //_f = LittleFS.open(szFilename, "r");
     // _f = SPIFFS.open(szFilename, "r");
     //SD_CS(LOW);
     // _f = SD.open(szFilename, "r");
-#else
+ #else
     //_f = SD.open(szFilename, FILE_READ);
-#endif
-   _f = FFat.open(szFilename, "r");
+ #endif
+   _f = SPIFFS.open(szFilename, "r");
     *pFileSize = _f.size();
     return &_f;
 }
 
 static void jpegCloseFile(void *pHandle)
 {
-    // Serial.println("jpegCloseFile");
+    // DEBUG_PORT.println("jpegCloseFile");
     File *f = static_cast<File *>(pHandle);
     f->close();
 
@@ -52,7 +53,7 @@ static void jpegCloseFile(void *pHandle)
 
 static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 {
-    // Serial.printf("jpegReadFile, iLen: %d\n", iLen);
+    // DEBUG_PORT.printf("jpegReadFile, iLen: %d\n", iLen);
     File *f = static_cast<File *>(pFile->fHandle);
     size_t r = f->read(pBuf, iLen);
     return r;
@@ -60,7 +61,7 @@ static int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen)
 
 static int32_t jpegSeekFile(JPEGFILE *pFile, int32_t iPosition)
 {
-    // Serial.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
+    // DEBUG_PORT.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
     File *f = static_cast<File *>(pFile->fHandle);
     f->seek(iPosition);
     return iPosition;

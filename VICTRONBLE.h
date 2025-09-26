@@ -178,8 +178,6 @@ typedef struct {
 
 void hexCharStrToByteArray(char * hexCharStr, unsigned char * byteArray); // called in LoadVictronConfiguration to set unsigned char version of the input string 
 
-
-
 void BLEsetup();  // called from main void setup();
 void BLEloop();   // called from main void loop() 
 

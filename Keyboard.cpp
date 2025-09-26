@@ -3,7 +3,7 @@
 #include <Arduino_GFX_Library.h> 
 // also includes Arduino etc, so variable names are understood
 #include "Structures.h"
-
+#include "debug_port.h"
 #include "Keyboard.h"
 // Based on Felix Biego's keyboard   https://github.com/fbiego/esp32-touch-keyboard/tree/main
 // modified to use strings (char array) and not Strings.
@@ -30,8 +30,8 @@ int KBD_size = 2;  //generic size modifier for Kbd 1=small, 2=480 wide
   #define voffset 35 
 
 extern int text_height;  //so we can get them if we change heights etc inside functions
-
-extern void EEPROM_WRITE(_sDisplay_Config B,_sWiFi_settings_Config A);
+extern const char *Setupfilename;
+extern void SaveConfiguration();
 extern void setFont(int);
 extern int Display_Page;
 
@@ -68,7 +68,7 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
   
   if (!VariableChanged && !Keyboardinuse) {
     strcpy(Local_var, DATA);
-   // Serial.printf(" !variable changed  <%s>\n",Local_var);
+   // DEBUG_PORT.printf(" !variable changed  <%s>\n",Local_var);
     WriteinKey(result_positionX, result_positionY, 1, Local_var);
     Keyboardinuse=true;
   }
@@ -76,15 +76,15 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
   if(Touch_available){
   if ((ts.isTouched)) {
     st = KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps);
-    //Serial.printf(" Pressure test %i  KEYchr<%i> Bool <%i>\n",ts.points[0].size,ts.points[0].x, ts.points[0].y,KEY,st );
+    //DEBUG_PORT.printf(" Pressure test %i  KEYchr<%i> Bool <%i>\n",ts.points[0].size,ts.points[0].x, ts.points[0].y,KEY,st );
   }
 
   if (!KeyPressUsed && (ts.isTouched) && (ts.points[0].size > 10) && (KeyOver(ts.points[0].x, ts.points[0].y, KEY, caps))) {
-  //  Serial.printf(" Keyboard check inputsizeof<%i>   sizeof_here *data(%i)   currentlen<%i>\n", sizeof_data, sizeof(*DATA), strlen(Local_var));
+  //  DEBUG_PORT.printf(" Keyboard check inputsizeof<%i>   sizeof_here *data(%i)   currentlen<%i>\n", sizeof_data, sizeof(*DATA), strlen(Local_var));
     KeyPressUsed = true;
     lastkeypressed = millis();
     Command_Key = false;
-    //Serial.printf(" Key test %s \n",KEY);
+    //DEBUG_PORT.printf(" Key test %s \n",KEY);
     if (!strcmp(KEY, "^")) {
       caps = caps + 1;
       if (caps > 2) { caps = 0; }  
@@ -101,25 +101,25 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
     }
     if (!strcmp(KEY, "MEM")) {
       strcpy(Local_var, DATA);
-      //Serial.printf(" reset  <%s> \n",Local_var);
+      //DEBUG_PORT.printf(" reset  <%s> \n",Local_var);
       WriteinKey(result_positionX, result_positionY, 1, Local_var);
       Command_Key = true;
     }
     if (!strcmp(KEY, "ENT")) {
       strcpy(DATA, Local_var);
-      Serial.printf("Updated data: was %s is  %s", DATA, Local_var);
+      DEBUG_PORT.printf("Updated data: was %s is  %s", DATA, Local_var);
       strncpy(DATA, Local_var, sizeof_data);  // limit_size so we cannot overwrite the original array size
       Command_Key = true;
       VariableChanged = false;
-      EEPROM_WRITE(Display_Config,Current_Settings);
+      SaveConfiguration();
       Keyboardinuse=false;
       setFont(0);
       Display_Page=-1; //Always return to settings, page -1
     }
-    if (!Command_Key) {  //Serial.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
+    if (!Command_Key) {  //DEBUG_PORT.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
       strcat(Local_var, KEY);
     }
-    Serial.printf(" end of loop <%s> \n",Local_var);
+    DEBUG_PORT.printf(" end of loop <%s> \n",Local_var);
     setFont(4);
     WriteinKey(result_positionX, result_positionY, 1, Local_var);
     }
@@ -144,11 +144,11 @@ void DrawKey(int KBD_size, int x, int rows_down, int width, String text ){
 void keyboard(int type) {
  static int lasttype;
  int oldsize;
- //Serial.printf(" setup keyboard %i  was%i \n",type,lasttype);
+ //DEBUG_PORT.printf(" setup keyboard %i  was%i \n",type,lasttype);
   if (type == -1){lasttype=6; return;} // silly number to just reset static lasttype variable
   if (lasttype == type) {return;} // redraws only if keys change
   caps=type;
-  Serial.printf("\n*** Start keyboard type %i  last type%i \n",type,lasttype);
+  DEBUG_PORT.printf("\n*** Start keyboard type %i  last type%i \n",type,lasttype);
   lasttype=type;
   ///gfx->setFont(&FreeMonoBold18pt7b);
   setFont(2);
@@ -193,7 +193,7 @@ bool XYinBox(int touchx,int touchy, int h,int v,int width,int height){ //xy posi
 }
 
 bool XYinBox(int x, int y ,int Kx, int Krows_down, int Kwidth){ // use DrawKey type key setting
-//Serial.printf(" Testing accuracy Target is ")
+//DEBUG_PORT.printf(" Testing accuracy Target is ")
 
     int h=Keyboard_X+(Kx*KBD_size);
     int width=Kwidth*KBD_size;
@@ -208,7 +208,7 @@ bool KeyOver(int x, int y, char* Key, int type){ //char array version
 
    if ((y > Keyboard_Y) && (y < (Keyboard_Y+25*KBD_size))) { //a, Keyboard_Y, 20, 25,
     //top row  
-   //Serial.printf(" In TOP ROW  KBD_size;(%i) x%i y%i   looking in space x%i y%i\n",KBD_size,x,y );
+   //DEBUG_PORT.printf(" In TOP ROW  KBD_size;(%i) x%i y%i   looking in space x%i y%i\n",KBD_size,x,y );
    /*  for (int x = 0; x < 10; x++) {
     int a = KBD_size*((x * 4) + (20 * x) + 2) + Keyboard_X;
     gfx->drawRoundRect(a, Keyboard_Y, 20*KBD_size, 25*KBD_size, 3, WHITE);
@@ -224,7 +224,7 @@ bool KeyOver(int x, int y, char* Key, int type){ //char array version
  
   if ((y > (Keyboard_Y + (30*KBD_size))) && (y < (Keyboard_Y + (30*KBD_size)+(25*KBD_size)))) { //Keyboard_Y + (30*KBD_size), 20, 25, 1, WHITE);
     //middle row
-      // Serial.printf(" In MIDDLE ROW   %i %i",x,y);
+      // DEBUG_PORT.printf(" In MIDDLE ROW   %i %i",x,y);
     for (int z = 0; z < 9; z++) {
       int a = KBD_size*((z * 4) + (20 * z) + 13) + Keyboard_X;
       int b = a + (20*KBD_size);
