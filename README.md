@@ -1,16 +1,14 @@
 
 # Marine Multi Display
-This project is a version of the NMEADISPLAY Wireless Instrument Repeater Display for Boats
-It has two versions, one for for the WaveShare Module and one for the GUITRON module used in NMEADISPLAY 
 
-<i>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
+<i><small>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
 The user is responsible for cross-checking data with other sources, exercising judgment, and maintaining situational awareness. 
-No liability for any loss, damage, or injury resulting from the use of this instrument will be accepted. </i>
+No liability for any loss, damage, or injury resulting from the use of this instrument will be accepted. </i></small>
 
-This revised project supports direct NMEA2000 connection and has a completely revised file editor that makes use of the SD card optional.
-(see below))
+This project is a development of the NMEADISPLAY Wireless Instrument Repeater Display for Boats. This revised project supports direct NMEA2000 connection and has a completely revised file editor and uses flash memory for configuration files making the use of the SD card optional.
 
+It has three versions, one for the GUITRON 480x480 module, one for the 480 480 4 inch WaveShare Module and one for the 800x480 '4.3inch box' wide waveshare module.  
 
 ## HOW TO INSTALL FIRST TIME
 First, plug your module into a com port on your PC. Switch the module on (press the PWRKEY) and record which port it is using. If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
@@ -25,22 +23,19 @@ Run the program ..   Make sure you select the correct version for your module an
 It will download the latest binaries to the directory where you saved it and program the hardware. 
 It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat file. 
 
-(*) if you wish to retain your Flash/FFat files, delete the '-e' from the bat file (change 'write_flash -e -z' to 'write_flash -z'    )
 It is possible some PC/ modules/ cables may not program at full speed. If you have trouble programming, try reducing the baud rate from 921600 to 115200. 
-
+If your module becomes corrupted and you cannot connect to USB port, you can usually recver by Pressing Reset, and then hold down BOOT  then release reset with boot still pressed, and release boot. This should allow the USB port to start and make the module receptive to reprogramming.
 
 ##Changed FILE STRUCTURE and editor 
 
 When connected via a PC, upload of new files (or images) is easy. However when connect by phone, you are effectively limited to just editing existing text files.
-ALL configuration files (".txt") for this version of the code ars now contained in three files that are stored in the FFATS flash and are automatically generated on first start. 
+ALL configuration files (".txt") for this version of the code ars now contained in three files that are stored in the (SPIFFS) flash and are automatically generated on first start. 
 There is no need to add a specially configured SD card.
 
 <img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
 WiFi details and source (UDP,ESPnow,Serial,N2K) switching can be set via the touch interface, but more options are available by editing the configuration files via the filemanager, and this is the recommended method for setting the module.
 Most importantly, this allows the user to change what is shown on the "Quad Display" {the default 'page 4' start page}. This configuration is saved in config.txt along with the wifi etc details.
 Data to set up the victron displays is set in vconfig.txt and colortest.text.
-In the MarineMultiDisplay version, these files are now stored in ESP32 Flash and so the SD card is not required. 
-
 
 # MODULE HARDWARE 
 
@@ -57,22 +52,24 @@ Availble from multiple sources (Possibly has part number JC4848W540C_I )
 
 
 
-## FATFS files 
-The root of the FATFS should have (at least) these files:
+## FLASH file Storage 
+The root of the FLASH (SPIFFS) should have (at least) these files:
 config.txt, ( a json file with user settings) and 
 vconfig.txt ( a json with settings for the ble victron mode )
 colortest.txt ( a json with settings that will eventually allow global day/night colours and also has some simulation/debug settings for the BLE part of the display)
   These txt files may (should!) self initiate if not present, but its better to have defaults present! 
 
 Other files may be added :
+(note- I do not recommed using graphics on the Wavshare boards as the colour quality is poor - this may be an issue in the driver ? and the display does not really need Jpegs! )
 logo4.jpg (the new generic start screen image), 
 v3small.jpg (used in the webbrowser start screen).
 and loading.jpg, (a picture that appears during OTA updates). 
 (these can be found on the NMEADISPLAY github, or you can add your own 400*400 JPG files)
 
 ## Connecting to NMEA 2000
-Is done automatically and does not require the module to be wirlessly connected to a multiplexer.
-Wireless communication is necessary to change settings. 
+Is done automatically and does not require the module to be wirelessly connected to a multiplexer.
+Wireless communication is necessary to change settings. I would recommend normally connecting the display to a multiplexer just to allow it to stop searching for the network.
+
 For the Guiton device, add a CAN Driver module such as the TJA1050 and a 3.3V voltage regulator.
 Connect the bottom left connection of the 8 way socket to TJA "TX" and the connection above to TJA "RX".
 Connect the 5v power supply (Bottom Right) to the 3.3v regulator input, and the output of the 3.3V regulator to the VCC connection of the TJA.
@@ -84,8 +81,7 @@ The wavshare module has inbuilt 12V regulator and CAn driver, so connecting this
 
 ## CAUTIONS
 
-I have not managed to get the SD or the Touch screen working reliably on the WAVSHARE device, but it is still able to display data and can be fully configured via the filemanager.
-
+I have got the wavshare wide display and the guitron working, but the 4" with touch is not working yet 
 
 ## Connecting to your Wifi SSID 
 You can connect to the module's access point by connecting and then using a browser to connect to 192.168.4.1 
@@ -136,17 +132,13 @@ The module will start with the "Quad" instrument display. Touching each quadrant
 This is a simplified view of the original mapping.
 ![Screen Navigation](https://github.com/user-attachments/assets/f05d7e21-4c72-45cd-ae81-91a27ed20897)
 
-Here is a short video tour of Version 1 of the software : https://youtube.com/shorts/24qs9CJK5vo?si=zCDUuTbXkYfHtEDB
-(Version 2 and 3 hav better graphics and a modified menu, but are essentailly similar).
-
-From version 4, the what instrurment data will be displayed in each of the 'quadrants' of the 'Quad' display can be selected from variables in the config.txt file. 
+Which instrurment data will be displayed in each of the 'quadrants' of the 'Quad' display can be selected from variables in the config.txt file. 
 
 ### NMEA DATA and UDP
 
-Whilst the main way to send instrument data to the Display is via NMEA(0183) over UDP, the project also accepts 'ESP-NOW' from suitable multiplexers such as VELA-Naviga types: 
+Whilst the main way to send instrument data to the Display was originally via NMEA(0183) over UDP, the project also accepts 'ESP-NOW' from suitable multiplexers such as VELA-Naviga types: 
 https://www.vela-navega.com/index.php/multiplexers
 The module also natively supports NME2000. 
-
 
 
 ### Victron BLE device display
@@ -164,10 +156,9 @@ The graphical format of the display is defined in VICTRONBLE.cpp and (vconfig.tx
 Each device has selected data displayed in a box with selectable position and height (but with fixed fonts and width).
 You will need to obtain the MAC and KEY via the victron app (see the device settings) and your devices must be connectable via the app.  
 
-
 There is a Simulate option, selectable in colortest, this initiates a crude simulation, suitable for assisting in code development.
 This works most logically with my default Vconfig.txt file. 
-I have seen some issues with Simulate crashing the display very badly:(needed reinstall of code). But I think this has been fixed in V4.30 
+I have seen some issues with Simulate crashing the display very badly:(needed reinstall of code). But I think(hope) this has been fixed.
 
 
 

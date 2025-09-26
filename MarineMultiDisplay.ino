@@ -7,9 +7,9 @@
 
 const char soft_version[] = " V0.11";
 
-//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for GUITRON (default or..)
-//#define WAVSHARE     // 4 inch but Touch untested and 
-//#define WIDEBOX    // 4.3inch 800 by 400 diSetup(play 
+//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
+#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+#define WIDEBOX    // 4.3inch 800 by 400 display Setup
 //**********  SET DEFINES
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -1455,7 +1455,7 @@ void Setup_Wire_Expander(int SDA, int SCL, int beepPin) {
   #ifdef WAVSHARE
   expander.portMode(ALLOUTPUT);  //Set the port as all output
   DEBUG_PORT.println("Confirm expander connected via double Beep ");
-  beep(2, beepPin);
+ // beep(2, beepPin);
   #endif
 }
 
@@ -1625,7 +1625,7 @@ bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
                // }
   if (result) {
     DEBUG_PORT.println("Device found: begin");
-    ts.begin(GT911_ADDR1);
+    ts.begin();  // remove address for wavshare? 
     ts.setRotation(ROTATION_INVERTED);
   }
  if (result) {DEBUG_PORT.println("TOUCH setup OK");
