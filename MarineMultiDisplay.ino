@@ -8,8 +8,8 @@
 const char soft_version[] = " V0.12";
 
 //**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
-//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-//#define WIDEBOX    // 4.3inch 800 by 400 display Setup
+#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+#define WIDEBOX    // 4.3inch 800 by 400 display Setup
 //**********  SET DEFINES
 
 bool _WideDisplay;  // so that I can pass this to sub files
