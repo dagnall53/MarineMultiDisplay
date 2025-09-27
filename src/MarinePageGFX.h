@@ -24,16 +24,23 @@ public:
   void drawPixel(int16_t x, int16_t y, uint16_t color);
   void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
   void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
+  void drawTriangleToCanvas(int16_t x0, int16_t y0,
+                          int16_t x1, int16_t y1,
+                          int16_t x2, int16_t y2,
+                          uint16_t color);
+
   void drawText(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color);
   void drawTextAlign(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color, uint8_t align);
   void drawTextCentered(int16_t centerX, int16_t centerY, const char* text, uint8_t size, uint16_t color);
   void drawTextOverlay(const char* label, uint16_t color);
 
   void compositeCanvas(); 
+  void clearCanvas(uint16_t color);  // Public method
+
   void clearOutsideRadius(int16_t centerX, int16_t centerY, int16_t radius, uint16_t color);
 
   // compass
-  void drawCompassPointer(int16_t centerX, int16_t centerY, int16_t radius, int16_t tailLength, float angleDeg, uint16_t color,bool shadow = true);
+  void drawCompassPointer(int16_t centerX, int16_t centerY, int16_t baseWidth, int16_t radius, int16_t tailLength, float angleDeg, uint16_t color,bool shadow = true);
 
   // Rounded rectangle primitives
   void drawRoundRect(int16_t x0, int16_t y0, int16_t w, int16_t h, int16_t radius, uint16_t color);

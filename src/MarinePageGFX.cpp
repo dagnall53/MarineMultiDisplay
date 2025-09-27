@@ -209,6 +209,16 @@ void MarinePageGFX::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uin
     }
   }
 }
+
+void MarinePageGFX::drawTriangleToCanvas(int16_t x0, int16_t y0,
+                                         int16_t x1, int16_t y1,
+                                         int16_t x2, int16_t y2,
+                                         uint16_t color) {
+  if (!_textCanvas || !isReady()) return;
+  _textCanvas->fillTriangle(x0, y0, x1, y1, x2, y2, color);
+}
+
+
 void MarinePageGFX::fillTriangle(int16_t x0, int16_t y0,
                                  int16_t x1, int16_t y1,
                                  int16_t x2, int16_t y2,
@@ -284,6 +294,11 @@ void MarinePageGFX::printf(const char* fmt, ...) {
 uint16_t* MarinePageGFX::getActiveBuffer() {
   return _buffer[_active];
 }
+void MarinePageGFX::clearCanvas(uint16_t color) {
+  if (_textCanvas && isReady()) {
+    _textCanvas->fillScreen(color);
+  }
+}
 
 void MarinePageGFX::drawText(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color) {
   if (!_textCanvas || !isReady()) return;
@@ -305,7 +320,7 @@ void MarinePageGFX::drawText(int16_t x, int16_t y, const char* text, uint8_t siz
   }
 }
 
-void MarinePageGFX::drawCompassPointer(int16_t centerX, int16_t centerY, int16_t radius, int16_t tailLength, float angleDeg, uint16_t color, bool shadow) {
+void MarinePageGFX::drawCompassPointer(int16_t centerX, int16_t centerY,int16_t baseWidth, int16_t radius, int16_t tailLength, float angleDeg, uint16_t color, bool shadow) {
   if (!isReady()) return;
 
   float angleRad = angleDeg * DEG_TO_RAD;
@@ -318,7 +333,7 @@ void MarinePageGFX::drawCompassPointer(int16_t centerX, int16_t centerY, int16_t
   int16_t tailX = centerX - cos(angleRad) * tailLength;
   int16_t tailY = centerY - sin(angleRad) * tailLength;
 
-  int16_t baseWidth = 12;
+  //int16_t baseWidth = 12;
   int16_t baseX1 = centerX + cos(perpRad) * (baseWidth / 2);
   int16_t baseY1 = centerY + sin(perpRad) * (baseWidth / 2);
   int16_t baseX2 = centerX - cos(perpRad) * (baseWidth / 2);
@@ -326,19 +341,19 @@ void MarinePageGFX::drawCompassPointer(int16_t centerX, int16_t centerY, int16_t
 
   if (shadow) {
     int16_t offset = 2;
-    fillTriangle(tipX + offset, tipY + offset,
+    drawTriangleToCanvas(tipX + offset, tipY + offset,
                  baseX1 + offset, baseY1 + offset,
                  baseX2 + offset, baseY2 + offset,
                  NEAR_BLACK);
 
-    fillTriangle(tailX + offset, tailY + offset,
+    drawTriangleToCanvas(tailX + offset, tailY + offset,
                  baseX2 + offset, baseY2 + offset,
                  baseX1 + offset, baseY1 + offset,
                  NEAR_BLACK);
   }
 
-  fillTriangle(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color);
-  fillTriangle(tailX, tailY, baseX2, baseY2, baseX1, baseY1, color);
+  drawTriangleToCanvas(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color);
+  drawTriangleToCanvas(tailX, tailY, baseX2, baseY2, baseX1, baseY1, color);
 }
 void MarinePageGFX::clearOutsideRadius(int16_t centerX, int16_t centerY, int16_t radius, uint16_t color) {
   if (!_textCanvas || !isReady()) return;
@@ -416,16 +431,7 @@ void MarinePageGFX::drawTextCentered(int16_t centerX, int16_t centerY, const cha
   _textCanvas->setCursor(x, y);
   _textCanvas->print(text);
 
-  // Composite canvas into active buffer
-  uint16_t* canvasBuf = (uint16_t*)_textCanvas->getFramebuffer();
-  for (int16_t yy = 0; yy < _height; yy++) {
-    for (int16_t xx = 0; xx < _width; xx++) {
-      uint16_t pixel = canvasBuf[yy * _width + xx];
-      if (pixel != 0) {
-        _buffer[_active][yy * _width + xx] = pixel;
-      }
-    }
-  }
+  // ❌ Removed compositing — let caller decide when to composite
 }
 
 void MarinePageGFX::drawTextOverlay(const char* label, uint16_t color) {
