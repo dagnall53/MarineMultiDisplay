@@ -43,7 +43,7 @@ extern boolean IsConnected;        // may be used in AP_AND_STA to flag connecti
 extern boolean AttemptingConnect;  // to note that WIFI.begin has been started
 extern int NetworksFound;
 
-#include <TAMC_GT911.h>
+#include "src/TAMC_GT911.h"
 extern TAMC_GT911 ts;
 extern bool Touch_available;
 
@@ -364,10 +364,10 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
       if (RunSetup || DataChanged) {
         setFont(3);
         GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
-        // GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
+        //if (hasSD) {GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
         // AddTitleBorderBox(0, Switch6, "B LOG");
         // GFXBorderBoxPrintf(Switch7, Current_Settings.Data_Log_ON On_Off);
-        // AddTitleBorderBox(0, Switch7, "N LOG");
+        // AddTitleBorderBox(0, Switch7, "N LOG");}
         GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON On_Off);
         AddTitleBorderBox(0, Switch8, "UDP");
         GFXBorderBoxPrintf(Switch9, Current_Settings.ESP_NOW_ON On_Off);
@@ -396,15 +396,15 @@ void Display(bool reset, int page) {  // setups for alternate pages to be select
           AddTitleBorderBox(0, Terminal, "-paused-");
         }
       }
-      // if (CheckButton(Switch6)) {
+      // if (CheckButton(Switch6) && hasSD) {
       //   Current_Settings.Log_ON = !Current_Settings.Log_ON;
-      //  // NO LOGGING YET if (Current_Settings.Log_ON) { StartInstlogfile(); }
+      //  // NO LOGGING YET if (Current_Settings.Log_ON) { StartInstlogfile(SD); }
       //   DataChanged = true;
       // };
 
-      // if (CheckButton(Switch7)) {
+      // if (CheckButton(Switch7) && hasSD) {
       //   Current_Settings.Data_Log_ON = !Current_Settings.Data_Log_ON;
-      //  //  NO LOGGING YET if (Current_Settings.Data_Log_ON) { DATA_Log_File_Create(FFat); }
+      //  //  NO LOGGING YET if (Current_Settings.Data_Log_ON) { DATA_Log_File_Create(SD); }
       //   DataChanged = true;
       // };
 

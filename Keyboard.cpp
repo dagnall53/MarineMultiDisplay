@@ -9,7 +9,7 @@
 // modified to use strings (char array) and not Strings.
 #include "FONTS/fonts.h"
 
-#include <TAMC_GT911.h>
+#include "src/TAMC_GT911.h"
 
 char TOP[] = "qQ1wW2eE3rR4tT5yY6uU7iI8oO9pP0";
 char MIDDLE[] = "aA_sS/dD:fF;gG(hH)jJ$kK&lL@";
@@ -35,7 +35,6 @@ extern void SaveConfiguration();
 extern void setFont(int);
 extern int Display_Page;
 
-#include <TAMC_GT911.h>
 extern TAMC_GT911 ts;
 extern bool Touch_available;
 

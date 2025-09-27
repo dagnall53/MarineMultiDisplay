@@ -5,10 +5,10 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.11";
+const char soft_version[] = " V0.12";
 
 //**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
-#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
 //#define WIDEBOX    // 4.3inch 800 by 400 display Setup
 //**********  SET DEFINES
 
@@ -29,7 +29,7 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <SPIFFS.h>
 #include <SD_MMC.h>
 #include <LittleFS.h>
-#include <TAMC_GT911.h>
+#include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
 
 //MAGIC TREK style File viewer see https://github.com/holgerlembke/
 #include <ESPFMfGK.h>  // the thing.
@@ -326,10 +326,10 @@ void setup() {
   gfx->println(soft_version);delay(100);
   //Fatfs_Setup();   // set up FATFS // includes gfx prints
   SPIFFS_Setup(); 
-    delay(100);listDir(SPIFFS,"/",1);  delay(500);
+  //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
   Touch_available = Touchsetup(); // if before ffats? stops ffats reading!
-  delay(100);listDir(SPIFFS,"/",1);  delay(500);
+  //delay(100);listDir(SPIFFS,"/",1);  delay(500);
   if (LoadConfigs(true,true)) {
      gfx->println(F("*** All CONFIGS LOADED ***"));
      DEBUG_PORT.println("All Configs Loaded ");
@@ -372,14 +372,19 @@ void loop() {
     if(Touch_available){ts.read();}
     //~3.2ms
     EXTHeartbeat();//~3.3ms
-    CheckAndUseInputs(); 
+    CheckAndUseInputs(); // for the 'serial' 0183 type inputs 
+    ///  BLEloop DO not try to do N2000 interrupt driven inputs and BLE interrupts at the same time ?
+    if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
+      BLEloop();
+    }
+    else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
 
     Display(Display_Page);
-       
-    if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  // repeat at intervals to connect to station.
+    // repeat at intervals to connect to station.   
+    if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  
       SSIDSearchTimer = millis() + scansearchinterval;   if (millis()<= 30000){SSIDSearchTimer = millis() + 200;}                       // fast scan for first 30 secs
       if (StationsConnectedtomyAP == 0) { 
-       WiFiChannel++;                                         // avoid scanning if we have someone connected to AP as it will/may disconnect!
+       WiFiChannel++;                                           // avoid scanning if we have someone connected to AP as it will/may disconnect!
        ScanAndConnect(Current_Settings.ssid, WiFiChannel,true); // ScanAndConnect will set AttemptingConnect And do a Wifi.begin if the required SSID has appeared
        if (WiFiChannel >= 12) { WiFiChannel = 1; }
       }  
@@ -388,17 +393,25 @@ void loop() {
     // switch off WIFIGFXBox after timed interval
     if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
       WIFIGFXBoxdisplaystarted = false;
-      // - see OTA    WebServerActive = false;
+      // - see OTA    WebServerActive = false; ?
       Display(true, -99);delay(10);
       Display(true, Display_Page);
-      delay(50);  // change page back, having set zero above which alows the graphics to reset up the boxes etc.
+      delay(50);  // change page back, having set display -99  above which alows the graphics to reset up the boxes etc.
     }
 
-    ///  BLEloop DO not try to do N2000 interrupts and BLE interrupts at the same time ?
-    if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
-      BLEloop();
-    }
-    else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
+  // the instrument log saves everything every LogInterval (set in config)  secs, even if data is not available! (NMEA0183DoubleNA)
+  // uses LOCAL Time as this advances if GPS (UTC) is lost (but resets when GPS received again.)
+  if ((Current_Settings.Log_ON) && (millis() >= LogInterval) && hasSD) {
+    LogInterval = millis() + (Current_Settings.log_interval_setting * 1000);
+    INSTLOG(SD, "%02i:%02i:%02i ,%4.2f STW ,%4.2f head-mag, %4.2f SOG ,%4.2f COG ,%4.2f DPT, %4.2f WS,%3.1f WA \r\n",
+            int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60, (int(BoatData.LOCTime) % 3600) % 60,
+            ValidData(BoatData.STW), ValidData(BoatData.MagHeading), ValidData(BoatData.SOG), ValidData(BoatData.COG),
+            ValidData(BoatData.WaterDepth), ValidData(BoatData.WindSpeedK), ValidData(BoatData.WindAngleApp));
+  }
+
+
+
+
   }
 }
 
@@ -772,14 +785,14 @@ bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   // Openfile for reading  //Active filesystems are: 0: SD-Card 1: Flash/FFat .
   bool fault = false;
   if (&fs == &SD) { SD_CS(LOW); }
-   DEBUG_PORT.printf("Free heap before open: %d\n", ESP.getFreeHeap());
-   DEBUG_PORT.printf("Internal heap: %d\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-   DEBUG_PORT.printf("PSRAM heap: %d\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+  //  DEBUG_PORT.printf("Sorting why it crashes! Free heap before open: %d\n", ESP.getFreeHeap());
+  //  DEBUG_PORT.printf("Internal heap: %d\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+  //  DEBUG_PORT.printf("PSRAM heap: %d\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
-  DEBUG_PORT.println(filename); // Confirm it's correct
-  DEBUG_PORT.println(fs.exists(filename) ? "Exists" : "Missing");
-  File test = fs.open("/test.txt", FILE_READ);
-  DEBUG_PORT.println(" TEST file loads");delay(100);
+  // DEBUG_PORT.println(filename); // Confirm it's correct
+  // DEBUG_PORT.println(fs.exists(filename) ? "Exists" : "Missing");
+  // File test = fs.open("/test.txt", FILE_READ);
+  // DEBUG_PORT.println(" TEST file loads");delay(100);
   File file = fs.open(filename, FILE_READ);
 
   if (!file) {
@@ -1655,17 +1668,17 @@ void UseNMEA(char* buf, int type) {
     // type 4 is Victron data
     /*TIME: %02i:%02i:%02i",
                       int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60,*/
-    if (Current_Settings.Data_Log_ON) {
+    if (Current_Settings.Data_Log_ON && hasSD) { // DATA LOG SAVES EVERY INCOMING DATA MESSAGE 
       if (BoatData.GPSTime != NMEA0183DoubleNA) {
-        if (type == 1) { DATA_Log(FFat," %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-        if (type == 2) { DATA_Log(FFat," %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-        if (type == 3) { DATA_Log(FFat," %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
-        if (type == 4) { DATA_Log(FFat,"\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
+        if (type == 1) { DATA_Log(SD," %02i:%02i:%02i UTC: SER:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 2) { DATA_Log(SD," %02i:%02i:%02i UTC: UDP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 3) { DATA_Log(SD," %02i:%02i:%02i UTC: ESP:%s", int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60, buf); }
+        if (type == 4) { DATA_Log(SD,"\n%.3f BLE: Victron:%s", float(millis()) / 1000, buf); }
       } else {
-        if (type == 1) { DATA_Log(FFat,"%.3f SER:%s", float(millis()) / 1000, buf); }
-        if (type == 2) { DATA_Log(FFat,"%.3f UDP:%s", float(millis()) / 1000, buf); }
-        if (type == 3) { DATA_Log(FFat,"%.3f ESP:%s", float(millis()) / 1000, buf); }
-        if (type == 4) { DATA_Log(FFat,"\n %.3f VIC:%s", float(millis()) / 1000, buf); }
+        if (type == 1) { DATA_Log(SD,"%.3f SER:%s", float(millis()) / 1000, buf); }
+        if (type == 2) { DATA_Log(SD,"%.3f UDP:%s", float(millis()) / 1000, buf); }
+        if (type == 3) { DATA_Log(SD,"%.3f ESP:%s", float(millis()) / 1000, buf); }
+        if (type == 4) { DATA_Log(SD,"\n %.3f VIC:%s", float(millis()) / 1000, buf); }
       }
     }
     // 8 is snasBold8pt small font and seems to wrap to give a space before the second line

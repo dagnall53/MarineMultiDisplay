@@ -85,7 +85,7 @@ to get Serial.print working
 
 
 #define TOUCH_INT 4          
-#define TOUCH_RST -1          // EX101 will reset it at the start ?
+#define TOUCH_RST  254 // -1 not acepted by TAMC GT911 as it is a UINT_8t variable. I modified to detect 254 as "not present"          //-1-1          // EX101 will reset it at the start ?
 #define TOUCH_SDA  8
 #define TOUCH_SCL  9
 

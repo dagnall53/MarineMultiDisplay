@@ -127,6 +127,13 @@ double NMEA0183GetDouble(const char *data) {
   return val;
 }
 */
+
+double ValidData(_sInstData variable) {  // To avoid showing NMEA0183DoubleNA value in displays etc replace with zero.
+  double res = 0;
+  if (variable.greyed) { return 0; }
+  if (variable.data != NMEA0183DoubleNA) { res = variable.data; }
+  return res;
+}
 //revised 18/03 all NULL data should be set "grey"
 void toNewStruct(char *field, _sInstData &data) {
   data.greyed = true;

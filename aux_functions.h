@@ -61,6 +61,8 @@ int HexStringToBytes(const char *hexStr,
                      unsigned char *output,
                      unsigned int *outputLen);
 
+double ValidData(_sInstData variable);  // To avoid showing NMEA0183DoubleNA value in displays etc replace with zero.
+  
 // other stuff placed here now 
 
 #endif

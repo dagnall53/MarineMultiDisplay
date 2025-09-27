@@ -492,6 +492,9 @@ void SetupWebstuff() {
   DEBUG_PORT.println("HTTP server started");
 }
 
+
+
+//dataLog saves every incoming message with a time stamp - for debugging 
 void DATA_Log_File_Create(fs::FS &fs) {
   // If the data.txt file doesn't exist
   // Create a (FIXED NAME!) file on the SD card and write the data labels
@@ -510,8 +513,8 @@ void DATA_Log_File_Create(fs::FS &fs) {
   }
   file.close();
 }
-
 void DATA_Log(fs::FS &fs, const char *fmt, ...) {
+  if (!hasSD){return;}
   if (!DATA_Log_FILE_Started) {
     DATA_Log_File_Create(fs);
     return;
@@ -528,7 +531,10 @@ void DATA_Log(fs::FS &fs, const char *fmt, ...) {
   appendFile(fs, DATALOGFileName, msg);
 }
 
+
+//regular save of boat position etc, 
 void StartInstlogfile(fs::FS &fs) {
+  if (!hasSD){return;}
   INSTlogFileStarted = false;
   // If the data.txt file doesn't exist
   // Create a file on the SD card and write the data labels
@@ -557,6 +563,7 @@ void StartInstlogfile(fs::FS &fs) {
   file.close();
 }
 void INSTLOG(fs::FS &fs, const char *fmt, ...) {  // CAN ONLY Write a Inst LOG file if we have GPS data for the date
+   if (!hasSD){return;}
   if (!INSTlogFileStarted) {
     StartInstlogfile(fs);
     return;

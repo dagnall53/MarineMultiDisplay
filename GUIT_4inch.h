@@ -84,7 +84,7 @@ using //(deleted), 00 60 Good results == type9 default
 #define I2S_BCLK      1       //1
 #define I2S_LRCK      2       //2  
 
-#define TOUCH_INT -1          //-1
+#define TOUCH_INT 254 // -1 not acepted by TAMC GT911 as it is a UINT_8t variable. I modified to detect 254 as "not present"          //-1
 #define TOUCH_RST 38          // important not -1
 #define TOUCH_SDA  19
 #define TOUCH_SCL  45
