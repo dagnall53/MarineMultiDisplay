@@ -79,9 +79,43 @@ struct _sBoatData {
   bool MOBActivated;
 
 };
+struct GraphBuffer {
+  double values[200];
+  uint16_t count = 0;
+  uint16_t head = 0;
 
-//BUTTON(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor; 
-struct _sButton { 
+  void push(double val) {
+    values[head] = val;
+    head = (head + 1) % 200;
+    if (count < 200) count++;
+  }
+  void reset() {
+  count = 0;
+  head = 0;
+  for (uint16_t i = 0; i < 200; i++) {
+    values[i] = 0.0;
+  }
+ } 
+  double get(uint16_t i) const {
+    return values[(head + i) % 200];
+  }
+void fill(double val) {
+  for (uint16_t i = 0; i < 200; i++) {
+    values[i] = val;
+  }
+  count = 200;
+  head = 0;
+}
+
+
+
+};
+
+
+
+
+//_sButton(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor; 
+struct _sButton { //_sButton(h,v,width,height,bordersize, backC,textC,borderC,Font ; 
   int h, v, width, height, bordersize;
   uint16_t BackColor, TextColor, BorderColor;
   int Font;                  //-1 == not forced (not used?)

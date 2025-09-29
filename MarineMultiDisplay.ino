@@ -5,12 +5,13 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.12";
+const char soft_version[] = " V0.20";
 
-//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
+//**********  SET DEFINES ************************************************
+//Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
 //#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
 //#define WIDEBOX    // 4.3inch 800 by 400 display Setup
-//**********  SET DEFINES
+//**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
 
@@ -31,8 +32,20 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <LittleFS.h>
 #include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
 
- #include "CanvasBridge.h" 
- #include "src/MarinePageGFX.h"  // Double-buffered graphics will to change most gfx-> to new page-> constructs 
+
+
+//********* stuff t add my library for paged displays *****************
+#include "CanvasBridge.h"
+#include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "FontType.h" // has include for all fonts and new FontID enum 
+#include "Structures.h"
+// allocate the (huge? buffers for the two pages)
+MarinePageGFX* page = nullptr;
+#define NEAR_BLACK 0x0001  // One bit on from BLACK - avoids the (useful) issue that BLACK can be seen as Transparent.
+GraphBuffer headingDeltaBuffer;  // or voltageBuffer, tempBuffer, etc. 200 deep buffer of double valuesfor graphing
+
+
+
 
 
 //MAGIC TREK style File viewer see https://github.com/holgerlembke/
@@ -307,6 +320,33 @@ bool LoadConfigs(bool print,bool displ){
 return FilesOK;
 }
 
+bool NewPagesetupstuff(){
+ bool sucess = true;
+  headingDeltaBuffer.fill(0.0); 
+  DEBUG_PORT.printf("Free PSRAM after gfx->begin(): %d bytes\n", ESP.getFreePsram());
+  page = new MarinePageGFX(gfx, 480, 480);  // Allocate after display init
+  page->begin();                            // begin the processes.. 
+  page->fillScreen(NEAR_BLACK);  
+/*  FOF dislay using Page ..   will need this in loop eg..
+  page->swap();
+  page->fillScreen(BLACK); // BLACK is transparent!! Leaves previously printed stuff behind but makes for a clean start
+  .... other stuff
+  page->DrawCompass(bottomLeftquarter);
+  ... stuff
+  page->compositeCanvas(); (assembles all the page stuff )
+  page->push(); // actually instantly shows it on screen 
+*/
+    if (!page->isReady()) {
+    DEBUG_PORT.println("ERROR: Page buffers not initialized.");
+    gfx->print("PAGE Buffer init failed!");
+    sucess = false;
+    }
+   Serial0.println("MarinePageGFX initialized successfully.");
+  return sucess;
+}
+
+
+
 
 void setup() {
   DEBUG_PORT.begin(115200);
@@ -328,6 +368,9 @@ void setup() {
   DEBUG_PORT.println(F(" Printing to screen  "));
   gfx->print(_device);
   gfx->println(soft_version);delay(100);
+  if (NewPagesetupstuff()) {gfx->println(F("*** Paging display Setup ***"));
+     DEBUG_PORT.println("Paging display Setup");}
+
   //Fatfs_Setup();   // set up FATFS // includes gfx prints
   SPIFFS_Setup(); 
   //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
@@ -382,8 +425,12 @@ void loop() {
       BLEloop();
     }
     else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
-
+  page->swap();
+  page->fillScreen(BLACK);
     Display(Display_Page);
+  page->compositeCanvas();
+  page->push();
+
     // repeat at intervals to connect to station.   
     if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  
       SSIDSearchTimer = millis() + scansearchinterval;   if (millis()<= 30000){SSIDSearchTimer = millis() + 200;}                       // fast scan for first 30 secs

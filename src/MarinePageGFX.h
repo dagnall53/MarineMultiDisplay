@@ -2,6 +2,9 @@
 #include <Arduino_GFX_Library.h>
 #include <gfxfont.h>  // Required for GFXfont support
 #include "..\CanvasBridge.h"
+#include "..\Structures.h"
+#include "..\FontType.h"
+
 #define NEAR_BLACK 0x0001  // One bit on
 
 
@@ -14,15 +17,29 @@ public:
   void swap();     // Switch active buffer
   void push();     // Push active buffer to screen
   bool isReady();  // Check if buffers are initialized
+  
+  
+  void DrawCompass(_sButton& button);
+  
+  void DrawScrollingGraph(_sButton& button, const GraphBuffer& buffer, double minVal, double maxVal);
+  void Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...);
+  void BorderPrintCanvasTwoSize(_sButton& button, int decimalInset, const char* fmt, ...);
+  void GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...);
+  void setFontByIndex(int index);
+  int getFontLineHeight(FontID id);
 
   // Drawing primitives
 
   void fillScreen(uint16_t color);
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
   void fillCircle(int16_t x, int16_t y, int16_t r, uint16_t color);
+  void fillCircleToCanvas(int16_t x0, int16_t y0, int16_t r, uint16_t color);
   void fillArc(int16_t x, int16_t y, int16_t r, int16_t start_angle, int16_t end_angle, uint16_t color);
   void drawPixel(int16_t x, int16_t y, uint16_t color);
-  void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+  
+  void drawLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+  void drawWideLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color,int width);
+  
   void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
   void drawTriangleToCanvas(int16_t x0, int16_t y0,
                           int16_t x1, int16_t y1,
@@ -38,9 +55,10 @@ public:
   void clearCanvas(uint16_t color);  // Public method
 
   void clearOutsideRadius(int16_t centerX, int16_t centerY, int16_t radius, uint16_t color);
+  void clearOutsideRadius(_sButton& button, uint16_t color);
 
   // compass
-  void drawCompassPointer(int16_t centerX, int16_t centerY, int16_t baseWidth, int16_t radius, int16_t tailLength, float angleDeg, uint16_t color,bool shadow = true);
+  void drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, float angleDeg, uint16_t color, bool shadow);
 
   // Rounded rectangle primitives
   void drawRoundRect(int16_t x0, int16_t y0, int16_t w, int16_t h, int16_t radius, uint16_t color);

@@ -3,6 +3,7 @@
 #include "Structures.h"
 #include <Arduino_GFX_Library.h> // defines colours BLUE etc
 #include "debug_port.h"
+#include "FontType.h"
 
 extern int MasterFont;  //global for font! Idea is to use to reset font after 'temporary' seletion of another
 extern String Fontname;
@@ -11,14 +12,7 @@ extern int text_offset ;      //offset is not equal to height, as subscripts pri
 extern int text_char_width;
 extern int Display_Page;
 
-#include "FONTS/fonts.h"               // Now do not have to use reserved directory name src/ for arduino?
-#include "FONTS/FreeSansBold6pt7b.h"   //font 7  9 high
-#include "FONTS/FreeSansBold8pt7b.h"   //font 8  11 high
-#include "FONTS/FreeSansBold12pt7b.h"  //font 9  18 pixels high
-#include "FONTS/FreeSansBold18pt7b.h"  //font 10 27 pixels
-#include "FONTS/FreeSansBold27pt7b.h"  //font 11 39 pixels
-#include "FONTS/FreeSansBold40pt7b.h"  //font 12 59 pixels
-#include "FONTS/FreeSansBold60pt7b.h"  //font 13 88 pixels
+
 
 void Display(int page);
 void Display(bool reset, int page) ;
