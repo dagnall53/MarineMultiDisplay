@@ -35,12 +35,13 @@ bool _WideDisplay;  // so that I can pass this to sub files
 
 
 //********* stuff t add my library for paged displays *****************
-#include "CanvasBridge.h"
+
 #include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "CanvasBridge.h"       // must be after MARINEPAGEGFX    
 #include "FontType.h" // has include for all fonts and new FontID enum 
 #include "Structures.h"
 // allocate the (huge? buffers for the two pages)
-MarinePageGFX* page = nullptr;
+extern MarinePageGFX* page;  //overcome ARDUINO QUIRK 
 #define NEAR_BLACK 0x0001  // One bit on from BLACK - avoids the (useful) issue that BLACK can be seen as Transparent.
 GraphBuffer headingDeltaBuffer;  // or voltageBuffer, tempBuffer, etc. 200 deep buffer of double valuesfor graphing
 
@@ -193,13 +194,13 @@ _sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, BLACK };
 _sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, BLACK };
 _sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, BLACK };
 // for the quarter screens on the main page
-_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };  //h  reduced by 15 to give 30 space at the bottom
-_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
+_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };  //h  reduced by 15 to give 30 space at the bottom
+_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };
+_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };
+_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };
 // for wide display //        int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
-_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, BLACK };
-_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, BLACK }; 
+_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, BLACK,12 };
+_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, BLACK,9 }; 
 
 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
@@ -427,6 +428,7 @@ void loop() {
     else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
   page->swap();
   page->fillScreen(BLACK);
+
     Display(Display_Page);
   page->compositeCanvas();
   page->push();
@@ -441,14 +443,14 @@ void loop() {
       }  
     }
        
-    // switch off WIFIGFXBox after timed interval
-    if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
-      WIFIGFXBoxdisplaystarted = false;
-      // - see OTA    WebServerActive = false; ?
-      Display(true, -99);delay(10);
-      Display(true, Display_Page);
-      delay(50);  // change page back, having set display -99  above which alows the graphics to reset up the boxes etc.
-    }
+    // // switch off WIFIGFXBox after timed interval
+    // if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
+    //   WIFIGFXBoxdisplaystarted = false;
+    //   // - see OTA    WebServerActive = false; ?
+    //   Display(true, -99);delay(10);
+    //   Display(true, Display_Page);
+    //   delay(50);  // change page back, having set display -99  above which alows the graphics to reset up the boxes etc.
+    // }
 
   // the instrument log saves everything every LogInterval (set in config)  secs, even if data is not available! (NMEA0183DoubleNA)
   // uses LOCAL Time as this advances if GPS (UTC) is lost (but resets when GPS received again.)
@@ -491,7 +493,7 @@ void Init_GFX() {
   gfx->fillScreen(BLUE);
   gfx->setTextBound(0, 0, TOUCH_WIDTH, 480);
   gfx->setTextColor(WHITE);
-  setFont(4);
+  gfx->setFont(&FreeMonoBold12pt7b);
   gfx->setCursor(0, 20);
   gfx->println(F("*********************"));
   gfx->println(F("***Display Started***"));
@@ -1114,65 +1116,65 @@ char* LongtoString(double data) {
 
 
 // Draw the compass pointer at an angle in degrees
-void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
-  // DEBUG_PORT.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
-  bool recent = (Wind.updated >= millis() - 3000);
-  if (!Wind.graphed) {  //EventTiming("START");
-    WindArrowSub(button, Speed, Wind);
-    // EventTiming("STOP");EventTiming("WIND arrow");
-  }
-  if (Wind.greyed) { return; }
+// void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
+//   // DEBUG_PORT.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
+//   bool recent = (Wind.updated >= millis() - 3000);
+//   if (!Wind.graphed) {  //EventTiming("START");
+//     WindArrowSub(button, Speed, Wind);
+//     // EventTiming("STOP");EventTiming("WIND arrow");
+//   }
+//   if (Wind.greyed) { return; }
 
-  if (!recent && !Wind.greyed) { WindArrowSub(button, Speed, Wind); }
-}
+//   if (!recent && !Wind.greyed) { WindArrowSub(button, Speed, Wind); }
+// }
 
-void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
-  //DEBUG_PORT.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
-  bool recent = (wind.updated >= millis() - 3000);
-  Phv center;
-  int rad, outer, inner;
-  static int lastfont;
-  static double lastwind;
-  center.h = button.h + button.width / 2;
-  center.v = button.v + button.height / 2;
-  rad = (button.height - (2 * button.bordersize)) / 2;  // height used as more likely to be squashed in height
-  outer = (rad * 82) / 100;                             //% of full radius (at full height) (COMPASS has .83 as inner circle)
-  inner = (rad * 28) / 100;                             //25% USe same settings as pointer
-  DrawMeterPointer(center, lastwind, inner, outer, 2, button.BackColor, button.BackColor);
-  if (wind.data != NMEA0183DoubleNA) {
-    if (wind.updated >= millis() - 3000) {
-      DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, BLACK);
-    } else {
-      wind.greyed = true;
-      DrawMeterPointer(center, wind.data, inner, outer, 2, LIGHTGREY, LIGHTGREY);
-    }
-  }
-  lastwind = wind.data;
-  wind.graphed = true;
-  lastfont = MasterFont;
-  if (Speed.data != NMEA0183DoubleNA) {
-    if (rad <= 130) {
-      UpdateDataTwoSize(1,true, true, 8, 7, button, Speed, "%2.0fkt");
-    } else {
-      UpdateDataTwoSize(1,true, true, 10, 9, button, Speed, "%2.0fkt");
-    }
-  }
+// void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
+//   //DEBUG_PORT.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
+//   bool recent = (wind.updated >= millis() - 3000);
+//   Phv center;
+//   int rad, outer, inner;
+//   static int lastfont;
+//   static double lastwind;
+//   center.h = button.h + button.width / 2;
+//   center.v = button.v + button.height / 2;
+//   rad = (button.height - (2 * button.bordersize)) / 2;  // height used as more likely to be squashed in height
+//   outer = (rad * 82) / 100;                             //% of full radius (at full height) (COMPASS has .83 as inner circle)
+//   inner = (rad * 28) / 100;                             //25% USe same settings as pointer
+//   DrawMeterPointer(center, lastwind, inner, outer, 2, button.BackColor, button.BackColor);
+//   if (wind.data != NMEA0183DoubleNA) {
+//     if (wind.updated >= millis() - 3000) {
+//       DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, BLACK);
+//     } else {
+//       wind.greyed = true;
+//       DrawMeterPointer(center, wind.data, inner, outer, 2, LIGHTGREY, LIGHTGREY);
+//     }
+//   }
+//   lastwind = wind.data;
+//   wind.graphed = true;
+//   lastfont = MasterFont;
+//   if (Speed.data != NMEA0183DoubleNA) {
+//     if (rad <= 130) {
+//       UpdateDataTwoSize(1,true, true, 8, 7, button, Speed, "%2.0fkt");
+//     } else {
+//       UpdateDataTwoSize(1,true, true, 10, 9, button, Speed, "%2.0fkt");
+//     }
+//   }
 
-  setFont(lastfont);
-}
+//   setFont(lastfont);
+// }
 
-void DrawMeterPointer(Phv center, double wind, int inner, int outer, int linewidth, uint16_t FILLCOLOUR, uint16_t LINECOLOUR) {  // WIP
-  Phv P1, P2, P3, P4, P5, P6;
-  P1 = translate(center, wind - linewidth, outer);
-  P2 = translate(center, wind + linewidth, outer);
-  P3 = translate(center, wind - (4 * linewidth), inner);
-  P4 = translate(center, wind + (4 * linewidth), inner);
-  P5 = translate(center, wind, inner);
-  P6 = translate(center, wind, outer);
-  PTriangleFill(P1, P2, P3, FILLCOLOUR);
-  PTriangleFill(P2, P3, P4, FILLCOLOUR);
-  Pdrawline(P5, P6, LINECOLOUR);
-}
+// void DrawMeterPointer(Phv center, double wind, int inner, int outer, int linewidth, uint16_t FILLCOLOUR, uint16_t LINECOLOUR) {  // WIP
+//   Phv P1, P2, P3, P4, P5, P6;
+//   P1 = translate(center, wind - linewidth, outer);
+//   P2 = translate(center, wind + linewidth, outer);
+//   P3 = translate(center, wind - (4 * linewidth), inner);
+//   P4 = translate(center, wind + (4 * linewidth), inner);
+//   P5 = translate(center, wind, inner);
+//   P6 = translate(center, wind, outer);
+//   PTriangleFill(P1, P2, P3, FILLCOLOUR);
+//   PTriangleFill(P2, P3, P4, FILLCOLOUR);
+//   Pdrawline(P5, P6, LINECOLOUR);
+// }
 
 Phv translate(Phv center, double angle, int rad) {  // 'full version with full accuracy cos and sin
   Phv moved;
@@ -1299,7 +1301,7 @@ void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //qui
   static char* token;
   const char delimiter[2] = "\n";  //  NB when i used  "static const char delimiter = '\n';"  I got big problems ..
   char* pch;
-  GFXBorderBoxPrintf(button, "");  // clear the button
+  page->GFXBorderBoxPrintf(button, "");  // clear the button
   pch = strtok(msg, delimiter);    // split (tokenise)  msg at the delimiter
   // print each separated line centered... starting from line 1
   button.PrintLine = 1;

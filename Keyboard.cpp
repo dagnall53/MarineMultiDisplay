@@ -113,7 +113,7 @@ void Use_Keyboard(char* DATA, int sizeof_data) {
       SaveConfiguration();
       Keyboardinuse=false;
       setFont(0);
-      Display_Page=-1; //Always return to settings, page -1
+      Display_Page=-1; //Always return to settings, pageIndex -1
     }
     if (!Command_Key) {  //DEBUG_PORT.printf(" adding %s on end of variable<%s>\n",KEY,Local_var);
       strcat(Local_var, KEY);

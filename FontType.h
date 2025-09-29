@@ -10,6 +10,14 @@
 #include "FONTS/FreeSansBold40pt7b.h"  //font 12 59 pixels
 #include "FONTS/FreeSansBold60pt7b.h"  //font 13 88 pixels
 
+struct GlyphMetrics {  //not used yet! 
+    int16_t offsetX;    // Horizontal offset from cursor to glyph origin
+    int16_t offsetY;    // Vertical offset from baseline to glyph origin
+    uint16_t width;     // Glyph bitmap width
+    uint16_t height;    // Glyph bitmap height
+    int16_t advanceX;   // Cursor advance after rendering this glyph
+    bool valid;         // True if glyph exists in font
+};
 enum FontID {
   FONT_MONO_8,
   FONT_MONO_12,

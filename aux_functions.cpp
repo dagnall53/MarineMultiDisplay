@@ -10,6 +10,11 @@ but highly modified!
 #include <NMEA0183Msg.h>
 #include <NMEA0183Messages.h>
 #include "debug_port.h"
+#include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "CanvasBridge.h"
+#include "FontType.h"
+#include "Structures.h"
+extern MarinePageGFX* page;
 
 extern int text_offset;
 extern int MasterFont;
@@ -292,38 +297,38 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
   int local;
   local = MasterFont;
   // can now change font inside this function
-  setFont(font);
+  page->setFontByIndex(font);
   typingspaceH = button.height - (2 * button.bordersize);
   typingspaceW = button.width - (2 * button.bordersize);
   LinesOfType = typingspaceH / (text_height + 2);  //assumes textsize 1
                                                    // is this taken into acount in TBh1?? drops a line if it thinks it would print outside box?
   if (horizCenter || vertCenter) {
-    gfx->setTextWrap(false);
+    page->setTextWrap(false);
   } else {
-    gfx->setTextWrap(true);
+    page->setTextWrap(true);
   }
   // get bounds as would be printed at top of box..
   // set text bounds first so that can be taken into account ! Use same zero starts as in Sub_for_UpdateTwoSize
-  gfx->setTextBound(0, 0, Screen_Width, 480);                 // so that TBx1 can be simply obtained and used in better h centering
-  gfx->getTextBounds(msg, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // do not forget '&' using pointers not values!!!
+  page->setTextBound(0, 0, Screen_Width, 480);                 // so that TBx1 can be simply obtained and used in better h centering
+  page->getTextBounds(msg, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // do not forget '&' using pointers not values!!!
 
-  // gfx->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);                               //
-  // gfx->getTextBounds(msg, button.h + button.bordersize+1, button.v + button.bordersize+1, &TBx1, &TBy1, &TBw1, &TBh1);  // do not forget '&' using pointers not values!!!
+  // page->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);                               //
+  // page->getTextBounds(msg, button.h + button.bordersize+1, button.v + button.bordersize+1, &TBx1, &TBy1, &TBw1, &TBh1);  // do not forget '&' using pointers not values!!!
   // FOR debugging line wrapping: use serial input (shows as RED! ) e.g. from Arduino serial monitor
   int LinesPrinted;
   LinesPrinted = int(0.5 + TBh1 / text_offset);
-  gfx->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);  //
-  //test gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH,RED);
+  page->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);  //
+  //test page->fillRect(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH,RED);
 
   y = button.v + text_offset;
   x = button.h + button.bordersize;
   if (horizCenter) { x = x + ((typingspaceW - (TBw1)) / 2) - TBx1; }                                   // subtract any start text offset
   y = TopLeftYforthisLine(button, button.PrintLine) + text_offset + 1;                                 // // puts y cursor on a specific line
   if (vertCenter) { y = text_offset + button.bordersize + button.v + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
-  //gfx->fillRect(x,y-text_offset,TBw1,TBh1, button.BackColor); // Background exactly the text - needed for STATUS to make flash work in status!
-  gfx->setCursor(x, y);
-  gfx->setTextColor(color, button.BackColor);  // Background colour the text
-  gfx->print(msg);
+  //page->fillRect(x,y-text_offset,TBw1,TBh1, button.BackColor); // Background exactly the text - needed for STATUS to make flash work in status!
+  page->setCursor(x, y);
+  page->setTextColor(color, button.BackColor);  // Background colour the text
+  page->print(msg);
   button.PrintLine = button.PrintLine + LinesPrinted;
   //NOTE TEXT WRAP uses the last variable in the GFXFont setting, which should be roughly twice the character height.
   //But often seems to be set larger,
@@ -332,15 +337,15 @@ void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int
     button.screenfull = true;
     if (!button.debugpause) {
       button.PrintLine = 0;
-      gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH, button.BackColor);
+      page->fillRect(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH, button.BackColor);
       button.screenfull = false;
     }
   }
 
   //  button.PrintLine = button.PrintLine + 1;  //  FOR NEXT LINE (TBh / (text_height + 2)) + 1;
-  gfx->setTextBound(0, 0, Screen_Width, 480);  //MUST RESET IT ?
-  //gfx->setTextWrap(true);
-  setFont(local);
+  page->setTextBound(0, 0, Screen_Width, 480);  //MUST RESET IT ?
+  //page->setTextWrap(true);
+  page->setFontByIndex(local);
 }
 
 void UpdateLinef(uint16_t color, int font, _sButton &button, const char *fmt, ...) {  // Types sequential lines in the button space '&' for button to store printline?
@@ -379,11 +384,11 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   typingspaceH = button.height - 2;                           // (2 * button.bordersize);
   typingspaceW = button.width - 2 - (2 * button.bordersize);  // small one pixel inset either side
   if (horizCenter) {
-    gfx->setTextWrap(false);
+    page->setTextWrap(false);
   } else {
-    gfx->setTextWrap(true);
+    page->setTextWrap(true);
   }
-  gfx->setTextSize(magnify);  //is now set in used in message buildup
+  page->setTextSize(magnify);  //is now set in used in message buildup
   va_list args;               // extract the fmt..
   va_start(args, fmt);
   vsnprintf(msg, 300, fmt, args);
@@ -407,13 +412,13 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   setFont(bigfont);                                                               // here so the text_offset is correct for bigger font
   x = button.h + button.bordersize + 1;                                           //starting point left..
   y = button.v + button.bordersize + (magnify * text_offset) + button.PrintLine;  // Printline here will be GFX pixels down inside.. not LINES starting bpoint 'down' allow for magnify !! bigger font for front half and use printline to set start
-  //gfx->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  gfx->setTextBound(0, 0, Screen_Width, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
+  //page->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
+  page->setTextBound(0, 0, Screen_Width, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
 
-  gfx->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);                       // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
+  page->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);                       // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
   button.PrintLine = button.PrintLine + (magnify * text_offset) + button.bordersize;  // do here before text offset gets set for smaller font!
   setFont(smallfont);
-  gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
+  page->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
                                                                   // if (typingspaceW >=300){
                                                                   //   DEBUG_PORT.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
                                                                   //   }
@@ -422,23 +427,23 @@ void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigf
   if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }  //offset to horizontal center
                                                                                                  // if (vertCenter) { y = button.v + button.bordersize + (magnify * text_offset) + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
   if (erase) {
-    gfx->setTextColor(button.BackColor);
+    page->setTextColor(button.BackColor);
   } else {
-    gfx->setTextColor(button.TextColor);
+    page->setTextColor(button.TextColor);
   }
-  gfx->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);
+  page->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);
   x = x - TBx1;  // NOTE TBx1 is normally zero for most fonts, but some print with offsets that will be corrected by TBx1.
-  gfx->setCursor(x, y);
-  gfx->print(digits);
-  x = gfx->getCursorX();
+  page->setCursor(x, y);
+  page->print(digits);
+  x = page->getCursorX();
   if (TBw2 != 0) {
     setFont(smallfont);
-    gfx->setCursor((x - TBx2), y);  // Set decimals start position based on where Digits ended and allow for any font start offset TBx2
-    gfx->print(decimal);
+    page->setCursor((x - TBx2), y);  // Set decimals start position based on where Digits ended and allow for any font start offset TBx2
+    page->print(decimal);
   }
-  gfx->setTextColor(button.TextColor);
-  gfx->setTextBound(0, 0, Screen_Width, 480);  //MUST reset it for other functions that do not set it themselves!
-  gfx->setTextSize(1);
+  page->setTextColor(button.TextColor);
+  page->setTextBound(0, 0, Screen_Width, 480);  //MUST reset it for other functions that do not set it themselves!
+  page->setTextSize(1);
 }
 void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool erase, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
   static char msg[300] = { '\0' };
@@ -452,7 +457,7 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   bool recent = (data.updated >= millis() - 6000);
 
   if (erase && (data.lastx >= 2) && (data.lasty >= 2) && (data.lasth >= 10) && (data.lastw >= 10)) {  // make sure the last were set! dont print blue box in top left!!
-    //gfx->fillRect(data.lastx-5, data.lasty-data.lasth, data.lastw+25, data.lasth+20, button.BackColor);
+    //page->fillRect(data.lastx-5, data.lasty-data.lasth, data.lastw+25, data.lasth+20, button.BackColor);
     x = data.lastx - 5;
     y = data.lasty - data.lasth;
     w = data.lastw + 30;
@@ -467,7 +472,7 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
       h = button.height - (2 * button.bordersize);
       y = button.v + button.bordersize;
     }  // do not overflow!
-    gfx->fillRect(x, y, w, h, c);
+    page->fillRect(x, y, w, h, c);
     return;
   }
 
@@ -477,9 +482,9 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   typingspaceH = button.height - (2 * button.bordersize) - 2;
   typingspaceW = button.width - (2 * button.bordersize) - 2;  // small one pixel inset
   if (horizCenter || vertCenter) {
-    gfx->setTextWrap(false);
+    page->setTextWrap(false);
   } else {
-    gfx->setTextWrap(true);
+    page->setTextWrap(true);
   }
   // SetTextsize (magnify) is now set in used in message buildup
   va_list args;  // extract the fmt..
@@ -505,12 +510,12 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   setFont(bigfont);                                                // here so the text_offset is correct for bigger font
   x = button.h + button.bordersize + 1;                            //starting point left..
   y = button.v + button.bordersize + 1 + (magnify * text_offset);  // starting bpoint 'down' allow for magnify !! bigger font for front half
-  //gfx->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  gfx->setTextBound(0, 0, Screen_Width, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
+  //page->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
+  page->setTextBound(0, 0, Screen_Width, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
 
-  gfx->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
+  page->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
   setFont(smallfont);
-  gfx->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
+  page->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);  // get text bounds for decimal
 
   if (((TBw1 + TBw2) >= typingspaceW) || (TBh1 >= typingspaceH)) {  // too big //too tall!!
     if ((TBw1 <= typingspaceW) && (TBh1 <= typingspaceH)) {         //just print digits not decimals
@@ -519,7 +524,7 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
       decimal[1] = 0;
     } else {                                       // DEBUG_PORT.print("***DEBUG <"); DEBUG_PORT.print(msg);DEBUG_PORT.print("> became <");DEBUG_PORT.print(digits);
                                                    // DEBUG_PORT.print(decimal);DEBUG_PORT.println("> and was too big to print in box");
-      gfx->setTextBound(0, 0, Screen_Width, 480);  //reset text bounds
+      page->setTextBound(0, 0, Screen_Width, 480);  //reset text bounds
       data.displayed = true;
       return;
     }
@@ -528,86 +533,72 @@ void Sub_for_UpdateTwoSize(int magnify, bool horizCenter, bool vertCenter, bool 
   if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }                    //offset to horizontal center
   if (vertCenter) { y = button.v + button.bordersize + (magnify * text_offset) + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
   if (erase) {
-    gfx->setTextColor(button.BackColor, button.BackColor);
+    page->setTextColor(button.BackColor, button.BackColor);
   } else {
-    gfx->setTextColor(button.TextColor, button.BackColor);
+    page->setTextColor(button.TextColor, button.BackColor);
   }
-  gfx->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);
+  page->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);
   if (!recent) {
-    gfx->setTextColor(DARKGREY, button.BackColor);
+    page->setTextColor(DARKGREY, button.BackColor);
     data.greyed = true;
   }
   x = x - TBx1;  // NOTE TBx1 is normally zero for most fonts, but some print with offsets that will be corrected by TBx1.
-  gfx->setCursor(x, y);
+  page->setCursor(x, y);
   data.lastx = x;
   data.lasty = y;
   data.lastw = (TBw1 + TBw2);
   data.lasth = (TBh1);
 
-  gfx->print(digits);
-  x = gfx->getCursorX();
+  page->print(digits);
+  x = page->getCursorX();
   if (TBw2 != 0) {
     setFont(smallfont);
-    gfx->setCursor((x - TBx2), y);  // Set decimals start position based on where Digits ended and allow for any font start offset TBx2
-    gfx->print(decimal);
+    page->setCursor((x - TBx2), y);  // Set decimals start position based on where Digits ended and allow for any font start offset TBx2
+    page->print(decimal);
   }
-  gfx->setTextColor(button.TextColor);
-  gfx->setTextBound(0, 0, Screen_Width, 480);  //MUST reset it for other functions that do not set it themselves!
+  page->setTextColor(button.TextColor);
+  page->setTextBound(0, 0, Screen_Width, 480);  //MUST reset it for other functions that do not set it themselves!
 }
 
-void ButtonMasterDisplay(bool reset, const char *msg, const char *units,int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt){
-   if (reset) {
-    GFXBorderBoxPrintf(button, "");
-    AddTitleInsideBox(9, 3, button, msg);
-    AddTitleInsideBox(9, 2, button, units);
-    data.lastx =0; // reset the last data print locations, which would otherwise be set in Sub_for_UpdateTwoSize
-    data.lasty =0;
-    data.lastw =0;
-    data.lasth =0;
-    return;
-  }
-  if (data.data == NMEA0183DoubleNA) { return; }
-  bool recent = (data.updated >= millis() - 6000);
-  if (data.greyed) { return; }
-  if (!data.displayed) {
-    gfx->setTextSize(magnify);
-    //  DEBUG_PORT.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
-    data.displayed = true;  //reset to false inside toNewStruct
-    gfx->setTextSize(1);
-    return;
-  }
-  if (!recent && !data.greyed) {
-    gfx->setTextSize(magnify);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
-    data.displayed = true;  //reset to false inside toNewStruct
-    gfx->setTextSize(1);
-  }
-}
+// void ButtonMasterDisplay(bool reset, const char *msg, const char *units,int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt){
+//   if (data.data == NMEA0183DoubleNA) { return; }
+//   bool recent = (data.updated >= millis() - 6000);
+//   if (data.greyed) { return; }
+//   if (!data.displayed) {
+//  if (!recent && !data.greyed) {
+//     page->setTextColor(DARKGREY, button.BackColor); 
+//     data.greyed = true;}
+//     page->setTextSize(magnify);
+//      page->GFXBorderBoxPrintf(button, fmt, data.data);
+//      page->BorderPrintCanvasTwoSize(button, 154, fmt, data.data);
+//      page->Addtitletobutton(button, 6, 9, msg);
+//      page->Addtitletobutton(button, 3, 9, units);
+//      data.displayed = true;  //reset to false inside toNewStruct
+//     return;
+//   }
+// }
 
-void UpdateDataTwoSize(int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt) {
-  if (data.data == NMEA0183DoubleNA) { return; }
-  bool recent = (data.updated >= millis() - 6000);
-  if (data.greyed) { return; }
-  if (!data.displayed) {
-    gfx->setTextSize(magnify);
-    //  DEBUG_PORT.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
-    data.displayed = true;  //reset to false inside toNewStruct
-    gfx->setTextSize(1);
-    return;
-  }
-  if (!recent && !data.greyed) {
-    gfx->setTextSize(magnify);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
-    Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
-    data.displayed = true;  //reset to false inside toNewStruct
-    gfx->setTextSize(1);
-  }
-}
+// void UpdateDataTwoSize(int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton button, _sInstData &data, const char *fmt) {
+//   if (data.data == NMEA0183DoubleNA) { return; }
+//   bool recent = (data.updated >= millis() - 6000);
+//   if (data.greyed) { return; }
+//   if (!data.displayed) {
+//     page->setTextSize(magnify);
+//     //  DEBUG_PORT.printf(" in UpdateDataTwoSize bigfont %i  smallfont %i    data %f  format %s",bigfont,smallfont,               data.data,fmt);
+//    // Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
+//     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
+//     data.displayed = true;  //reset to false inside toNewStruct
+//     page->setTextSize(1);
+//     return;
+//   }
+//   if (!recent && !data.greyed) {
+//     page->setTextSize(magnify);
+//   //  Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, true, bigfont, smallfont, button, data, fmt, data.lastdata);
+//     Sub_for_UpdateTwoSize(magnify, horizCenter, vertCenter, false, bigfont, smallfont, button, data, fmt, data.data);
+//     data.displayed = true;  //reset to false inside toNewStruct
+//     page->setTextSize(1);
+//   }
+// }
 
 
 
@@ -618,8 +609,8 @@ void GFXBorderBoxPrintf(_sButton button, const char *fmt, ...) {
   vsnprintf(msg, 300, fmt, args);
   va_end(args);
   int len = strlen(msg);
-  gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
-  gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
+  page->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
+  page->fillRect(button.h + button.bordersize, button.v + button.bordersize,
                 button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
   // DO NOT USE MULTI LINE messages in GFXBorderBoxPrintf!!
   CommonSub_UpdateLine(true, true, button.TextColor, MasterFont, button, msg);
@@ -638,21 +629,21 @@ void AddTitleBorderBox(int font, _sButton button, const char *fmt, ...) {  // ad
   vsnprintf(Title, 300, fmt, args);
   va_end(args);
   int len = strlen(Title);
-  gfx->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
-  gfx->setTextColor(WHITE, button.BorderColor);
+  page->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
+  page->setTextColor(WHITE, button.BorderColor);
   // DEBUG_PORT.printf(" Debug. title'%s'  v(%i) TBH(%i)",Title, button.v,TBh);
   if ((button.v - TBh) >= 0) {  // text writes from point at bottom left .. have we room to draw 'above' the box?
-    gfx->setCursor(button.h, button.v);
-    gfx->fillRect(button.h, button.v - TBh, TBw, TBh, button.BorderColor);
+    page->setCursor(button.h, button.v);
+    page->fillRect(button.h, button.v - TBh, TBw, TBh, button.BorderColor);
     //DEBUG_PORT.printf(" h v positioned\n");
   } else {  //DEBUG_PORT.printf(" moved down to TBH (%i) \n",TBh);
-    gfx->setCursor(button.h, TBh - 2);
-    gfx->fillRect(button.h, 2, TBw, TBh, button.BorderColor);
+    page->setCursor(button.h, TBh - 2);
+    page->fillRect(button.h, 2, TBw, TBh, button.BorderColor);
     // move 'inside' box by moving down.. -2 just because this does not leave a gap with the small FreeMono8pt7b font (0) I normally chose
     // -2 still leaves gap (~2) with Font 8, but it also does not properly blank the background for the top two pixels..) ..
     // (Font 3 is monobold 8, prints like font 0 ,but is less clear IMHO.
   }
-  gfx->print(Title);
+  page->print(Title);
   setFont(Font_Before);  //DEBUG_PORT.println("Font selected is %i",MasterFont);
 }
 // Pos 1 2 3 4 for top right, botom right etc. add a top left title to the box
@@ -669,35 +660,35 @@ void AddTitleInsideBox(int font, int pos, _sButton button, const char *fmt, ...)
   vsnprintf(Title, 300, fmt, args);
   va_end(args);
   int len = strlen(Title);
-  gfx->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
-  gfx->setTextColor(WHITE, button.BorderColor);
+  page->getTextBounds(Title, 0, 0, &TBx1, &TBy1, &TBw, &TBh);
+  page->setTextColor(WHITE, button.BorderColor);
   //different positions
   //top left- just inside / outside the box- original function
   if ((button.v - TBh) >= 0) {
-    gfx->setCursor(button.h, button.v);
+    page->setCursor(button.h, button.v);
   } else {
-    gfx->setCursor(button.h, button.v + TBh);
+    page->setCursor(button.h, button.v + TBh);
   }
   //
   //top right
   switch (pos) {
     case 1:  // top right
-      gfx->setCursor(button.h + button.width - TBw - button.bordersize, button.v + TBh);
+      page->setCursor(button.h + button.width - TBw - button.bordersize, button.v + TBh);
       break;
     case 2:  //bottom right
-      gfx->setCursor(button.h + button.width - TBw - button.bordersize, button.v + button.height + TBy1 + button.bordersize);
+      page->setCursor(button.h + button.width - TBw - button.bordersize, button.v + button.height + TBy1 + button.bordersize);
       break;
     case 3:  //top left
-      gfx->setCursor(button.h, button.v + TBh);
+      page->setCursor(button.h, button.v + TBh);
       break;
     case 4:  //bottom left
-      gfx->setCursor(button.h, button.v + button.height + TBy1 + button.bordersize);
+      page->setCursor(button.h, button.v + button.height + TBy1 + button.bordersize);
       break;
     default:  //top right
-      gfx->setCursor(button.h + button.width - TBw, button.v - TBh);
+      page->setCursor(button.h + button.width - TBw, button.v - TBh);
       break;
   }
-  gfx->print(Title);
+  page->print(Title);
   setFont(Font_Before);  //DEBUG_PORT.println("Font selected is %i",MasterFont);
 }
 
@@ -721,21 +712,21 @@ int GraphRange(double data, int _TL, int _BR, double dmin, double dmax) {  // re
 }
 
 void PTriangleFill(Phv P1, Phv P2, Phv P3, uint16_t COLOUR) {
-  gfx->fillTriangle(P1.h, P1.v, P2.h, P2.v, P3.h, P3.v, COLOUR);
+  page->fillTriangle(P1.h, P1.v, P2.h, P2.v, P3.h, P3.v, COLOUR);
 }
 void Pdrawline(Phv P1, Phv P2, uint16_t COLOUR) {  // simple hack for a thicker line
   int wide = 1;
 
-  gfx->drawLine(P1.h, P1.v, P2.h, P2.v, COLOUR);
-  gfx->drawLine(P1.h + wide, P1.v, P2.h + wide, P2.v, COLOUR);
-  gfx->drawLine(P1.h, P1.v + wide, P2.h, P2.v + wide, COLOUR);
-  gfx->drawLine(P1.h + wide, P1.v + wide, P2.h + wide, P2.v + wide, COLOUR);
+  page->drawLineToCanvas(P1.h, P1.v, P2.h, P2.v, COLOUR);
+  page->drawLineToCanvas(P1.h + wide, P1.v, P2.h + wide, P2.v, COLOUR);
+  page->drawLineToCanvas(P1.h, P1.v + wide, P2.h, P2.v + wide, COLOUR);
+  page->drawLineToCanvas(P1.h + wide, P1.v + wide, P2.h + wide, P2.v + wide, COLOUR);
 }
 
 
 
 void PfillCircle(Phv P1, int rad, uint16_t COLOUR) {
-  gfx->fillCircle(P1.h, P1.v, rad, COLOUR);
+  page->fillCircle(P1.h, P1.v, rad, COLOUR);
 }
 
 void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnification) {
@@ -752,7 +743,7 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
     v = button.v + ((button.height) / 2);
     // magnification 1 degree is roughly 111111 m
     AddTitleInsideBox(1, 1, button, "circle:%4.1fm", float((button.height) / (2 * (magnification / 111111))));
-    gfx->drawCircle(h, v, (button.height) / 2, button.BorderColor);
+    page->fillCircleToCanvas(h, v, (button.height) / 2, button.BorderColor);
     AddTitleBorderBox(0, button, "Magnification:%4.1f pixel/m", float(magnification) / 111111);
     if (startposlon == 0) {
       startposlat = BoatData.Latitude.data;
@@ -761,7 +752,7 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
     LongD = h + ((BoatData.Longitude.data - startposlon) * magnification);
     LatD = v - ((BoatData.Latitude.data - startposlat) * magnification);  // negative because display is top left to bottom right!
                                                                           //set limits!! ?
-    gfx->fillCircle(LongD, LatD, 4, button.TextColor);
+    page->fillCircle(LongD, LatD, 4, button.TextColor);
   }
 }
 
@@ -775,8 +766,8 @@ void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton butt
   //if (instance >> 2) {return;} // allow only instance 0 and 1  
    if (DATA.graphed) { return; }
    if (reset ) { // redraw on reset even if data is not valid 
-    gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
-    gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
+    page->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
+    page->fillRect(button.h + button.bordersize, button.v + button.bordersize,
                   button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
     AddTitleInsideBox(font, 3, button, " %s", msg);
     AddTitleInsideBox(font, 1, button, " %4.0f%s", dmax, units);
@@ -808,7 +799,7 @@ void SCROLLGraph(bool reset, int instance, int dotsize, bool line, _sButton butt
     // end of reset / setup....
   }
   // Every redraw.. clear plot area and re-add every time titles as they may get overwritten
-  gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize,
+  page->fillRect(button.h + button.bordersize, button.v + button.bordersize,
                 button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
   AddTitleInsideBox(font, 3, button, " %s", msg);
   AddTitleInsideBox(font, 1, button, " %4.0f%s", dmax, units);

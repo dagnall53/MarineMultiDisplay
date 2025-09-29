@@ -113,7 +113,7 @@ This will bring up the new Trek style file browser.
 There are three JSON files that control operations:
 The "config.txt". controls WiFi settings and major display modes, and is backed up by EEPROM, so that the SD card is not essential for basic operations.
 Vconfig.txt and colortest.txt are only stored on the SD and are related mainly to Victron BLE functions.
-In the config.txt you can select which 'page' is displayed after startup by changing the number: "Start_Page" 4 is the quad display and the default. 
+In the config.txt you can select which 'pageIndex' is displayed after startup by changing the number: "Start_Page" 4 is the quad display and the default. 
 From version 3.97, you can select what is displayed in the various 'quarters' with the JAVASCRIPT entries: 
 e.g.  "FourWayBR": "SOG",
       "FourWayBL": "DEPTH",
@@ -150,7 +150,7 @@ This is immensely powerful, but interrupts the main wifi for one second every ti
 It cannot therefore be used simultaneously with the standard NMEA display routines. 
 
 There are two critical files for the display are vconfig.txt. (which has the Victron device Mac, key and names), and colortest.txt which has some settings to allow simulation of victron devices and other inputs useful during development.
-The display page uses a jpg (vicback.jpg) as a background for a more colourful display.
+The display pageIndex uses a jpg (vicback.jpg) as a background for a more colourful display.
 The code recognises only Solar chargers , SmartShunt and IP65 AC chargers.
 The graphical format of the display is defined in VICTRONBLE.cpp and (vconfig.txt).
 Each device has selected data displayed in a box with selectable position and height (but with fixed fonts and width).

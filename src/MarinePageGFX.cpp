@@ -6,8 +6,44 @@
 
 
 #define DEG_TO_RAD 0.0174532925f
+MarinePageGFX* page = nullptr;
+// Private variables
+static int _ShadowX = 0;
+static int _ShadowY = 0;
+static bool _ShadowON = 0;
+
+int getShadowY() { return _ShadowY;}
+void MarinePageGFX::setShadowY(int value) {_ShadowY = value;}
+
+int getShadowX() {return _ShadowX;}
+void MarinePageGFX::setShadowX(int value) {_ShadowX = value;}
+
+bool getShadow_ON() {return _ShadowON;}
+void MarinePageGFX::setShadow_ON(bool value) {_ShadowON = value;}
+
+
+
+
+
 
 const GFXfont* _currentFont = nullptr;
+
+
+
+
+
+void MarinePageGFX::setTextBound(int x, int y, int w, int h) {
+  _textBoundX = x;
+  _textBoundY = y;
+  _textBoundW = w;
+  _textBoundH = h;
+}
+void MarinePageGFX::setTextWrap(bool wrap) {
+    _textCanvas->setTextWrap(wrap);
+}
+
+
+
 
 void MarinePageGFX::clearTextCanvas(uint16_t bg) {
   if (!_textCanvas || !isReady()) return;
@@ -133,49 +169,6 @@ int MarinePageGFX::getFontLineHeight(FontID id) {
 }
 
 
-void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, float angleDeg, uint16_t color, bool shadow) {
-  if (!isReady() || !_textCanvas) return;
-
-  // Compute center and radius from button
-  int16_t centerX = button.h + button.width / 2;
-  int16_t centerY = button.v + button.height / 2;
-  int16_t radius = (button.height - 2 * button.bordersize) / 2;
-
-  // Angle math
-  float angleRad = angleDeg * DEG_TO_RAD;
-  float perpRad = angleRad + PI / 2;
-
-  // Tip and tail
-  int16_t tipX = centerX + cos(angleRad) * radius;
-  int16_t tipY = centerY + sin(angleRad) * radius;
-  int16_t tailX = centerX - cos(angleRad) * tailLength;
-  int16_t tailY = centerY - sin(angleRad) * tailLength;
-
-  // Base triangle points
-  int16_t baseX1 = centerX + cos(perpRad) * (baseWidth / 2);
-  int16_t baseY1 = centerY + sin(perpRad) * (baseWidth / 2);
-  int16_t baseX2 = centerX - cos(perpRad) * (baseWidth / 2);
-  int16_t baseY2 = centerY - sin(perpRad) * (baseWidth / 2);
-
-  // Shadow rendering
-  if (shadow) {
-    int16_t offset = 2;
-    drawTriangleToCanvas(tipX + offset, tipY + offset,
-                         baseX1 + offset, baseY1 + offset,
-                         baseX2 + offset, baseY2 + offset,
-                         NEAR_BLACK);
-
-    drawTriangleToCanvas(tailX + offset, tailY + offset,
-                         baseX2 + offset, baseY2 + offset,
-                         baseX1 + offset, baseY1 + offset,
-                         NEAR_BLACK);
-  }
-
-  // Main pointer
-  drawTriangleToCanvas(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color);
-  drawTriangleToCanvas(tailX, tailY, baseX2, baseY2, baseX1, baseY1, color);
-  drawLineToCanvas(tipX, tipY, tailX, tailY, NEAR_BLACK);
-}
 
 void MarinePageGFX::clearOutsideRadius(_sButton& button, uint16_t color) {
   if (!_textCanvas || !isReady()) return;
@@ -269,9 +262,7 @@ void MarinePageGFX::DrawScrollingGraph(_sButton& button, const GraphBuffer& buff
   // Push to display
   //pushCanvas();
 }
-
-
-void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button, int decimalInset, const char* fmt, ...) {
+void MarinePageGFX::GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...) {
   if (!_textCanvas || !fmt) return;
 
   // Format the string
@@ -280,10 +271,81 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button, int decimalInset,
   va_start(args, fmt);
   vsnprintf(buffer, sizeof(buffer), fmt, args);
   va_end(args);
-
+  //parse value back to double 
+  double testValue = 0.0;
+  sscanf(buffer, "%lf", &testValue);
+// 
+  if (testValue == -1e9 || std::isnan(testValue)) {return;}
   // Font selection
+  if (button.Font >= 0 && button.Font < FONT_COUNT) {
+    setFontByIndex(button.Font);
+  }
+
+  // Set text size to 1 (no magnification)
+  _textCanvas->setTextSize(1);
+
+  // Measure text bounds
+  int16_t x, y;
+  uint16_t w, h;
+  _textCanvas->getTextBounds(buffer, 0, 0, &x, &y, &w, &h);
+
+  // Calculate centered position
+  int16_t tx = button.h + (button.width - w) / 2 - x;
+  int16_t ty = button.v + (button.height - h) / 2 - y;
+
+  // Draw background
+  _textCanvas->fillRect(button.h, button.v, button.width, button.height, button.BackColor);
+  // Draw border
+  if (button.bordersize > 0) {
+    for (int i = 0; i < button.bordersize; i++) {
+      _textCanvas->drawRect(button.h + i, button.v + i,
+                            button.width - 2 * i, button.height - 2 * i,
+                            button.BorderColor);
+    }
+  }
+
+  // Set text color and print
+  _textCanvas->setTextColor(NEAR_BLACK);
+  _textCanvas->setCursor(tx+_ShadowX, ty+_ShadowY);
+  _textCanvas->print(buffer);
+  _textCanvas->setTextColor(button.TextColor);
+  _textCanvas->setCursor(tx, ty);
+  _textCanvas->print(buffer);
+
+
+
+  // Optional: draw debug box around text bounds
+  // _textCanvas->drawRect(tx + x, ty + y, w, h, 0xF800); // red box
+
+  // Reset PrintLine since we're not stacking
+  button.PrintLine = 0;
+}
+
+
+void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button,int decimalInset, const char* fmt, ...) {
+  if (!_textCanvas || !fmt) return;
+
+  // Format the string
+  char buffer[128];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buffer, sizeof(buffer), fmt, args);
+  va_end(args);
+  Serial0.println("debug ");
+  Serial0.println(buffer);
+  //parse value back to double 
+  double testValue = 0.0;
+  sscanf(buffer, "%lf", &testValue);
+  Serial0.println(testValue);
+// 
+  if (testValue == -1e9 || std::isnan(testValue)) {return;}
+
+    // Font selection
   FontID mainFont = static_cast<FontID>(button.Font);
   FontID smallFont = (mainFont > 0) ? static_cast<FontID>(button.Font - 1) : mainFont;
+  // Font selection
+  //FontID mainFont = static_cast<FontID>(Font);
+  //FontID smallFont = static_cast<FontID>(Font - 1) ;
 
   _textCanvas->setTextSize(1);
 
@@ -295,7 +357,7 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button, int decimalInset,
     size_t intLen = dot - buffer;
     strncpy(intPart, buffer, intLen);
     intPart[intLen] = '\0';
-
+	
     strncpy(fracPart, dot + 1, sizeof(fracPart));
     fracPart[sizeof(fracPart) - 1] = '\0';
     snprintf(intDotPart, sizeof(intDotPart), "%s.", intPart);  // int + dot
@@ -306,17 +368,17 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button, int decimalInset,
     strncpy(intDotPart, intPart, sizeof(intDotPart));
     intDotPart[sizeof(intDotPart) - 1] = '\0';
   }
-
   // Measure parts
   int16_t x1, y1, x2, y2,y3;
   uint16_t w1, h1, w2, h2,w3;
-
+//   Serial0.print(" Debug  before text bounds<");Serial0.print(intDotPart);Serial0.print(">  <");Serial0.print(fracPart);Serial0.println(">");
   _textCanvas->setFont(fontTable[mainFont]);
   _textCanvas->getTextBounds(intDotPart, 0, 0, &x1, &y1, &w1, &h1);
 
   _textCanvas->setFont(fontTable[smallFont]);
   _textCanvas->getTextBounds(fracPart, 0, 0, &x2, &y2, &w2, &h2);
   _textCanvas->getTextBounds("1", 0, 0, &x2, &y2, &w3, &h2);
+
   
   uint16_t totalHeight = std::max(h1, h2);
 
@@ -340,7 +402,7 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button, int decimalInset,
   int16_t intX = decimalX - w1;
   _textCanvas->setFont(fontTable[mainFont]);
     _textCanvas->setTextColor(NEAR_BLACK);
-  _textCanvas->setCursor(intX+2, baselineY+2);
+  _textCanvas->setCursor(intX+_ShadowX, baselineY+_ShadowY);
   _textCanvas->print(intDotPart);
   _textCanvas->setTextColor(button.TextColor);
   _textCanvas->setCursor(intX, baselineY);
@@ -351,7 +413,7 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button, int decimalInset,
   
   _textCanvas->setFont(fontTable[smallFont]);
      _textCanvas->setTextColor(NEAR_BLACK);
-  _textCanvas->setCursor(fracX+2, baselineY+2);
+  _textCanvas->setCursor(fracX+_ShadowX, baselineY+_ShadowY);
   _textCanvas->print(fracPart);
    _textCanvas->setTextColor(button.TextColor);
   _textCanvas->setCursor(fracX, baselineY);
@@ -408,6 +470,49 @@ void MarinePageGFX::DrawCompass(_sButton& button) {
   }
 
 }
+void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, float angleDeg, uint16_t color, bool shadow) {
+  if (!isReady() || !_textCanvas) return;
+
+  // Compute center and radius from button
+  int16_t centerX = button.h + button.width / 2;
+  int16_t centerY = button.v + button.height / 2;
+  int16_t radius = (button.height - 2 * button.bordersize) / 2;
+
+  // Angle math
+  float angleRad = (angleDeg-90) * DEG_TO_RAD;  // correct orientation the easy way 
+  float perpRad = angleRad + PI / 2;
+
+  // Tip and tail
+  int16_t tipX = centerX + cos(angleRad) * radius;
+  int16_t tipY = centerY + sin(angleRad) * radius;
+  int16_t tailX = centerX - cos(angleRad) * tailLength;
+  int16_t tailY = centerY - sin(angleRad) * tailLength;
+
+  // Base triangle points
+  int16_t baseX1 = centerX + cos(perpRad) * (baseWidth / 2);
+  int16_t baseY1 = centerY + sin(perpRad) * (baseWidth / 2);
+  int16_t baseX2 = centerX - cos(perpRad) * (baseWidth / 2);
+  int16_t baseY2 = centerY - sin(perpRad) * (baseWidth / 2);
+
+  // Shadow rendering
+  if (shadow) {
+    int16_t offset = 2;
+    drawTriangleToCanvas(tipX + offset, tipY + offset,
+                         baseX1 + offset, baseY1 + offset,
+                         baseX2 + offset, baseY2 + offset,
+                         NEAR_BLACK);
+
+    drawTriangleToCanvas(tailX + offset, tailY + offset,
+                         baseX2 + offset, baseY2 + offset,
+                         baseX1 + offset, baseY1 + offset,
+                         NEAR_BLACK);
+  }
+
+  // Main pointer
+  drawTriangleToCanvas(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color);
+  drawTriangleToCanvas(tailX, tailY, baseX2, baseY2, baseX1, baseY1, color);
+  drawLineToCanvas(tipX, tipY, tailX, tailY, NEAR_BLACK);
+}
 
 
 void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...) {
@@ -419,7 +524,11 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
   va_start(args, fmt);
   vsnprintf(buffer, sizeof(buffer), fmt, args);
   va_end(args);
-
+  //parse value back to double 
+  double testValue = 0.0;
+  sscanf(buffer, "%lf", &testValue);
+// 
+  if (testValue == -1e9 || std::isnan(testValue)) {return;}
   // Font setup
   FontID fontID = static_cast<FontID>(font);
   _textCanvas->setFont(fontTable[fontID]);
@@ -475,60 +584,6 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
  
 }
 
-void MarinePageGFX::GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...) {
-  if (!_textCanvas || !fmt) return;
-
-  // Format the string
-  char buffer[128];
-  va_list args;
-  va_start(args, fmt);
-  vsnprintf(buffer, sizeof(buffer), fmt, args);
-  va_end(args);
-
-  // Font selection
-  if (button.Font >= 0 && button.Font < FONT_COUNT) {
-    setFontByIndex(button.Font);
-  }
-
-  // Set text size to 1 (no magnification)
-  _textCanvas->setTextSize(1);
-
-  // Measure text bounds
-  int16_t x, y;
-  uint16_t w, h;
-  _textCanvas->getTextBounds(buffer, 0, 0, &x, &y, &w, &h);
-
-  // Calculate centered position
-  int16_t tx = button.h + (button.width - w) / 2 - x;
-  int16_t ty = button.v + (button.height - h) / 2 - y;
-
-  // Draw background
-  _textCanvas->fillRect(button.h, button.v, button.width, button.height, button.BackColor);
-  // Draw border
-  if (button.bordersize > 0) {
-    for (int i = 0; i < button.bordersize; i++) {
-      _textCanvas->drawRect(button.h + i, button.v + i,
-                            button.width - 2 * i, button.height - 2 * i,
-                            button.BorderColor);
-    }
-  }
-
-  // Set text color and print
-  _textCanvas->setTextColor(NEAR_BLACK);
-  _textCanvas->setCursor(tx+2, ty+2);
-  _textCanvas->print(buffer);
-  _textCanvas->setTextColor(button.TextColor);
-  _textCanvas->setCursor(tx, ty);
-  _textCanvas->print(buffer);
-
-
-
-  // Optional: draw debug box around text bounds
-  // _textCanvas->drawRect(tx + x, ty + y, w, h, 0xF800); // red box
-
-  // Reset PrintLine since we're not stacking
-  button.PrintLine = 0;
-}
 
 void MarinePageGFX::fillCircleToCanvas(int16_t x0, int16_t y0, int16_t r, uint16_t color) {
   if (!_textCanvas || r <= 0) return;
@@ -620,6 +675,7 @@ void MarinePageGFX::drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t colo
   uint16_t* buf = _buffer[_active] + y * _width + x;
   for (int16_t i = 0; i < w; i++) buf[i] = color;
 }
+
 void MarinePageGFX::drawCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t corner, uint16_t color) {
   int16_t f = 1 - r;
   int16_t ddF_x = 1;
@@ -752,11 +808,25 @@ void MarinePageGFX::fillTriangle(int16_t x0, int16_t y0,
   }
 }
 
-void MarinePageGFX::setCursor(int16_t x, int16_t y) {
-  _cursorX = x;
-  _cursorY = y;
+// Returns the current X position of the text cursor
+int MarinePageGFX::getCursorX() {
+    return _textCanvas->getCursorX();  // assuming _textcanvas is a pointer
 }
 
+int MarinePageGFX::getCursorY() {
+    return _textCanvas->getCursorY();
+}
+
+void MarinePageGFX::setCursor(int16_t x, int16_t y) {
+  _textCanvas->setCursor(x, y);
+
+}
+
+void MarinePageGFX::setTextColor(uint16_t fg, uint16_t bg) {
+	_gfx->setTextColor(fg,bg);
+  _textColor = fg;
+  _backgroundColor = bg;
+}
 void MarinePageGFX::setTextColor(uint16_t color) {
   _textColor = color;
 }
@@ -764,6 +834,46 @@ void MarinePageGFX::setTextColor(uint16_t color) {
 void MarinePageGFX::setTextSize(uint8_t size) {
   _textSize = size;
 }
+
+void MarinePageGFX::getTextBounds(const char* msg, int16_t x, int16_t y,
+                                   int16_t* x1, int16_t* y1,
+                                   uint16_t* w, uint16_t* h) {
+    if (!msg ) return;
+     _textCanvas->getTextBounds(msg, x, y, x1, y1, w, h);
+
+}
+
+void MarinePageGFX::println(const char* buf) {
+  _gfx->setCursor(_cursorX, _cursorY);
+  _gfx->setTextColor(_textColor);
+  _gfx->setTextSize(_textSize);
+
+  // Apply bounding box and wrap settings
+  if (_textBoundW > 0 && _textBoundH > 0) {
+    _gfx->setTextBound(_textBoundX, _textBoundY, _textBoundW, _textBoundH);
+    _gfx->setTextWrap(_textWrap);
+  }
+
+  _gfx->println(buf);
+}
+
+
+void MarinePageGFX::print(const char* buf) {
+  _gfx->setCursor(_cursorX, _cursorY);
+  _gfx->setTextColor(_textColor);
+  _gfx->setTextSize(_textSize);
+
+  // Apply bounding box and wrap settings
+  if (_textBoundW > 0 && _textBoundH > 0) {
+    _gfx->setTextBound(_textBoundX, _textBoundY, _textBoundW, _textBoundH);
+    _gfx->setTextWrap(_textWrap);
+  }
+
+  _gfx->print(buf);
+}
+
+
+
 
 void MarinePageGFX::printf(const char* fmt, ...) {
   char buf[128];
@@ -775,6 +885,11 @@ void MarinePageGFX::printf(const char* fmt, ...) {
   _gfx->setCursor(_cursorX, _cursorY);
   _gfx->setTextColor(_textColor);
   _gfx->setTextSize(_textSize);
+   // Apply bounding box and wrap settings
+  if (_textBoundW > 0 && _textBoundH > 0) {
+    _gfx->setTextBound(_textBoundX, _textBoundY, _textBoundW, _textBoundH);
+    _gfx->setTextWrap(_textWrap);
+  }
   _gfx->print(buf);
 }
 

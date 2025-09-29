@@ -73,7 +73,6 @@ extern _MyColors ColorSettings;
 extern void showPicture(const char *name);
 // extern Arduino_ST7701_RGBPanel *gfx ;  // declare the gfx structure so I can use GFX commands in Keyboard.cpp and here...
 extern Arduino_RGB_Display *gfx;  //  change if alternate (not 'Arduino_RGB_Display' ) display !
-extern void setFont(int);
 extern const char soft_version[];
 extern const char _device[];
 //const char *host = "NMEADisplay";
@@ -81,7 +80,7 @@ extern _sBoatData BoatData;
 extern void WifiGFXinterrupt(int font, _sButton &button, const char *fmt, ...);
 extern _sButton WifiStatus;
 extern int Display_Page;
-extern void Display(bool reset, int page);
+extern void Display(bool reset, int pageIndex);
 
 bool WebServerActive;
 WebServer server(80);
@@ -176,7 +175,7 @@ void readFile(fs::FS &fs, const char * path){
 }
 
 // //***************************************************
-// Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
+// Slightly more flexible way of defining pageIndex.. allows if statements ..required for changed displayname..
 String html_Question() {
   String st = "<!DOCTYPE html>\r\n";
   st += "<html><head>";
@@ -208,7 +207,7 @@ String html_Question() {
   return st;
 }
 // So I can modify the Display Panel Name! but also so that OTA works even without SD card present
-//prettified version/*the main html web page, with modified names etc    */
+//prettified version/*the main html web pageIndex, with modified names etc    */
 String html_startws() {
   String logs, filename;
   String st =
@@ -446,7 +445,7 @@ void SetupWebstuff() {
       HTTPUpload &upload = server.upload();
       if (upload.status == UPLOAD_FILE_START) {
         HaltOtherOperations = true;
-        setFont(9);
+        gfx->setFont(&FreeSansBold12pt7b);
         gfx->setTextColor(BLACK);
         gfx->fillScreen(BLUE);
         delay(10);

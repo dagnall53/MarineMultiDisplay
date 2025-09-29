@@ -18,12 +18,20 @@ public:
   void push();     // Push active buffer to screen
   bool isReady();  // Check if buffers are initialized
   
+  int getShadowX();
+  void setShadowX(int value);
+  int getShadowY();
+  void setShadowY(int value);
+  bool getShadow_ON();
+  void setShadow_ON(bool value);
+
+  
   
   void DrawCompass(_sButton& button);
   
   void DrawScrollingGraph(_sButton& button, const GraphBuffer& buffer, double minVal, double maxVal);
   void Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...);
-  void BorderPrintCanvasTwoSize(_sButton& button, int decimalInset, const char* fmt, ...);
+  void BorderPrintCanvasTwoSize(_sButton& button,int decimalInset, const char* fmt, ...);
   void GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...);
   void setFontByIndex(int index);
   int getFontLineHeight(FontID id);
@@ -76,10 +84,19 @@ public:
   // Text rendering
   void setCursor(int16_t x, int16_t y);
   void setTextColor(uint16_t color);
+  void setTextColor(uint16_t fg, uint16_t bg);
   void setTextSize(uint8_t size);
+  void println(const char* buf);
+  void print(const char* buf);
   void printf(const char* fmt, ...);
   void setFont(const GFXfont* font);
+  void setTextBound(int x, int y, int w, int h);
+  void setTextWrap(bool wrap);
+  int getCursorX();
+  int getCursorY();
+  void getTextBounds(const char* msg, int16_t x, int16_t y,int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h);
 
+  
   // Buffer access
   uint16_t* getActiveBuffer();
   void clearTextCanvas(uint16_t bg = 0);
@@ -88,11 +105,17 @@ private:
   Arduino_GFX* _gfx;
   Arduino_Canvas* _textCanvas = nullptr;
 
+  int16_t _textBoundX = 0;
+  int16_t _textBoundY = 0;
+  uint16_t _textBoundW = 0;
+  uint16_t _textBoundH = 0;
+  bool _textWrap;
   int16_t _width, _height;
   uint16_t* _buffer[2];
   int _active;
   int16_t _cursorX, _cursorY;
   uint16_t _textColor;
+  uint16_t _backgroundColor;
   uint8_t _textSize;
   const GFXfont* _gfxFont = nullptr;
 };

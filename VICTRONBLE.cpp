@@ -23,6 +23,12 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 #include "debug_port.h"
+#include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "CanvasBridge.h"
+extern MarinePageGFX* page;
+#include "FontType.h"
+#include "Structures.h"
+
 // The Espressif people decided to use String instead of std::string in newer versions
 // (3.0 and later?) of their ESP32 libraries. Check your BLEAdvertisedDevice.h file to see
 // if this is the case for getManufacturerData(); if so, then uncomment this line so we'll
@@ -540,7 +546,7 @@ void Setup_N_Display(int i) {  // setsup the display box , but changes position 
   } else {
     strncpy(borderdisplay, victronDevices.DeviceVictronName[i], 30);
   }
-  GFXBorderBoxPrintf(DisplayOuterbox, "");  //Used to blank the previous stuff!
+  page->GFXBorderBoxPrintf(DisplayOuterbox, "");  //Used to blank the previous stuff!
 }
 
 void DebugRawVdata(unsigned char *outputData, int datasize) {

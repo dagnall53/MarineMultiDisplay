@@ -14,8 +14,8 @@ extern int Display_Page;
 
 
 
-void Display(int page);
-void Display(bool reset, int page) ;
+void Display(int pageIndex);
+void Display(bool reset, int pageIndex) ;
 bool CheckButton(_sButton & button);
 void setFont(int fontinput);
 void ShowGPSinBox(int font, _sButton button);
@@ -50,7 +50,7 @@ extern _sButton Threelines0;
 extern _sButton Threelines1 ;
 extern _sButton Threelines2;
 extern _sButton Threelines3 ;
-// for the quarter screens on the main page
+// for the quarter screens on the main pageIndex
 extern _sButton topLeftquarter;  //h  reduced by 15 to give 30 space at the bottom
 extern _sButton bottomLeftquarter ;
 extern _sButton topRightquarter;
