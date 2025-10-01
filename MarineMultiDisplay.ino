@@ -5,6 +5,47 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
+/*   
+USB CDC on Boot ENABLED
+Erase All fkash before sketch ENABLED
+Partition Scheme Default 16M(6.25MB APP/3.43MB SPIFFS)  {Hopefully this pulls in my modified CSV}
+PSRAM OPI PSRAM
+
+
+NEEDS to be re-done after changing ESP32 compiler version
+I have manually modified partitions to include the default_16MB version to make it operable for esp32s3, see below to make it operable.
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x640000,
+app1,     app,  ota_1,   0x650000,0x640000,
+spiffs,   data, spiffs,  0xc90000,0x360000,
+coredump, data, coredump,0xFF0000,0x10000,
+
+
+
+
+TO add partition  
+esp32s3.menu.PartitionScheme.default_16MB=Default 16M(6.25MB APP/3.43MB SPIFFS)
+esp32s3.menu.PartitionScheme.default_16MB.build.partitions=default_16MB
+esp32s3.menu.PartitionScheme.default_16MB.upload.maximum_size=6553600
+to BOARDS.txt with the other esp32s3.menu.PartitionScheme  entries
+
+THEN:   To force Arduino to recognise changes to boards.txt
+Select File > Quit from the Arduino IDE menus if it is running.
+Delete the folder at the following path:C:/USERS/ ~~~/AppData/Roaming/arduino-ide/
+:warning: Please be careful when deleting things from your computer. When in doubt, back up!
+
+Start the Arduino IDE.
+The custom board options menus should now reflect any changes that were made to boards.txt.
+
+The arduino-ide folder is used by Arduino IDE to store data, but it doesn't store any irreplaceable data there so you won't notice any significant impacts from the deletion of the data.
+
+
+*/
+
+
+
 const char soft_version[] = " V0.20";
 
 //**********  SET DEFINES ************************************************
@@ -27,12 +68,12 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
 #include "FS.h"
 #include <FFat.h>  // plan to use FATFS for local files
-#include <SPIFFS.h>
+#include <SPIFFS.h>// plan to use FATFS for local files
 #include <SD_MMC.h>
 #include <LittleFS.h>
 #include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
 
-
+#include "esp_partition.h"
 
 //********* stuff t add my library for paged displays *****************
 
@@ -183,11 +224,11 @@ _sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE };
 // modified all to lift by 30 pixels to allow a common bottom row display (to show logs and get to settings)
 
 
-_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, BLACK };              // used for wind and graph displays
-_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, BLACK };             //  ''
-_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, BLACK };                //  ''
-_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, BLACK };      //  ''
-_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, BLACK };  //  ''
+_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, BLACK,13 };      // used for wind and BIG graph displays
+_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, BLACK,12 };             //  ''
+_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, BLACK,12 };                //  ''
+_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, BLACK,12 };      //  ''
+_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, BLACK,12 };  //  ''
 //used for nmea RMC /GPS display // was only three lines to start!
 _sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, BLACK };
 _sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, BLACK };
@@ -260,7 +301,7 @@ _sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK }; 
 
 
 //#include "esp_task_wdt.h"
-#include "esp_partition.h"
+
 // void SDList(char* msg){
 //   DEBUG_PORT.println(msg);
 //   listDir(SD, "/", 1);
@@ -269,7 +310,7 @@ _sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK }; 
 bool LoadConfigs(bool print,bool displ){
   bool FilesOK = true;
   if (LoadConfiguration()) {
-   if(print){ DEBUG_PORT.println("USING FATS JSON for wifi and display settings");}
+   if(print){ DEBUG_PORT.println("USING JSON for wifi and display settings");}
    //if(displ){ gfx->println(F("FATS JSON (WiFi and display settings"));}
     Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
     Display_Page = Display_Config.Start_Page;
@@ -283,8 +324,8 @@ bool LoadConfigs(bool print,bool displ){
     SaveConfiguration(SPIFFS, Setupfilename, Display_Config, Current_Settings);
   }
   if (LoadVictronConfiguration()) {
-    if(print){  DEBUG_PORT.println("USING FATS JSON for Victron data settings");}
-   //  if(displ){gfx->println(F("USING FATS JSON for Victron settings"));}
+    if(print){  DEBUG_PORT.println("USING JSON for Victron data settings");}
+   //  if(displ){gfx->println(F("USING JSON for Victron settings"));}
   } else {  // try to set a useful example
     FilesOK = false;
     if(print){  DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");}
@@ -308,8 +349,8 @@ bool LoadConfigs(bool print,bool displ){
       SaveVictronConfiguration();  // should write a default file if it was missing?
     }
   if (LoadDisplayConfiguration()) {
-    if(print){  DEBUG_PORT.println("USING FATS JSON for Colours data settings");}
-   // if(displ){gfx->println(F("USING FATS JSON for Colours data settings"));}
+    if(print){  DEBUG_PORT.println("USING JSON for Colours data settings");}
+   // if(displ){gfx->println(F("USING JSON for Colours data settings"));}
   } else {
     FilesOK = false;
      if(print){ DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");}
@@ -347,7 +388,7 @@ bool NewPagesetupstuff(){
 }
 
 
-
+#include "MarineRuntimeOverlay.h";
 
 void setup() {
   DEBUG_PORT.begin(115200);
@@ -358,23 +399,43 @@ void setup() {
   #endif
   HaltOtherOperations = false;
   delay(100);
-  DEBUG_PORT.print("Starting NMEA Display");
+  DEBUG_PORT.println("");
+  DEBUG_PORT.print("*****Starting NMEA Display*****");
   DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
   // Serial.println(F(" Using Serial.print "));
   // Serial0.println(F(" Using Serial0.print "));
   DEBUG_PORT.println(_device);DEBUG_PORT.println(soft_version); 
+  DEBUG_PORT.printf("Flash size reported: %u bytes\n", spi_flash_get_chip_size());
   Display_Config = Default_JSON;
   Current_Settings = Default_Settings_JSON;
-  Init_GFX(); // must be before SD setup (at least for Guitron)
+  Init_GFX(); // must be before SD setup (at least for Guitron?)
   DEBUG_PORT.println(F(" Printing to screen  "));
   gfx->print(_device);
-  gfx->println(soft_version);delay(100);
+  gfx->println(soft_version);delay(100); 
   if (NewPagesetupstuff()) {gfx->println(F("*** Paging display Setup ***"));
      DEBUG_PORT.println("Paging display Setup");}
+     DEBUG_PORT.printf("Free PSRAM after Paging Display setup(): %d bytes\n", ESP.getFreePsram());
+  //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
+ // MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));  delay(500); 
+ const esp_partition_t* ffat_part = esp_partition_find_first(
+    ESP_PARTITION_TYPE_DATA,
+    ESP_PARTITION_SUBTYPE_DATA_FAT,
+    "ffat" // This must match the label in your partition CSV
+  );
+
+  if (ffat_part) {
+    gfx->printf("FFat @ 0x%X, size: %u bytes\n", ffat_part->address, ffat_part->size);
+    DEBUG_PORT.printf("FFat @ 0x%X, size: %u bytes\n", ffat_part->address, ffat_part->size);
+  } else {
+    gfx->println("FFat partition not found");
+    DEBUG_PORT.println("FFat partition not found");
+  }
+
 
   //Fatfs_Setup();   // set up FATFS // includes gfx prints
-  SPIFFS_Setup(); 
-  //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
+  const esp_partition_t* spiffs_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "spiffs");
+  if (spiffs_part) {gfx->printf("SPIFFS @ 0x%X, size: %u bytes\n",spiffs_part->address, spiffs_part->size); DEBUG_PORT.printf("SPIFFS @ 0x%X, size: %u bytes\n",spiffs_part->address, spiffs_part->size);}
+  if (spiffs_part) {SPIFFS_Setup();} 
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
   Touch_available = Touchsetup(); // if before ffats? stops ffats reading!
   //delay(100);listDir(SPIFFS,"/",1);  delay(500);
@@ -399,7 +460,12 @@ void setup() {
   Start_ESP_EXT();             //  Sets esp_now links to the current WiFi.channel etc.
   BLEsetup();                  // listDir(FFat,"/",1);  delay(500);                   // setup Victron BLE interface (does not do much!!)
   setupFilemanager();          // listDir(FFat,"/",1); delay(500);  
-  DEBUG_PORT.println("Setup Completed");  delay(500); 
+  DEBUG_PORT.println("Setup Completed");  
+    MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));  delay(500); 
+  page->swap();
+  page->fillScreen(BLUE);
+  page->compositeCanvas();
+  page->push();
  }
 
 void loop() {
@@ -621,38 +687,44 @@ void Fatfs_Setup() {
     gfx->println(F(""));
   }
 }
+
+
+
+
 void SPIFFS_Setup() {
   bool FMsetup=false;
   hasSPIFFS = false;
-  DEBUG_PORT.print("FFAT  START");
+  DEBUG_PORT.println("=== SPIFFS Health Check ===");
   if (SPIFFS.begin(true)) {
-    hasSPIFFS = true;
-  size_t totalBytes = SPIFFS.totalBytes();
-  size_t usedBytes = SPIFFS.usedBytes();
-  size_t freeBytes = totalBytes - usedBytes;
-
-   
-    gfx->printf("SPIFFS initiated: %i free",freeBytes);
+    DEBUG_PORT.println("SPIFFS mounted cleanly");hasSPIFFS = true;
+    DEBUG_PORT.printf("Total: %u, Used: %u\n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
+  } else {
+    DEBUG_PORT.println("SPIFFS mount failed — attempting format...");
+   }
+  if (hasSPIFFS ) {
+    size_t totalBytes = SPIFFS.totalBytes();
+    size_t usedBytes = SPIFFS.usedBytes();
+    size_t freeBytes = totalBytes - usedBytes;
+   // gfx->printf("SPIFFS initiated: %i free",freeBytes);
     delay(500);
     if (!filemgr.AddFS(SPIFFS, "Flash/SPIFFS", false)) {
       DEBUG_PORT.println(F("Adding SPIFFS to Filemanager failed."));
-    } else { FMsetup=true;
+      } else { FMsetup=true;
       DEBUG_PORT.println(F("  Added SPIFFS to Filemanager"));
     }
-  } else {
-    DEBUG_PORT.println(F("FFat File System not initiated."));
-  }
+  } 
   
   if (!hasSPIFFS) {
-      gfx->print(F("---  NO SPIFFS ---"));
+   //   gfx->print(F("---  NO SPIFFS ---"));
   }
   if (FMsetup){
     DEBUG_PORT.println(F("+ Filemanager*"));
-    gfx->println(F("+ Filemanager*"));
+  //  gfx->println(F("+ Filemanager*"));
   } else {
-    gfx->println(F(""));
+  //  gfx->println(F(""));
   }
-}
+ }
+
 //*********** FLASH OVERLOAD  functions So can just be called from sub routines*********
 // void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
 //   DEBUG_PORT.printf("SAVING CONFIG\n");

@@ -3,7 +3,7 @@
 #include <math.h>
 
 #include "..\FontType.h"
-
+#include "..\debug_port.h"
 
 #define DEG_TO_RAD 0.0174532925f
 MarinePageGFX* page = nullptr;
@@ -27,6 +27,10 @@ void MarinePageGFX::setShadow_ON(bool value) {_ShadowON = value;}
 
 
 const GFXfont* _currentFont = nullptr;
+
+uint16_t* MarinePageGFX::getBuffer(int index) {
+    return (index >= 0 && index < 2) ? _buffer[index] : nullptr;
+}
 
 
 
@@ -55,7 +59,7 @@ MarinePageGFX::MarinePageGFX(Arduino_GFX* gfx, int16_t width, int16_t height)
     _cursorX(0), _cursorY(0), _textColor(0xFFFF), _textSize(1) {
 
   if (!psramFound()) {
-    Serial0.println("ERROR: PSRAM not found. Cannot allocate page buffers.");
+    DEBUG_PORT.println("ERROR: PSRAM not found. Cannot allocate page buffers.");
     _buffer[0] = nullptr;
     _buffer[1] = nullptr;
     return;
@@ -66,11 +70,11 @@ MarinePageGFX::MarinePageGFX(Arduino_GFX* gfx, int16_t width, int16_t height)
   _buffer[1] = (uint16_t*)heap_caps_malloc(bufSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
   if (!_buffer[0] || !_buffer[1]) {
-    Serial0.println("ERROR: Failed to allocate page buffers in PSRAM.");
+    DEBUG_PORT.println("ERROR: Failed to allocate page buffers in PSRAM.");
     _buffer[0] = nullptr;
     _buffer[1] = nullptr;
   } else {
-    Serial0.printf("Page buffers allocated: %d bytes each\n", bufSize);
+    DEBUG_PORT.printf("Page buffers allocated: %d bytes each\n", bufSize);
   }
 }
 
@@ -87,7 +91,7 @@ void MarinePageGFX::begin() {
   if (isReady()) {
     fillScreen(0x0000);  // Clear to black
   } else {
-    Serial0.println("WARNING: Buffer not initialized. Skipping fillScreen.");
+    DEBUG_PORT.println("WARNING: Buffer not initialized. Skipping fillScreen.");
   }
   _textCanvas = new Arduino_Canvas(_width, _height, nullptr, false);
   _textCanvas->begin();
@@ -102,7 +106,7 @@ void MarinePageGFX::push() {
   if (isReady()) {
     _gfx->draw16bitRGBBitmap(0, 0, _buffer[_active], _width, _height);
   } else {
-    Serial0.println("WARNING: Buffer not initialized. Skipping push.");
+    DEBUG_PORT.println("WARNING: Buffer not initialized. Skipping push.");
   }
 }
 
@@ -149,9 +153,7 @@ void MarinePageGFX::drawLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int16_t
 
 void MarinePageGFX::setFontByIndex(int index) {
   if (!_textCanvas) return;
-  //Serial0.printf("Font set: %d\n", index);
-
-
+  //DEBUG_PORT,printf("Font set: %d\n", index);
   if (index >= 0 && index < FONT_COUNT) {
     _currentFont = fontTable[index];
     _textCanvas->setFont(_currentFont);
@@ -322,73 +324,168 @@ void MarinePageGFX::GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...) {
 }
 
 
-void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button,int decimalInset, const char* fmt, ...) {
-  if (!_textCanvas || !fmt) return;
+void MarinePageGFX::PrintSubshadow(_sButton& button, const char* valueBuffer, int16_t valH,int16_t valV, int chosenFont){
+  setFontByIndex(chosenFont);  
+  if ((_ShadowX)||(_ShadowY)){
+  _textCanvas->setCursor(valH+_ShadowX,valV+_ShadowY);
+  _textCanvas->setTextColor(NEAR_BLACK);
+  _textCanvas->print(valueBuffer);}
+  _textCanvas->setCursor(valH,valV);
+  _textCanvas->setTextColor(button.TextColor);
+  _textCanvas->print(valueBuffer);
+}
 
+void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, const char* fmt, ...) {
+    if (!_textCanvas || !fmt) return;
+  char valueBuffer[64]; 
+  int magnify =1; 
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(valueBuffer, sizeof(valueBuffer), fmt, args);
+  va_end(args);
+    //parse value back to double 
+  double testValue = 0.0;
+  sscanf(valueBuffer, "%lf", &testValue);
+// DEBUG_PORT.println(testValue);
+// 
+  if (testValue == -1e9 || std::isnan(testValue)) {return;}
+  int printableWidth = button.width - 2 * button.bordersize;
+  int printableHeight = button.height - 2 * button.bordersize;
+    // Draw background
+  _textCanvas->fillRect(button.h, button.v, button.width, button.height, button.BackColor);
+  // Draw border
+  if (button.bordersize > 0) {
+    for (int i = 0; i < button.bordersize; i++) {
+      _textCanvas->drawRect(button.h + i, button.v + i,
+                            button.width - 2 * i, button.height - 2 * i,
+                            button.BorderColor);
+    }
+  }
+  // Measure parts
+  int16_t x1, y1;
+  uint16_t w1,w2, h1,h2;
+  // Font probing using FontID and fontTable
+  _textCanvas->setTextSize(1);
+  int chosenFont;
+  _textCanvas->setTextBound(0, 0, 1024, 1024);  // artificially large bounds
+  int lastw =0;
+  for (int fontIndex = 7; fontIndex <=13; fontIndex++) {
+    setFontByIndex(fontIndex);
+    _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
+    if ((w1 >= printableWidth)||(lastw>=w1)) { break;}   // make sure that if we have an error in the fint table and loop, we still catch the lagest font
+    lastw=w1;
+    chosenFont = fontIndex;
+  }
+ //  DEBUG_PORT.printf("** Font selected is font %i, magnification %i \n",chosenFont, magnify );
+  // allow possibilty that if biggest font is less than half the printableWidth and then magnify by 2 
+  if (lastw <= 2*printableWidth/3 ) {
+    magnify=2; 
+   _textCanvas->setTextSize(magnify);
+    lastw =0;
+    for (int fontIndex = 7; fontIndex <=13; fontIndex++) {
+     setFontByIndex(fontIndex);
+     _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
+      if ((w1 >= printableWidth)||(lastw>=w1)) { break;}   // make sure that if we have an error in the fint table and loop, we still catch the lagest font
+      lastw=w1;
+     chosenFont = fontIndex;
+    }
+  } 
+  // SET chosen magnify and font for printing 
+  _textCanvas->setTextSize(magnify);
+  setFontByIndex(chosenFont);  
+  _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1); // repeat in case we do a magnify before this .. 
+  _textCanvas->getTextBounds(valueBuffer, 0, 0, &x1, &y1, &w2, &h2);
+   // Compute top  so reference would be vertically centered - fixes vertical alignment so different character heights do not shift position of decimal point
+  int16_t refV = button.v + (button.height + h1) / 2; // V centered ?
+   // Center actual value horizontally
+  int16_t valH = button.h + button.bordersize + (button.width-w2) / 2;
+  // set correct text bounds
+  _textCanvas->setTextBound(button.h + button.bordersize, button.v+button.bordersize,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize); 
+ // DEBUG_PORT.printf("print  %s  at v%i h%i in font %i, magnification %i \n",valueBuffer,refV,valH,chosenFont,magnify );
+  PrintSubshadow(button,valueBuffer,valH,refV,chosenFont);
+
+  // setFontByIndex(chosenFont);  
+  // _textCanvas->setCursor(valH+_ShadowX,refV+_ShadowY);
+  // _textCanvas->setTextColor(NEAR_BLACK);
+  // _textCanvas->print(valueBuffer);
+  // _textCanvas->setCursor(valH,refV);
+  // _textCanvas->setTextColor(button.TextColor);
+  // _textCanvas->print(valueBuffer);
+    
+  _textCanvas->setTextSize(1); // reset magnify for other functions
+  button.PrintLine = 0;
+ }
+
+
+
+
+
+void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button,int magnify,int bigF,int Smallf,int decimalInset, const char* fmt, ...) {
+  if (!_textCanvas || !fmt) return;
   // Format the string
   char buffer[128];
   va_list args;
   va_start(args, fmt);
   vsnprintf(buffer, sizeof(buffer), fmt, args);
   va_end(args);
-  Serial0.println("debug ");
-  Serial0.println(buffer);
+ // DEBUG_PORT.println("debug ");
+ // DEBUG_PORT.println(buffer);
   //parse value back to double 
   double testValue = 0.0;
   sscanf(buffer, "%lf", &testValue);
-  Serial0.println(testValue);
+// DEBUG_PORT.println(testValue);
 // 
   if (testValue == -1e9 || std::isnan(testValue)) {return;}
 
     // Font selection
-  FontID mainFont = static_cast<FontID>(button.Font);
-  FontID smallFont = (mainFont > 0) ? static_cast<FontID>(button.Font - 1) : mainFont;
+  FontID mainFont = static_cast<FontID>(bigF);
+  FontID smallFont =static_cast<FontID>(Smallf) ;
   // Font selection
   //FontID mainFont = static_cast<FontID>(Font);
   //FontID smallFont = static_cast<FontID>(Font - 1) ;
 
-  _textCanvas->setTextSize(1);
+  _textCanvas->setTextSize(magnify);
 
   // Split into integer and fractional parts
   const char* dot = strchr(buffer, '.');
   char intPart[64], fracPart[64], intDotPart[66];
-
   if (dot) {
     size_t intLen = dot - buffer;
     strncpy(intPart, buffer, intLen);
     intPart[intLen] = '\0';
-	
-    strncpy(fracPart, dot + 1, sizeof(fracPart));
-    fracPart[sizeof(fracPart) - 1] = '\0';
-    snprintf(intDotPart, sizeof(intDotPart), "%s.", intPart);  // int + dot
+    // Prepend dot to fractional part
+    snprintf(fracPart, sizeof(fracPart), ".%s", dot + 1);
+    // Just the integer part (no dot)
+    strncpy(intDotPart, intPart, sizeof(intDotPart));
+    intDotPart[sizeof(intDotPart) - 1] = '\0';
   } else {
     strncpy(intPart, buffer, sizeof(intPart));
     intPart[sizeof(intPart) - 1] = '\0';
-    fracPart[0] = '\0';
+    fracPart[0] = '\0';  // No fractional part
     strncpy(intDotPart, intPart, sizeof(intDotPart));
     intDotPart[sizeof(intDotPart) - 1] = '\0';
   }
-  // Measure parts
+
+ // Measure parts
   int16_t x1, y1, x2, y2,y3;
-  uint16_t w1, h1, w2, h2,w3;
-//   Serial0.print(" Debug  before text bounds<");Serial0.print(intDotPart);Serial0.print(">  <");Serial0.print(fracPart);Serial0.println(">");
+  uint16_t w1, h1, w2, h2,h3,w3,w4,w5;
+//   DEBUG_PORT.print(" Debug  before text bounds<");DEBUG_PORT,print(intDotPart);DEBUG_PORT,print(">  <");DEBUG_PORT,print(fracPart);DEBUG_PORT,println(">");
+  _textCanvas->setTextBound(0,0,900,500); //Set bigger than we can so that GetText Bound is not limited
   _textCanvas->setFont(fontTable[mainFont]);
   _textCanvas->getTextBounds(intDotPart, 0, 0, &x1, &y1, &w1, &h1);
-
+   _textCanvas->getTextBounds("119", 0, 0, &x1, &y1, &w5, &h3); // I just want h3
   _textCanvas->setFont(fontTable[smallFont]);
   _textCanvas->getTextBounds(fracPart, 0, 0, &x2, &y2, &w2, &h2);
-  _textCanvas->getTextBounds("1", 0, 0, &x2, &y2, &w3, &h2);
-
+  _textCanvas->getTextBounds(".", 0, 0, &x2, &y2, &w3, &h2);
+  _textCanvas->getTextBounds("9", 0, 0, &x2, &y2, &w4, &h2); // get w4 = width of small 9 
   
-  uint16_t totalHeight = std::max(h1, h2);
-
-  // Fixed decimal anchor position
-  int16_t decimalX = button.h + decimalInset;
-  int16_t baselineY = button.v + (button.height - totalHeight) / 2 - y1; 
-
+  uint16_t totalHeight = h3; // fix where 9 is ! do not use max std::max(h1, h2);
+ // DEBUG_PORT.print("text<");DEBUG_PORT.print(intDotPart);DEBUG_PORT.print(">  <");DEBUG_PORT.print(fracPart);DEBUG_PORT.println(">");
+ // DEBUG_PORT.print("width <");DEBUG_PORT.print(w1);DEBUG_PORT.print(">  <");DEBUG_PORT.print(w2);DEBUG_PORT.print("> <= ? width ");DEBUG_PORT.print(button.width-(2*button.bordersize));DEBUG_PORT.println("");
+  uint16_t TotalWidth= w2+w1+w3;
+  // Fixed decimal anchor position relative to box 
   // Draw background
   _textCanvas->fillRect(button.h, button.v, button.width, button.height, button.BackColor);
-
   // Draw border
   if (button.bordersize > 0) {
     for (int i = 0; i < button.bordersize; i++) {
@@ -398,8 +495,18 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button,int decimalInset, 
     }
   }
 
-  // Draw integer + dot, right-aligned to decimalX
+  decimalInset= button.width - (3*button.bordersize) ; 
+  int16_t decimalX = button.h + decimalInset-w3;
+  int16_t baselineY = button.v + (button.height + h3) / 2; // V centered ?
+ if (TotalWidth <= button.width-(2*button.bordersize) ){decimalX = button.h+ button.width - (3*button.bordersize) -(2*w3)-w4;        }
   int16_t intX = decimalX - w1;
+  
+
+
+  //_textCanvas->setTextBound(button.h + button.bordersize, button.v+button.bordersize,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize); //?
+  // Draw integer + dot, right-aligned to decimalX
+
+  
   _textCanvas->setFont(fontTable[mainFont]);
     _textCanvas->setTextColor(NEAR_BLACK);
   _textCanvas->setCursor(intX+_ShadowX, baselineY+_ShadowY);
@@ -407,24 +514,22 @@ void MarinePageGFX::BorderPrintCanvasTwoSize(_sButton& button,int decimalInset, 
   _textCanvas->setTextColor(button.TextColor);
   _textCanvas->setCursor(intX, baselineY);
   _textCanvas->print(intDotPart);
-
+ int16_t fracX = decimalX; // outside for diagnostic ?? add?? subtract ?? allow a bit more w3, for the  size ".""
+   if (TotalWidth <= button.width-(2*button.bordersize) ){
   // Draw fractional part, left-aligned after decimal
-  int16_t fracX = decimalX+(w3/2); // allow a bit more for the decimal size half the width of a "1"
-  
-  _textCanvas->setFont(fontTable[smallFont]);
+     _textCanvas->setFont(fontTable[smallFont]);
      _textCanvas->setTextColor(NEAR_BLACK);
   _textCanvas->setCursor(fracX+_ShadowX, baselineY+_ShadowY);
   _textCanvas->print(fracPart);
    _textCanvas->setTextColor(button.TextColor);
   _textCanvas->setCursor(fracX, baselineY);
   _textCanvas->print(fracPart);
-
+   }
   // Optional diagnostics
-  //if (diagnosticsEnabled()) {
-  //  _textCanvas->drawLine(intX, baselineY, fracX + w2, baselineY, TFT_RED); // baseline
-  //  _textCanvas->drawLine(decimalX, button.v, decimalX, button.v + button.height, TFT_CYAN); // anchor
-  //}
-
+  //   _textCanvas->drawLine(intX, baselineY, fracX + w2, baselineY, RED); // baseline
+  //   _textCanvas->drawLine(decimalX, button.v, decimalX, button.v + button.height, GREEN); // anchor
+  //  _textCanvas->drawLine(intX, button.v, intX, button.v + button.height, DARKGREEN); // anchor
+ 
   button.PrintLine = 0;
 }
 void MarinePageGFX::DrawCompass(_sButton& button) {
@@ -496,15 +601,15 @@ void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int1
 
   // Shadow rendering
   if (shadow) {
-    int16_t offset = 2;
-    drawTriangleToCanvas(tipX + offset, tipY + offset,
-                         baseX1 + offset, baseY1 + offset,
-                         baseX2 + offset, baseY2 + offset,
+    int16_t offset = 2;/*_ShadowX, baselineY+_ShadowY*/
+    drawTriangleToCanvas(tipX + _ShadowX, tipY + _ShadowY,
+                         baseX1 + _ShadowX, baseY1 + _ShadowY,
+                         baseX2 + _ShadowX, baseY2 + _ShadowY,
                          NEAR_BLACK);
 
-    drawTriangleToCanvas(tailX + offset, tailY + offset,
-                         baseX2 + offset, baseY2 + offset,
-                         baseX1 + offset, baseY1 + offset,
+    drawTriangleToCanvas(tailX + _ShadowX, tailY + _ShadowY,
+                         baseX2 + _ShadowX, baseY2 + _ShadowY,
+                         baseX1 + _ShadowX, baseY1 + _ShadowY,
                          NEAR_BLACK);
   }
 
@@ -517,7 +622,6 @@ void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int1
 
 void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...) {
   if (!_textCanvas || !fmt) return;
-
   // Format the string
   char buffer[128];
   va_list args;
@@ -537,6 +641,7 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
   // Measure text
   int16_t x, y;
   uint16_t w, h;
+  _textCanvas->setTextBound(0, 0, 1024, 1024);  // artificially large bounds
   _textCanvas->getTextBounds(buffer, 0, 0, &x, &y, &w, &h);
 
   // Positioning logic
@@ -577,6 +682,7 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
   }
 
   // Draw text
+   _textCanvas->setTextBound(button.h + button.bordersize, button.v+button.bordersize,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize);
   _textCanvas->setTextColor(button.TextColor,button.BorderColor);
   _textCanvas->setCursor(tx, ty);
   _textCanvas->print(buffer);
@@ -1039,3 +1145,4 @@ void MarinePageGFX::drawRoundRect(int16_t x0, int16_t y0, int16_t w, int16_t h, 
 void MarinePageGFX::setFont(const GFXfont* font) {
   _gfxFont = font;
 }
+

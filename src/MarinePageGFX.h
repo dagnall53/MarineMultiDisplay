@@ -12,6 +12,8 @@ class MarinePageGFX {
 public:
   MarinePageGFX(Arduino_GFX* gfx, int16_t width, int16_t height);
   ~MarinePageGFX();
+  
+  uint16_t* getBuffer(int index);
 
   void begin();
   void swap();     // Switch active buffer
@@ -31,9 +33,10 @@ public:
   
   void DrawScrollingGraph(_sButton& button, const GraphBuffer& buffer, double minVal, double maxVal);
   void Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...);
-  void BorderPrintCanvasTwoSize(_sButton& button,int decimalInset, const char* fmt, ...);
+  void AutoPrint2Size(_sButton& button, const char* reference, const char* fmt, ...);
+  void BorderPrintCanvasTwoSize(_sButton& button,int magnify,int bigF,int Smallf,int decimalInset, const char* fmt, ...);
   void GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...);
-  void setFontByIndex(int index);
+
   int getFontLineHeight(FontID id);
 
   // Drawing primitives
@@ -82,6 +85,8 @@ public:
 
 
   // Text rendering
+  void PrintSubshadow(_sButton& button, const char* valueBuffer, int16_t valH,int16_t valV, int chosenFont);
+
   void setCursor(int16_t x, int16_t y);
   void setTextColor(uint16_t color);
   void setTextColor(uint16_t fg, uint16_t bg);
@@ -90,6 +95,7 @@ public:
   void print(const char* buf);
   void printf(const char* fmt, ...);
   void setFont(const GFXfont* font);
+  void setFontByIndex(int index);
   void setTextBound(int x, int y, int w, int h);
   void setTextWrap(bool wrap);
   int getCursorX();

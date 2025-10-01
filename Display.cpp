@@ -769,9 +769,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
         setFont(10);
       }
-  page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight, 154, "%.1f",BoatData.SOG.data);
+  page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight,1,12,11, 154, "%.1f",BoatData.SOG.data);
   page->Addtitletobutton(TopHalfBigSingleTopRight, 6, 8, " SOG ");
-   page->BorderPrintCanvasTwoSize(BottomHalfBigSingleTopRight,154, "%.1f",BoatData.COG.data);
+   page->BorderPrintCanvasTwoSize(BottomHalfBigSingleTopRight,1,12,11,154, "%.1f",BoatData.COG.data);
   page->Addtitletobutton(BottomHalfBigSingleTopRight, 6, 8, " COG ");
 
       if (millis() > slowdown + 1000) {
@@ -1129,13 +1129,14 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
   }
   /*if (selected dta .data != NMEA0183DoubleNA) */
   page->setShadowX(4); page->setShadowY(4);
-  if ((Choice == "SOG")&&(BoatData.SOG.data!= NMEA0183DoubleNA) ){ page->BorderPrintCanvasTwoSize(Position, 164, "%.1f",BoatData.SOG.data);
+  if ((Choice == "SOG")&&(BoatData.SOG.data!= NMEA0183DoubleNA) ){ //page->AutoPrint2Size(Position,"99.9", "%.1f",BoatData.SOG.data);
+                            page->BorderPrintCanvasTwoSize(Position,1,12,10,160,"%.1f",BoatData.SOG.data);
                             page->Addtitletobutton(Position, 6, 9, " SOG ");
                             page->Addtitletobutton(Position, 3, 9, " Kts ");}
-  if ((Choice == "STW") &&(BoatData.STW.data!= NMEA0183DoubleNA) ) {  page->BorderPrintCanvasTwoSize(Position, 164, "%.1f",BoatData.STW.data);
+  if ((Choice == "STW") &&(BoatData.STW.data!= NMEA0183DoubleNA) ) {  page->AutoPrint2Size(Position,"99.9", "%.1f",BoatData.STW.data);
                             page->Addtitletobutton(Position, 6, 9, " STW ");
                             page->Addtitletobutton(Position, 3, 9, " Kts ");}
-  if ((Choice == "DEPTH") &&(BoatData.WaterDepth.data!= NMEA0183DoubleNA) ) { page->BorderPrintCanvasTwoSize(Position, 164, "%.1f",BoatData.WaterDepth.data);
+  if ((Choice == "DEPTH") &&(BoatData.WaterDepth.data!= NMEA0183DoubleNA) ) { page->AutoPrint2Size(Position,"199.9" ,"%.1f",BoatData.WaterDepth.data);
                             page->Addtitletobutton(Position, 6, 9, " DEPTH ");
                             page->Addtitletobutton(Position, 3, 9, " m ");} 
   page->setShadowX(0); page->setShadowY(0);

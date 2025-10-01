@@ -48,6 +48,7 @@ static const GFXfont* const fontTable[FONT_COUNT] = {
   &FreeSansBold6pt7b,
   &FreeSansBold8pt7b,
   &FreeSansBold12pt7b,
+  &FreeSansBold18pt7b,
   &FreeSansBold27pt7b,
   &FreeSansBold40pt7b,
   &FreeSansBold60pt7b

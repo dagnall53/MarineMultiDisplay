@@ -368,18 +368,18 @@ void SetupWebstuff() {
     WifiGFXinterrupt(8, WifiStatus, "Re-Loading Configurations");
     if (LoadConfiguration()) {
       DEBUG_PORT.println("Reloading wifi and display settings");
-      //gfx->println(F("USING FATS JSON for WiFi and display settings"));
+      //gfx->println(F("USING JSON for WiFi and display settings"));
       Saved_Display_Config = Display_Config;
       Saved_Settings = Current_Settings;
       Display_Page = Display_Config.Start_Page;
     }
     if (LoadVictronConfiguration()) {
       DEBUG_PORT.println("Reloading Victron data settings");
-      // gfx->println(F("USING FATS JSON for Victron settings"));
+      // gfx->println(F("USING JSON for Victron settings"));
     }
     if (LoadDisplayConfiguration()) {
       DEBUG_PORT.println("Reloading Colours data settings");
-      // gfx->println(F("USING FATS JSON for Colours data settings"));
+      // gfx->println(F("USING JSON for Colours data settings"));
     }
     delay(100);
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
