@@ -805,10 +805,10 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
                       int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
         }
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-        page->UpdateLinef(9, BigSingleDisplay, "");
-        page->UpdateLinef(9, BigSingleDisplay, "LAT %s", LattoString(BoatData.Latitude.data));
-        page->UpdateLinef(9, BigSingleDisplay, "LON %s", LongtoString(BoatData.Longitude.data));
-        page->UpdateLinef(9, BigSingleDisplay, "");
+        page->UpdateLinef(9, BigSingleDisplay, "/n");
+        page->UpdateLinef(9, BigSingleDisplay, "LAT %s/n", LattoString(BoatData.Latitude.data));
+        page->UpdateLinef(9, BigSingleDisplay, "LON %s/n", LongtoString(BoatData.Longitude.data));
+        page->UpdateLinef(9, BigSingleDisplay, "/n");
         }
 
         if (BoatData.MagHeading.data != NMEA0183DoubleNA) { page->UpdateLinef(9, BigSingleDisplay, "Mag Heading: %.4f\n", BoatData.MagHeading); }
@@ -1154,13 +1154,16 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
                             page->AddTitleInsideBox(Position, 6, 9, " DEPTH ");
                             page->AddTitleInsideBox(Position, 3, 9, " m ");} 
   page->setShadowX(0); page->setShadowY(0);
- if (Choice == "DGRAPH") {   int max=0;int min= 20; page->DrawScrollingGraph(Position, DepthBuffer, min, max);
-                       page->AddTitleInsideBox(Position, 1, 0, "Fathmometer");
-                       page->AddTitleInsideBox(Position, 2, 0, "MAX:%i",max);
-                       page->AddTitleInsideBox(Position, 3, 0, "MIN:%i",min);}
-  
+ if (Choice == "DGRAPH") { page->DrawScrollingGraph(Position, DepthBuffer,10,0); //int min= 20;int max=0;    min, max);
+                       page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 10m");
+                       page->AddTitleInsideBox(Position, 2, 0, "surface");
+                       page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ",20);}
+  if (Choice == "DGRAPH2") { page->DrawScrollingGraph(Position, DepthBuffer,50,0); //int min= 20;int max=0;    min, max);
+                       page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 50m");
+                       page->AddTitleInsideBox(Position, 2, 0, "surface");
+                       page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ",50);}
 
-  // if (Choice == "DGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 10, 0, 8, "Fathmometer 10m ", "m"); }
+  
   // if (Choice == "DGRAPH2") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
   // if (Choice == "STWGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.STW, 0, 10, 8, "STW-Graph ", "kts"); }
   // if (Choice == "SOGGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.SOG, 0, 10, 8, "SOG-Graph ", "kts"); }

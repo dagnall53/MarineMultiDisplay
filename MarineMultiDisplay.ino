@@ -1,16 +1,40 @@
 
-//********* for SERIAL on Wavshare.. MUST SET ******************
-//Tools-> CDC on boot ENABLED
 
-// not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
+/*
+*************** settings **************************
+USB CDC on boot enabled
+Erase All flash before sketch disable -- but also test Enable to check that the code rebuilds the configuration files
+Partition scheme  Default 16M(6.25Mb APP /3.4MB SPIFFS)
+PSRAM OPI PSRAM
+
+to activate the Default 16M(6.25Mb APP /3.4MB SPIFFS)  partition - which is default_16MB.csv in the 2.0.17/tools/partitions 
+you need to edit the Boards.text in 2.0.17/tools 
+after esp32s3.menu.PartitionScheme.default_8MB.upload.maximum_size=3342336
+add
+esp32s3.menu.PartitionScheme.default_16MB=Default 16M(6.25MB APP/3.43MB SPIFFS)
+esp32s3.menu.PartitionScheme.default_16MB.build.partitions=default_16MB
+esp32s3.menu.PartitionScheme.default_16MB.upload.maximum_size=6553600
+But NOTE: This will not be seen by Arduino until you delete its rapid access copy of its settings.
+
+This is all held in C:\Users\<yourname>dagna\AppData\Roaming\arduino-ide
+Close Arduino ide and then the whole directory needs to be deleted.
+I will be rebuilt next time you open Arduino, but now the 16M partition will be available as an option.
+See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/1170025
+
+*/
+
+
+
+
+// also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
 const char soft_version[] = " V0.20";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
-//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-//#define WIDEBOX    // 4.3inch 800 by 400 display Setup
+#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+#define WIDEBOX    // 4.3inch 800 by 400 display Setup
 //**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -21,7 +45,7 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <Wire.h>  // Load the Wire Library
 #include <esp_now.h>
 #include <esp_wifi.h>
-#include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation'
+#include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation' V1.6.0
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
@@ -76,7 +100,7 @@ bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 #include "debug_port.h"
 #include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
 
-int Screen_Width;     // Solution to pass OUCH_WIDTH to stuff that does not see module data until later!
+int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
 
 #include "N2kMsg.h"
 #include "NMEA2000.h"
