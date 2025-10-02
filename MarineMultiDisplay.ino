@@ -155,6 +155,12 @@ bool dataUpdated;     // flag that Nmea Data has been updated
 // If the structure is changed, be sure to change the Key (first figure) so that new defaults and struct can be set.
 //
 //Config.txt holds both Default and Display settings in one file
+//for new graphs
+#include "Globals.h"
+GraphBuffer DepthBuffer;
+
+ // or voltageBuffer, tempBuffer, etc.
+
 const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
 _sDisplay_Config Saved_Display_Config;
 _sDisplay_Config Display_Config;
@@ -197,13 +203,13 @@ _sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
 _sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
 _sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE };
 // for the quarter screens on the main page
-_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };  //h  reduced by 15 to give 30 space at the bottom
-_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };
-_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };
-_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };
+_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };  //h  reduced by 15 to give 30 space at the bottom
+_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
 // for wide display //        int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
-_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,12 };
-_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,13 }; 
+_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,8 }; 
 
 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
@@ -405,8 +411,10 @@ void setup() {
   setupFilemanager();          // listDir(FFat,"/",1); delay(500);
   DEBUG_PORT.println("Setup Completed");
 // include #include "MarineRuntimeOverlay.h"; if we wish to debug page sizes etc MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));
-
-   delay(500); 
+  for (int i=0;i<=200;i++){ // fill buffer with zero to start
+    DepthBuffer.push(0);
+  }
+   delay(100); 
  }
 
 void loop() {

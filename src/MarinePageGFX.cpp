@@ -314,11 +314,16 @@ void MarinePageGFX::DrawScrollingGraph(_sButton& button, const GraphBuffer& buff
 
   // Scale factor
   double range = maxVal - minVal;
-  if (range <= 0.0001) range = 1.0;
-
+  if (range == 0) range = 1.0;
   // Step size
   float xStep = static_cast<float>(graphW) / 199.0;
-
+  
+  // Inline clamp helper
+  auto clampY = [&](int16_t y) -> int16_t {
+    if (y < graphY) return graphY;
+    if (y > graphY + graphH) return graphY + graphH;
+    return y;
+  };
   // Draw graph line
   for (uint16_t i = 1; i < buffer.count; i++) {
     double v1 = buffer.get(i - 1);
@@ -329,6 +334,11 @@ void MarinePageGFX::DrawScrollingGraph(_sButton& button, const GraphBuffer& buff
 
     int16_t y1 = graphY + graphH - static_cast<int16_t>(((v1 - minVal) / range) * graphH);
     int16_t y2 = graphY + graphH - static_cast<int16_t>(((v2 - minVal) / range) * graphH);
+	    // Clamp to graph box so drawing never escapes the button
+    y1 = clampY(y1);
+    y2 = clampY(y2);
+
+
     drawWideLineToCanvas(x1, y1, x2, y2, button.TextColor,1);
     //_textCanvas->drawLine(x1, y1, x2, y2, button.TextColor);
   }

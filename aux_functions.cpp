@@ -14,7 +14,9 @@ but highly modified!
 #include "CanvasBridge.h"
 #include "FontType.h"
 #include "Structures.h"
+#include "Globals.h"
 extern MarinePageGFX* page;
+extern GraphBuffer DepthBuffer;
 
 extern int text_offset;
 extern int MasterFont;
@@ -182,15 +184,15 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {
   // DEBUG_PORT.println(" Fields:");for(int x=0 ;int <Num_DataFields;int++){DEBUG_PORT.print(Field[x]);DEBUG_PORT.print(",");} DEBUG_PORT.println("> ");
   switch (Index / 4) {
     case 1:  //dbt
-      toNewStruct(Field[3], BoatData.WaterDepth);
+      toNewStruct(Field[3], BoatData.WaterDepth);DepthBuffer.push(BoatData.WaterDepth.data);// depth is negative! to keep the graph sensible
       return true;
       break;
     case 2:  //DPT //dIFFERENT TO DBT/DBK
-      toNewStruct(Field[1], BoatData.WaterDepth);
+      toNewStruct(Field[1], BoatData.WaterDepth);DepthBuffer.push(BoatData.WaterDepth.data);
       return true;
       break;
     case 3:  //DBK
-      toNewStruct(Field[3], BoatData.WaterDepth);
+      toNewStruct(Field[3], BoatData.WaterDepth);DepthBuffer.push(BoatData.WaterDepth.data);
       return true;
       break;
 

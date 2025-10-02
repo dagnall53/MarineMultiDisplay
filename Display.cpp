@@ -13,6 +13,8 @@
 #include "Structures.h"
 
 extern MarinePageGFX* page;
+#include "Globals.h"
+
 
 #include "debug_port.h"
 
@@ -94,17 +96,16 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     WIFIGFXBoxdisplaystarted = false;
     DEBUG_PORT.println("IN Display_Page.. load config (reset)");
     LoadConfiguration();  //Reload configuration in case new data stored
+    page->clearCanvas(BLUE);
     RunSetup = true;
   }
   //generic setup stuff for ALL pages
  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
   if (RunSetup) {
     DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
-    page->fillScreen(BLUE);
+    page->clearCanvas(BLUE);
     page->setTextColor(WHITE);
-    setFont(3);
-    page->GFXBorderBoxPrintf(StatusBox, " display start Runsetup"); // overrwrites on start 
-  }
+   }
 
   // if ((millis() >= flashinterval)) {
   //   flashinterval = millis() + 1000;
@@ -371,6 +372,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (RunSetup) {
         Terminal.debugpause = false;
          page->clearCanvas(BLUE);
+         page->GFXBorderBoxPrintf(Terminal, "will fill with data");
       }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
         setFont(3);
@@ -732,6 +734,11 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (RunSetup) {
         setFont(10);
         page->fillScreen(BLACK);
+        page->GFXBorderBoxPrintf(topLeftquarter, "will fill with data");
+        page->GFXBorderBoxPrintf(topRightquarter, "will fill with data");
+        page->GFXBorderBoxPrintf(bottomRightquarter, "will fill with data");
+        page->GFXBorderBoxPrintf(bottomLeftquarter, "will fill with data");
+         if (_WideDisplay) {page->GFXBorderBoxPrintf(WideScreenCentral,"will fill with data");}
       }
       ButtonDataSelect(topLeftquarter, 0, Display_Config.FourWayTL, RunSetup);
       ButtonDataSelect(topRightquarter, 1, Display_Config.FourWayTR, RunSetup);
@@ -779,9 +786,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         setFont(10);
       }
   page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight, 154, "%.1f",BoatData.SOG.data);
-  page->Addtitletobutton(TopHalfBigSingleTopRight, 6, 8, " SOG ");
+  page->AddTitleInsideBox(TopHalfBigSingleTopRight, 6, 8, " SOG ");
    page->BorderPrintCanvasTwoSize(BottomHalfBigSingleTopRight,154, "%.1f",BoatData.COG.data);
-  page->Addtitletobutton(BottomHalfBigSingleTopRight, 6, 8, " COG ");
+  page->AddTitleInsideBox(BottomHalfBigSingleTopRight, 6, 8, " COG ");
 
       if (millis() > slowdown + 1000) {
         slowdown = millis();
@@ -791,10 +798,10 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         BigSingleDisplay.PrintLine = 0;
         if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(8, BigSingleDisplay, "Satellites in view %.0f ", BoatData.SatsInView); }
         if (BoatData.GPSTime != NMEA0183DoubleNA) {
-        page->UpdateLinef(9, BigSingleDisplay, "");
-        page->UpdateLinef(9, BigSingleDisplay, "Date: %06i ", int(BoatData.GPSDate));
-        page->UpdateLinef(9, BigSingleDisplay, "");
-        page->UpdateLinef(9, BigSingleDisplay, "TIME: %02i:%02i:%02i",
+        page->UpdateLinef(9, BigSingleDisplay, "\n");
+        page->UpdateLinef(9, BigSingleDisplay, "Date: %06i \n", int(BoatData.GPSDate));
+        page->UpdateLinef(9, BigSingleDisplay, "\n");
+        page->UpdateLinef(9, BigSingleDisplay, "TIME: %02i:%02i:%02i\n",
                       int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
         }
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
@@ -804,8 +811,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->UpdateLinef(9, BigSingleDisplay, "");
         }
 
-        if (BoatData.MagHeading.data != NMEA0183DoubleNA) { page->UpdateLinef(9, BigSingleDisplay, "Mag Heading: %.4f", BoatData.MagHeading); }
-        if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) { page->UpdateLinef(9, BigSingleDisplay, "Variation: %.4f", BoatData.Variation); }
+        if (BoatData.MagHeading.data != NMEA0183DoubleNA) { page->UpdateLinef(9, BigSingleDisplay, "Mag Heading: %.4f\n", BoatData.MagHeading); }
+        if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) { page->UpdateLinef(9, BigSingleDisplay, "Variation: %.4f\n", BoatData.Variation); }
       }
       if (CheckButton(BigSingleTopLeft)) { Display_Page = 10; }
       //if (CheckButton(bottomLeftquarter)) { Display_Page = 4; }  //Loop to the main settings pageIndex
@@ -1133,20 +1140,26 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
  if ((Choice == "WIND") &&(BoatData.WindSpeedK.data!= NMEA0183DoubleNA) ){
        page->DrawCompass(Position);
       page->drawCompassPointer(Position, 20, 50, BoatData.WindAngleApp.data, WHITE,true);
-      page->Addtitletobutton(Position, 6, 9, "Apparent:%.1fkts",BoatData.WindSpeedK.data);
+      page->AddTitleInsideBox(Position, 6, 9, "Apparent:%.1fkts",BoatData.WindSpeedK.data);
   }
   /*if (selected dta .data != NMEA0183DoubleNA) */
  page->setShadowX(4); page->setShadowY(4);
   if ((Choice == "SOG")&&(BoatData.SOG.data!= NMEA0183DoubleNA) ){ page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.SOG.data);
-                            page->Addtitletobutton(Position, 6, 9, " SOG ");
-                            page->Addtitletobutton(Position, 3, 9, " Kts ");}
+                            page->AddTitleInsideBox(Position, 6, 9, " SOG ");
+                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");}
   if ((Choice == "STW") &&(BoatData.STW.data!= NMEA0183DoubleNA) ) {  page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.STW.data);
-                            page->Addtitletobutton(Position, 6, 9, " STW ");
-                            page->Addtitletobutton(Position, 3, 9, " Kts ");}
+                            page->AddTitleInsideBox(Position, 6, 9, " STW ");
+                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");}
   if ((Choice == "DEPTH") &&(BoatData.WaterDepth.data!= NMEA0183DoubleNA) ) { page->AutoPrint2Size(Position, "199.9", "%.1f",BoatData.WaterDepth.data);
-                            page->Addtitletobutton(Position, 6, 9, " DEPTH ");
-                            page->Addtitletobutton(Position, 3, 9, " m ");} 
+                            page->AddTitleInsideBox(Position, 6, 9, " DEPTH ");
+                            page->AddTitleInsideBox(Position, 3, 9, " m ");} 
   page->setShadowX(0); page->setShadowY(0);
+ if (Choice == "DGRAPH") {   int max=0;int min= 20; page->DrawScrollingGraph(Position, DepthBuffer, min, max);
+                       page->AddTitleInsideBox(Position, 1, 0, "Fathmometer");
+                       page->AddTitleInsideBox(Position, 2, 0, "MAX:%i",max);
+                       page->AddTitleInsideBox(Position, 3, 0, "MIN:%i",min);}
+  
+
   // if (Choice == "DGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 10, 0, 8, "Fathmometer 10m ", "m"); }
   // if (Choice == "DGRAPH2") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
   // if (Choice == "STWGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.STW, 0, 10, 8, "STW-Graph ", "kts"); }
