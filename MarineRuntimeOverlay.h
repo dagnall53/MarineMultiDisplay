@@ -8,32 +8,15 @@
 class MarineRuntimeOverlay {
 public:
     static void printPartitionInfo() {
-    DEBUG_PORT.println("=== Partition Info ===");
-
-    const esp_partition_t* running = esp_ota_get_running_partition();
-    if (running) {
-        DEBUG_PORT.printf("Running partition address: 0x%X\n", running->address);
-        DEBUG_PORT.printf("Running partition size: %u bytes\n", running->size);
+        const esp_partition_t* running = esp_ota_get_running_partition();
+        DEBUG_PORT.println("=== Partition Info ===");
+        DEBUG_PORT.print("Running partition label: ");
+        DEBUG_PORT.println(running ? running->label : "Unknown");
+        DEBUG_PORT.print("Address: 0x");
+        DEBUG_PORT.println((uintptr_t)(running ? running->address : 0), HEX);
+        DEBUG_PORT.print("Size: ");
+        DEBUG_PORT.println(running ? running->size : 0);
     }
-
-    const esp_partition_t* spiffs_part = esp_partition_find_first(
-        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "spiffs");
-
-    if (spiffs_part) {
-        DEBUG_PORT.printf("SPIFFS partition @ 0x%X, size: %u bytes\n",
-                          spiffs_part->address, spiffs_part->size);
-    } else {
-        DEBUG_PORT.println("SPIFFS partition not found");
-    }
-
-    DEBUG_PORT.println("=== PSRAM Status ===");
-    DEBUG_PORT.printf("Free PSRAM: %u\n", ESP.getFreePsram());
-    DEBUG_PORT.printf("Largest allocatable block: %u\n", heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
-
-    DEBUG_PORT.println("=== Internal Heap Status ===");
-    DEBUG_PORT.printf("Free heap: %u\n", ESP.getFreeHeap());
-    DEBUG_PORT.printf("Minimum free heap ever: %u\n", ESP.getMinFreeHeap());
-}
 
     static void printPSRAMStatus() {
         DEBUG_PORT.println("=== PSRAM Status ===");

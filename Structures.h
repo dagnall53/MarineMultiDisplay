@@ -120,6 +120,7 @@ struct _sButton { //_sButton(h,v,width,height,bordersize, backC,textC,borderC,Fo
   bool Keypressed;           //used by keypressed
   unsigned long LastDetect;  //used by keypressed
   int PrintLine;             // used for UpdateLinef()
+    int lastY;                 // used for where last topleft print was  
   bool screenfull,debugpause;
 };
 

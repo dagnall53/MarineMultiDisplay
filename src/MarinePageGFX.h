@@ -12,33 +12,37 @@ class MarinePageGFX {
 public:
   MarinePageGFX(Arduino_GFX* gfx, int16_t width, int16_t height);
   ~MarinePageGFX();
-  
-  uint16_t* getBuffer(int index);
 
   void begin();
   void swap();     // Switch active buffer
   void push();     // Push active buffer to screen
   bool isReady();  // Check if buffers are initialized
-  
   int getShadowX();
   void setShadowX(int value);
   int getShadowY();
   void setShadowY(int value);
   bool getShadow_ON();
   void setShadow_ON(bool value);
-
   
   
   void DrawCompass(_sButton& button);
   
   void DrawScrollingGraph(_sButton& button, const GraphBuffer& buffer, double minVal, double maxVal);
+  void AddTitleInsideBox(_sButton& button, int position, int font, const char* fmt, ...);
   void Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...);
-  void AutoPrint2Size(_sButton& button, const char* reference, const char* fmt, ...);
-  void BorderPrintCanvasTwoSize(_sButton& button,int magnify,int bigF,int Smallf,int decimalInset, const char* fmt, ...);
+  void BorderPrintCanvasTwoSize(_sButton& button, int decimalInset, const char* fmt, ...);
   void GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...);
 
+  
+  void AutoPrint2Size(_sButton& button, const char* reference, const char* fmt, ...);
   int getFontLineHeight(FontID id);
-
+  
+  void CommonSub_UpdateLine(uint16_t color, int font, _sButton &button, const char *msg);
+  void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int font, _sButton &button, const char *msg);
+  void UpdateLinef(uint16_t color, int font, _sButton &button, const char *fmt, ...);
+  void UpdateLinef(int font, _sButton &button, const char *fmt, ...);
+  void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...);
+  
   // Drawing primitives
 
   void fillScreen(uint16_t color);
@@ -85,24 +89,20 @@ public:
 
 
   // Text rendering
+    // Text rendering
   void PrintSubshadow(_sButton& button, const char* valueBuffer, int16_t valH,int16_t valV, int chosenFont);
-
+  void SplitInterDecimal(const char* buffer, char* Integer, char* Fraction, char* Dot);
+  void DrawBox(_sButton& button);
   void setCursor(int16_t x, int16_t y);
+  int16_t getCursorX();
+  int16_t getCursorY();
   void setTextColor(uint16_t color);
-  void setTextColor(uint16_t fg, uint16_t bg);
   void setTextSize(uint8_t size);
-  void println(const char* buf);
-  void print(const char* buf);
   void printf(const char* fmt, ...);
-  void setFont(const GFXfont* font);
   void setFontByIndex(int index);
-  void setTextBound(int x, int y, int w, int h);
-  void setTextWrap(bool wrap);
-  int getCursorX();
-  int getCursorY();
-  void getTextBounds(const char* msg, int16_t x, int16_t y,int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h);
+  void setFont(const GFXfont* font);
+  int getFontByIndex(void);
 
-  
   // Buffer access
   uint16_t* getActiveBuffer();
   void clearTextCanvas(uint16_t bg = 0);
@@ -111,17 +111,11 @@ private:
   Arduino_GFX* _gfx;
   Arduino_Canvas* _textCanvas = nullptr;
 
-  int16_t _textBoundX = 0;
-  int16_t _textBoundY = 0;
-  uint16_t _textBoundW = 0;
-  uint16_t _textBoundH = 0;
-  bool _textWrap;
   int16_t _width, _height;
   uint16_t* _buffer[2];
   int _active;
   int16_t _cursorX, _cursorY;
   uint16_t _textColor;
-  uint16_t _backgroundColor;
   uint8_t _textSize;
   const GFXfont* _gfxFont = nullptr;
 };

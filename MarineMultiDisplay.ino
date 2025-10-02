@@ -5,47 +5,6 @@
 // not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-/*   
-USB CDC on Boot ENABLED
-Erase All fkash before sketch ENABLED
-Partition Scheme Default 16M(6.25MB APP/3.43MB SPIFFS)  {Hopefully this pulls in my modified CSV}
-PSRAM OPI PSRAM
-
-
-NEEDS to be re-done after changing ESP32 compiler version
-I have manually modified partitions to include the default_16MB version to make it operable for esp32s3, see below to make it operable.
-# Name,   Type, SubType, Offset,  Size, Flags
-nvs,      data, nvs,     0x9000,  0x5000,
-otadata,  data, ota,     0xe000,  0x2000,
-app0,     app,  ota_0,   0x10000, 0x640000,
-app1,     app,  ota_1,   0x650000,0x640000,
-spiffs,   data, spiffs,  0xc90000,0x360000,
-coredump, data, coredump,0xFF0000,0x10000,
-
-
-
-
-TO add partition  
-esp32s3.menu.PartitionScheme.default_16MB=Default 16M(6.25MB APP/3.43MB SPIFFS)
-esp32s3.menu.PartitionScheme.default_16MB.build.partitions=default_16MB
-esp32s3.menu.PartitionScheme.default_16MB.upload.maximum_size=6553600
-to BOARDS.txt with the other esp32s3.menu.PartitionScheme  entries
-
-THEN:   To force Arduino to recognise changes to boards.txt
-Select File > Quit from the Arduino IDE menus if it is running.
-Delete the folder at the following path:C:/USERS/ ~~~/AppData/Roaming/arduino-ide/
-:warning: Please be careful when deleting things from your computer. When in doubt, back up!
-
-Start the Arduino IDE.
-The custom board options menus should now reflect any changes that were made to boards.txt.
-
-The arduino-ide folder is used by Arduino IDE to store data, but it doesn't store any irreplaceable data there so you won't notice any significant impacts from the deletion of the data.
-
-
-*/
-
-
-
 const char soft_version[] = " V0.20";
 
 //**********  SET DEFINES ************************************************
@@ -68,12 +27,12 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
 #include "FS.h"
 #include <FFat.h>  // plan to use FATFS for local files
-#include <SPIFFS.h>// plan to use FATFS for local files
+#include <SPIFFS.h>
 #include <SD_MMC.h>
 #include <LittleFS.h>
 #include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
 
-#include "esp_partition.h"
+
 
 //********* stuff t add my library for paged displays *****************
 
@@ -82,8 +41,10 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include "FontType.h" // has include for all fonts and new FontID enum 
 #include "Structures.h"
 // allocate the (huge? buffers for the two pages)
-extern MarinePageGFX* page;  //overcome ARDUINO QUIRK 
-#define NEAR_BLACK 0x0001  // One bit on from BLACK - avoids the (useful) issue that BLACK can be seen as Transparent.
+MarinePageGFX* page = nullptr;  // or assign to a valid instance
+
+//extern MarinePageGFX* page;  //overcome ARDUINO QUIRK 
+#define NEAR_NEAR_BLACK 0x0001  // One bit on from NEAR_BLACK - avoids the (useful) issue that NEAR_BLACK can be seen as Transparent.
 GraphBuffer headingDeltaBuffer;  // or voltageBuffer, tempBuffer, etc. 200 deep buffer of double valuesfor graphing
 
 
@@ -218,90 +179,91 @@ int Display_Page;
 
 _sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE };
 
-//_sButton WindDisplay = { 0, 0, 480, 480, 0, BLUE, WHITE, BLACK };  // full screen no border
+//_sButton WindDisplay = { 0, 0, 480, 480, 0, BLUE, WHITE, NEAR_BLACK };  // full screen no border
 
 //used for single data display
 // modified all to lift by 30 pixels to allow a common bottom row display (to show logs and get to settings)
 
 
-_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, BLACK,13 };      // used for wind and BIG graph displays
-_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, BLACK,12 };             //  ''
-_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, BLACK,12 };                //  ''
-_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, BLACK,12 };      //  ''
-_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, BLACK,12 };  //  ''
+_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, NEAR_BLACK };              // used for wind and graph displays
+_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, NEAR_BLACK };             //  ''
+_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, NEAR_BLACK };                //  ''
+_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, NEAR_BLACK };      //  ''
+_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, NEAR_BLACK };  //  ''
 //used for nmea RMC /GPS display // was only three lines to start!
-_sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, BLACK };
-_sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, BLACK };
-_sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, BLACK };
-_sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, BLACK };
+_sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE };
 // for the quarter screens on the main page
-_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };  //h  reduced by 15 to give 30 space at the bottom
-_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };
-_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };
-_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK,12 };
+_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };  //h  reduced by 15 to give 30 space at the bottom
+_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };
+_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };
+_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,12 };
 // for wide display //        int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
-_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, BLACK,12 };
-_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, BLACK,9 }; 
+_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,12 };
+_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,13 }; 
 
 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
-_sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, BLACK };
-_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, BLACK };
+_sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
 
-_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, BLACK };
-_sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, BLACK };
+_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
 
 
 #define sw_width 65
 //switches at line 180
-_sButton Switch1 = { 20, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch2 = { 100, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch3 = { 180, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch5 = { 260, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch4 = { 345, 180, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
-_sButton Switch4a = { 345, 140, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
+_sButton Switch1 = { 20, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch2 = { 100, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch3 = { 180, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch5 = { 260, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch4 = { 345, 180, 120, 35, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
+_sButton Switch4a = { 345, 140, 120, 35, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
 //switches at line 60
-_sButton Switch6 = { 20, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch7 = { 100, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch8 = { 180, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch9 = { 260, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch10 = { 340, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+_sButton Switch6 = { 20, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch7 = { 100, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch8 = { 180, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch9 = { 260, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch10 = { 340, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
 
 
 //WIDTH dependant settings, h, v, width, height, bordersize
 // read TOUCH_WIDTH nd subtract x..
 
-_sButton StatusBox = { 0, 460, TOUCH_WIDTH, 20, 0, BLACK, WHITE, BLACK };
-_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, BLACK };  // big central box for wifi events to pop up - v3.5
-_sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, BLACK };
-_sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, BLACK };
-_sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, BLACK };  //also used for showing the current settings
 
-_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, NEAR_BLACK };  // big central box for wifi events to pop up - v3.5
+_sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, NEAR_BLACK };
+_sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, NEAR_BLACK };
+_sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, NEAR_BLACK };  //also used for showing the current settings
+
+_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
 
 
-_sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, BLACK, BLUE };
+_sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, NEAR_BLACK, NEAR_BLACK };
 //for selections
-_sButton FullTopCenter = { 80, 0, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton FullTopCenter = { 80, 0, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
 
-_sButton Full0Center = { 80, 55, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full1Center = { 80, 110, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full2Center = { 80, 165, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full3Center = { 80, 220, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full4Center = { 80, 275, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full5Center = { 80, 330, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };  // inteferes with settings box do not use!
+_sButton Full0Center = { 80, 55, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Full1Center = { 80, 110, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Full2Center = { 80, 165, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Full3Center = { 80, 220, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Full4Center = { 80, 275, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Full5Center = { 80, 330, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };  // inteferes with settings box do not use!
 
 
 
 
 //#include "esp_task_wdt.h"
-
+#include "esp_partition.h"
 // void SDList(char* msg){
 //   DEBUG_PORT.println(msg);
 //   listDir(SD, "/", 1);
@@ -310,7 +272,7 @@ _sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK }; 
 bool LoadConfigs(bool print,bool displ){
   bool FilesOK = true;
   if (LoadConfiguration()) {
-   if(print){ DEBUG_PORT.println("USING JSON for wifi and display settings");}
+   if(print){ DEBUG_PORT.println("USING FATS JSON for wifi and display settings");}
    //if(displ){ gfx->println(F("FATS JSON (WiFi and display settings"));}
     Saved_Display_Config=Display_Config;Saved_Settings=Current_Settings;
     Display_Page = Display_Config.Start_Page;
@@ -324,8 +286,8 @@ bool LoadConfigs(bool print,bool displ){
     SaveConfiguration(SPIFFS, Setupfilename, Display_Config, Current_Settings);
   }
   if (LoadVictronConfiguration()) {
-    if(print){  DEBUG_PORT.println("USING JSON for Victron data settings");}
-   //  if(displ){gfx->println(F("USING JSON for Victron settings"));}
+    if(print){  DEBUG_PORT.println("USING FATS JSON for Victron data settings");}
+   //  if(displ){gfx->println(F("USING FATS JSON for Victron settings"));}
   } else {  // try to set a useful example
     FilesOK = false;
     if(print){  DEBUG_PORT.println("\n\n***FAILED TO GET Victron JSON FILE****\n**** SAVING DEFAULT on FSTFS****\n\n");}
@@ -349,8 +311,8 @@ bool LoadConfigs(bool print,bool displ){
       SaveVictronConfiguration();  // should write a default file if it was missing?
     }
   if (LoadDisplayConfiguration()) {
-    if(print){  DEBUG_PORT.println("USING JSON for Colours data settings");}
-   // if(displ){gfx->println(F("USING JSON for Colours data settings"));}
+    if(print){  DEBUG_PORT.println("USING FATS JSON for Colours data settings");}
+   // if(displ){gfx->println(F("USING FATS JSON for Colours data settings"));}
   } else {
     FilesOK = false;
      if(print){ DEBUG_PORT.println("\n\n***FAILED TO GET Colours JSON FILE****\n**** SAVING DEFAULT on FATFS****\n\n");}
@@ -368,10 +330,10 @@ bool NewPagesetupstuff(){
   DEBUG_PORT.printf("Free PSRAM after gfx->begin(): %d bytes\n", ESP.getFreePsram());
   page = new MarinePageGFX(gfx, 480, 480);  // Allocate after display init
   page->begin();                            // begin the processes.. 
-  page->fillScreen(NEAR_BLACK);  
+  page->fillScreen(NEAR_NEAR_BLACK);  
 /*  FOF dislay using Page ..   will need this in loop eg..
   page->swap();
-  page->fillScreen(BLACK); // BLACK is transparent!! Leaves previously printed stuff behind but makes for a clean start
+  page->fillScreen(NEAR_BLACK); // NEAR_BLACK is transparent!! Leaves previously printed stuff behind but makes for a clean start
   .... other stuff
   page->DrawCompass(bottomLeftquarter);
   ... stuff
@@ -388,7 +350,7 @@ bool NewPagesetupstuff(){
 }
 
 
-#include "MarineRuntimeOverlay.h";
+
 
 void setup() {
   DEBUG_PORT.begin(115200);
@@ -399,43 +361,24 @@ void setup() {
   #endif
   HaltOtherOperations = false;
   delay(100);
-  DEBUG_PORT.println("");
-  DEBUG_PORT.print("*****Starting NMEA Display*****");
-  DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
+  DEBUG_PORT.print(F("***Starting NMEA Display***"));
+  DEBUG_PORT.println(F(" using 'DEBUG_PORT.print' "));
   // Serial.println(F(" Using Serial.print "));
   // Serial0.println(F(" Using Serial0.print "));
   DEBUG_PORT.println(_device);DEBUG_PORT.println(soft_version); 
   DEBUG_PORT.printf("Flash size reported: %u bytes\n", spi_flash_get_chip_size());
   Display_Config = Default_JSON;
   Current_Settings = Default_Settings_JSON;
-  Init_GFX(); // must be before SD setup (at least for Guitron?)
+  Init_GFX(); // must be before SD setup (at least for Guitron)
   DEBUG_PORT.println(F(" Printing to screen  "));
   gfx->print(_device);
-  gfx->println(soft_version);delay(100); 
+  gfx->println(soft_version);delay(100);
   if (NewPagesetupstuff()) {gfx->println(F("*** Paging display Setup ***"));
      DEBUG_PORT.println("Paging display Setup");}
-     DEBUG_PORT.printf("Free PSRAM after Paging Display setup(): %d bytes\n", ESP.getFreePsram());
+  DEBUG_PORT.println("Setup Completed");
+   //Fatfs_Setup();   // set up FATFS // includes gfx prints
+  SPIFFS_Setup(); 
   //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
- // MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));  delay(500); 
- const esp_partition_t* ffat_part = esp_partition_find_first(
-    ESP_PARTITION_TYPE_DATA,
-    ESP_PARTITION_SUBTYPE_DATA_FAT,
-    "ffat" // This must match the label in your partition CSV
-  );
-
-  if (ffat_part) {
-    gfx->printf("FFat @ 0x%X, size: %u bytes\n", ffat_part->address, ffat_part->size);
-    DEBUG_PORT.printf("FFat @ 0x%X, size: %u bytes\n", ffat_part->address, ffat_part->size);
-  } else {
-    gfx->println("FFat partition not found");
-    DEBUG_PORT.println("FFat partition not found");
-  }
-
-
-  //Fatfs_Setup();   // set up FATFS // includes gfx prints
-  const esp_partition_t* spiffs_part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "spiffs");
-  if (spiffs_part) {gfx->printf("SPIFFS @ 0x%X, size: %u bytes\n",spiffs_part->address, spiffs_part->size); DEBUG_PORT.printf("SPIFFS @ 0x%X, size: %u bytes\n",spiffs_part->address, spiffs_part->size);}
-  if (spiffs_part) {SPIFFS_Setup();} 
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
   Touch_available = Touchsetup(); // if before ffats? stops ffats reading!
   //delay(100);listDir(SPIFFS,"/",1);  delay(500);
@@ -459,13 +402,11 @@ void setup() {
   Udp.begin(atoi(Current_Settings.UDP_PORT));
   Start_ESP_EXT();             //  Sets esp_now links to the current WiFi.channel etc.
   BLEsetup();                  // listDir(FFat,"/",1);  delay(500);                   // setup Victron BLE interface (does not do much!!)
-  setupFilemanager();          // listDir(FFat,"/",1); delay(500);  
-  DEBUG_PORT.println("Setup Completed");  
-    MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));  delay(500); 
-  page->swap();
-  page->fillScreen(BLUE);
-  page->compositeCanvas();
-  page->push();
+  setupFilemanager();          // listDir(FFat,"/",1); delay(500);
+  DEBUG_PORT.println("Setup Completed");
+// include #include "MarineRuntimeOverlay.h"; if we wish to debug page sizes etc MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));
+
+   delay(500); 
  }
 
 void loop() {
@@ -478,24 +419,32 @@ void loop() {
  // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
                           // SD_CS("HIGH");
-  if (!HaltOtherOperations) { 
+   if (!HaltOtherOperations) { 
+     DEBUG_PORT.println("before Filemanager ");
     SD_CS("LOW");
     filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
     SD_CS("HIGH");
     //approx 2ms to here
+    DEBUG_PORT.println("before read Touch ");
     if(Touch_available){ts.read();}
     //~3.2ms
+    DEBUG_PORT.println("before ESP Heartbeat ");
     EXTHeartbeat();//~3.3ms
+    DEBUG_PORT.println("before check inputs ");
     CheckAndUseInputs(); // for the 'serial' 0183 type inputs 
+    DEBUG_PORT.println("before BLEloop ");
     ///  BLEloop DO not try to do N2000 interrupt driven inputs and BLE interrupts at the same time ?
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
       BLEloop();
     }
-    else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
+    else{if (Current_Settings.N2K_ON) {  DEBUG_PORT.println("before BLEN2K parse ");NMEA2000.ParseMessages(); }}
+ DEBUG_PORT.println("before page swap ");
   page->swap();
-  page->fillScreen(BLACK);
+DEBUG_PORT.println("before fill NEAR_BLACK ");
 
-    Display(Display_Page);
+  page->fillScreen(NEAR_BLACK);
+  DEBUG_PORT.printf("before Display_Page(%i)\n",Display_Page);delay(10);
+    Display(false,Display_Page);
   page->compositeCanvas();
   page->push();
 
@@ -532,6 +481,7 @@ void loop() {
 
 
   }
+  delay(10);
 }
 
 
@@ -569,8 +519,8 @@ void Init_GFX() {
 
 void InitNMEA2000() {  // make it display device Info on start up..
 
- DEBUG_PORT.print("NMEA2000 using RX pin ");DEBUG_PORT.println(ESP32_CAN_RX_PIN);
- DEBUG_PORT.print("NMEA2000 using TX pin ");DEBUG_PORT.println(ESP32_CAN_TX_PIN);
+ DEBUG_PORT.print("***Set up NMEA2000 using RX:");DEBUG_PORT.print(ESP32_CAN_RX_PIN);
+ DEBUG_PORT.print("and TX:");DEBUG_PORT.println(ESP32_CAN_TX_PIN);
  gfx->println(F("Setting up NMEA2000 interface"));
  delay(10);
   NMEA2000.SetN2kCANMsgBufSize(8);
@@ -641,9 +591,9 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
     char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
     if (known) {
-      UpdateLinef(BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(NEAR_BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     } else {
-      UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     }
     //52685 is light gray in RBG565 light gray for pgns we do not decode. (based on handler setup)
   }
@@ -681,50 +631,44 @@ void Fatfs_Setup() {
       gfx->print(F("---  NO FATFS ---"));
   }
   if (FMsetup){
-    DEBUG_PORT.println(F("+ Filemanager*"));
-    gfx->println(F("+ Filemanager*"));
+    //DEBUG_PORT.println(F("+ Filemanager*"));
+    gfx->println(F("& Filemanager Setup"));
   } else {
     gfx->println(F(""));
   }
 }
-
-
-
-
 void SPIFFS_Setup() {
   bool FMsetup=false;
   hasSPIFFS = false;
-  DEBUG_PORT.println("=== SPIFFS Health Check ===");
+  DEBUG_PORT.print("SPIFFS  START");
   if (SPIFFS.begin(true)) {
-    DEBUG_PORT.println("SPIFFS mounted cleanly");hasSPIFFS = true;
-    DEBUG_PORT.printf("Total: %u, Used: %u\n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
-  } else {
-    DEBUG_PORT.println("SPIFFS mount failed — attempting format...");
-   }
-  if (hasSPIFFS ) {
-    size_t totalBytes = SPIFFS.totalBytes();
-    size_t usedBytes = SPIFFS.usedBytes();
-    size_t freeBytes = totalBytes - usedBytes;
-   // gfx->printf("SPIFFS initiated: %i free",freeBytes);
+    hasSPIFFS = true;
+  size_t totalBytes = SPIFFS.totalBytes();
+  size_t usedBytes = SPIFFS.usedBytes();
+  size_t freeBytes = totalBytes - usedBytes;
+
+    gfx->printf("SPIFFS initiated: %i free",freeBytes);
+    DEBUG_PORT.printf(".. initiated: %i free",freeBytes);
     delay(500);
     if (!filemgr.AddFS(SPIFFS, "Flash/SPIFFS", false)) {
       DEBUG_PORT.println(F("Adding SPIFFS to Filemanager failed."));
-      } else { FMsetup=true;
-      DEBUG_PORT.println(F("  Added SPIFFS to Filemanager"));
+    } else { FMsetup=true;
+      DEBUG_PORT.println(F(" and added to Filemanager"));
     }
-  } 
+  } else {
+    DEBUG_PORT.println(F("FFat File System not initiated."));
+  }
   
   if (!hasSPIFFS) {
-   //   gfx->print(F("---  NO SPIFFS ---"));
+      gfx->print(F("---  NO SPIFFS ---"));
   }
   if (FMsetup){
-    DEBUG_PORT.println(F("+ Filemanager*"));
-  //  gfx->println(F("+ Filemanager*"));
+    DEBUG_PORT.println(F("+ Filemanager started"));
+    gfx->println(F("+ Filemanager started"));
   } else {
-  //  gfx->println(F(""));
+    gfx->println(F(""));
   }
- }
-
+}
 //*********** FLASH OVERLOAD  functions So can just be called from sub routines*********
 // void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
 //   DEBUG_PORT.printf("SAVING CONFIG\n");
@@ -881,7 +825,7 @@ void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   doc["_comments_"] = "Colours as integers";
   doc["WHITE"] = WHITE;
   doc["BLUE"] = BLUE;
-  doc["BLACK"] = BLACK;
+  doc["NEAR_BLACK"] = NEAR_BLACK;
   doc["GREEN"] = GREEN;
   doc["RED"] = RED;
 
@@ -935,7 +879,7 @@ bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   }
   // gett here means we can set defaults, regardless!
 
-  set.TextColor = doc["TextColor"] | BLACK;
+  set.TextColor = doc["TextColor"] | NEAR_BLACK;
   set.BackColor = doc["BackColor"] | WHITE;
   set.BorderColor = doc["BorderColor"] | BLUE;
   // set.BoxW = doc["BoxW"] | 46;
@@ -1130,10 +1074,10 @@ void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
   gfx->setTextColor(CurrentSettingsBox.TextColor);
   CurrentSettingsBox.PrintLine = 0;
   // 7 is smallest Bold Font
-  UpdateLinef(7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>", Text, A.ssid, A.password, A.UDP_PORT);
-  UpdateLinef(7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
-  UpdateLinef(7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
-  // UpdateLinef(7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
+  page->UpdateLinef(7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>", Text, A.ssid, A.password, A.UDP_PORT);
+  page->UpdateLinef(7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
+  page->UpdateLinef(7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
+  // page->UpdateLinef(7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
 }
 void ShowToplinesettings(String Text) {
   ShowToplinesettings(Current_Settings, Text);
@@ -1215,7 +1159,7 @@ char* LongtoString(double data) {
 //   DrawMeterPointer(center, lastwind, inner, outer, 2, button.BackColor, button.BackColor);
 //   if (wind.data != NMEA0183DoubleNA) {
 //     if (wind.updated >= millis() - 3000) {
-//       DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, BLACK);
+//       DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, NEAR_BLACK);
 //     } else {
 //       wind.greyed = true;
 //       DrawMeterPointer(center, wind.data, inner, outer, 2, LIGHTGREY, LIGHTGREY);
@@ -1279,8 +1223,8 @@ void DrawCompass(_sButton button) {
   gfx->fillArc(x, y, Rad3, Rad1, 270 - 45, 270, RED);
   gfx->fillArc(x, y, Rad3, Rad1, 270, 270 + 45, GREEN);
   //Mark 12 linesarks at 30 degrees
-  for (int i = 0; i < (360 / 30); i++) { gfx->fillArc(x, y, rad, Rad1, i * 30, (i * 30) + 1, BLACK); }  //239 to 200
-  for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, BLACK); }  // dots at 10 degrees
+  for (int i = 0; i < (360 / 30); i++) { gfx->fillArc(x, y, rad, Rad1, i * 30, (i * 30) + 1, NEAR_BLACK); }  //239 to 200
+  for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, NEAR_BLACK); }  // dots at 10 degrees
 }
 
 
@@ -1378,7 +1322,7 @@ void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //qui
   // print each separated line centered... starting from line 1
   button.PrintLine = 1;
   while (pch != NULL) {
-    CommonSub_UpdateLine(button.TextColor, font, button, pch);
+    page->CommonSub_UpdateLine(button.TextColor, font, button, pch);
     pch = strtok(NULL, delimiter);
   }
   WIFIGFXBoxdisplaystarted = true;
@@ -1807,15 +1751,15 @@ void UseNMEA(char* buf, int type) {
       }
     }
     // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
-    if ((Display_Page == -86)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-      if (type == 4) {UpdateLinef(BLACK, 8, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
+    if ((Display_Page == -86)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
+      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 8, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
     }
 
-    if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-      if (type == 4) {UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
-      if (type == 2) {UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
-      if (type == 3) {UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);}
-      if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf);}
+    if ((Display_Page == -21)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
+      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 8, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
+      if (type == 2) {page->UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
+      if (type == 3) {page->UpdateLinef(RED, 8, Terminal, "ESP:%s\n", buf);} // add lf as esp does not have it 
+      if (type == 1) { page->UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf);}
     }
     // now decode it for the displays to use
     if (ColorSettings.SerialOUT) {DEBUG_PORT.println(buf);}
