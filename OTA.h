@@ -397,7 +397,7 @@ void SetupWebstuff() {
     // Victron is never set up by the touchscreen only via SD editor so NOT needed? but makes sure construct is our usual one
     SaveVictronConfiguration();  // save config with bytes ??
     delay(100);
-    WifiGFXinterrupt(9, WifiStatus, "RESTARTING");
+    WifiGFXinterrupt(8, WifiStatus, "RESTARTING");
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
     server.sendHeader("Connection", "close");
     delay(150);
@@ -478,7 +478,7 @@ void SetupWebstuff() {
         }
       } else if (upload.status == UPLOAD_FILE_END) {
         if (Update.end(true)) {  //true to set the size to the current progress
-          WifiGFXinterrupt(9, WifiStatus, "SW UPDATED");
+          WifiGFXinterrupt(8, WifiStatus, "SW UPDATED");
           //DEBUG_PORT.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
           delay(500);
         } else {

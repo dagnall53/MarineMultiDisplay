@@ -133,6 +133,7 @@ int StationsConnectedtomyAP;
 // assists for wifigfx interrupt  box that shows status..  to help turn it off after a time
 uint32_t WIFIGFXBoxstartedTime;
 bool WIFIGFXBoxdisplaystarted;
+char WiFiMsg [300];       // to take message to send to the display to advise any progress
 
 
 
@@ -265,7 +266,7 @@ _sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
 // read TOUCH_WIDTH nd subtract x..
 
 
-_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, NEAR_BLACK };  // big central box for wifi events to pop up - v3.5
+_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, NEAR_BLACK,4 };  // big central box for wifi events to pop up - v3.5
 _sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, NEAR_BLACK };
 _sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, NEAR_BLACK };
 _sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, NEAR_BLACK };  //also used for showing the current settings
@@ -474,6 +475,8 @@ void loop() {
   Display(false,Display_Page);
   page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%ims>",Display_Config.PanelName,Display_Page, millis()-DebugInterval);  // common to all pages  
   DebugInterval=millis();
+  if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);}
+  else{WIFIGFXBoxdisplaystarted = false;}
   page->compositeCanvas();
   page->push();
  }
@@ -1297,7 +1300,7 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
         DEBUG_PORT.println(disconnectreason(info.wifi_sta_disconnected.reason));
         WiFi.disconnect(false);     // changed to false.. Revise?? so that it does this only if no one is connected to the AP ??
         AttemptingConnect = false;  // so that ScanandConnect can do a full scan next time..
-        WifiGFXinterrupt(8, WifiStatus, "Disconnected \n REASON:%s\n Retrying:<%s>", disconnectreason(info.wifi_sta_disconnected.reason).c_str(), Current_Settings.ssid);
+        WifiGFXinterrupt(8, WifiStatus, "Disconnected :%s ..Retrying:<%s>", disconnectreason(info.wifi_sta_disconnected.reason).c_str(), Current_Settings.ssid);
         IsConnected = false;
       }
       break;
@@ -1306,7 +1309,7 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       DEBUG_PORT.print("The ESP32 has received IP address :");
       DEBUG_PORT.println(WiFi.localIP());
       udp_st = Get_UDP_IP(WiFi.localIP(), subnet);
-      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>\nIP:%i.%i.%i.%i\n", WiFi.SSID(),
+      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO<%s>IP:%i.%i.%i.%i\n", WiFi.SSID(),
                        WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
       break;
 
@@ -1318,23 +1321,66 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 
     case ARDUINO_EVENT_WIFI_AP_STACONNECTED:  //12 a station connected to ESP32 soft-AP
       StationsConnectedtomyAP = StationsConnectedtomyAP + 1;
-      WifiGFXinterrupt(8, WifiStatus, "Station Connected\nTo AP\n Total now %i", StationsConnectedtomyAP);
+      WifiGFXinterrupt(8, WifiStatus, "Station Connected To AP Total now %i", StationsConnectedtomyAP);
       break;
     case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:  //13 a station disconnected from ESP32 soft-AP
       StationsConnectedtomyAP = StationsConnectedtomyAP - 1;
       if (StationsConnectedtomyAP == 0) {}
-      WifiGFXinterrupt(8, WifiStatus, "Station Disconnected\nfrom AP\n Total now %i", StationsConnectedtomyAP);
+      WifiGFXinterrupt(8, WifiStatus, "Station Disconnected from AP Total now %i", StationsConnectedtomyAP);
 
       break;
     case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:  //14 ESP32 soft-AP assign an IP to a connected station
-      WifiGFXinterrupt(8, WifiStatus, "Station Connected\nTo AP\nNow has Assigned IP");
+      WifiGFXinterrupt(8, WifiStatus, "Station Connected To AP Now has Assigned IP");
       DEBUG_PORT.print("   AP IP address: ");
       DEBUG_PORT.println(WiFi.softAPIP());
       break;
   }
 }
 
-void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //quick interrupt of gfx to show WIFI events..
+void WifiInterruptMessage (  const char* fmt, ...) {
+   if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
+  if (Display_Config.Start_Page == -87) { return; }                        // do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
+   WiFiMsg[0] = '\0';
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(WiFiMsg, 128, fmt, args);
+  va_end(args);
+  int len = strlen(WiFiMsg);
+  WIFIGFXBoxdisplaystarted = true;
+  WIFIGFXBoxstartedTime = millis();
+
+}
+
+void WiFiInterrupttoCanvas(_sButton& button,char* buf){
+ page->GFXBorderBoxPrintf(button, buf); //Just print? 
+ static char* token;
+  const char delimiter[2] = "\n";  //  NB when i used  "static const char delimiter = '\n';"  I got big problems ..
+  char* pch;
+  pch = strtok(buf, delimiter);    // split (tokenise)  msg at the delimiter
+  // print each separated line centered... starting from line 1
+  button.PrintLine = 1;
+  while (pch != NULL) {
+   // page->CommonSub_UpdateLine(button.TextColor, 8, WifiStatus, pch);
+    pch = strtok(NULL, delimiter);
+  }
+  delay(100);
+}
+void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {   // same parameters as old version 
+   if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
+  if (Display_Config.Start_Page == -87) { return; }                        // do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
+   WiFiMsg[0] = '\0';
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(WiFiMsg, 128, fmt, args);
+  va_end(args);
+  int len = strlen(WiFiMsg);
+  WIFIGFXBoxdisplaystarted = true;
+  WIFIGFXBoxstartedTime = millis();
+
+}
+
+
+void WifiGFXinterrupt(int variable, int font, _sButton& button, const char* fmt, ...) {  //quick interrupt use of this original by adding another variable 
   if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
   if (Display_Config.Start_Page == -87) { return; }                        // do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
   static char msg[300] = { '\0' };
@@ -1346,7 +1392,7 @@ void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //qui
   static char* token;
   const char delimiter[2] = "\n";  //  NB when i used  "static const char delimiter = '\n';"  I got big problems ..
   char* pch;
-  page->GFXBorderBoxPrintf(button, "");  // clear the button
+  page->GFXBorderBoxPrintf(button, msg);  // clear the button
   pch = strtok(msg, delimiter);    // split (tokenise)  msg at the delimiter
   // print each separated line centered... starting from line 1
   button.PrintLine = 1;
