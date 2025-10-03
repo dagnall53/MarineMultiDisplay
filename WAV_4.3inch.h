@@ -2,7 +2,7 @@
 Pins and defines for GFX - various versions!
 FOR WAVESHARE 4.3 inch LCD 800 by 400 in BOX WITH CAN BUS --NOTE THEY HAVE MANY SLIGHTLY SIMILAR NAMES
 https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3B/ESP32-S3-Touch-LCD-4.3B-Sch.pdf
-
+https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3B
 also need ?
 #define ARDUINO_USB_MODE 1
 #define ARDUINO_USB_CDC_ON_BOOT 1
@@ -15,7 +15,7 @@ to get Serial.print working
 #define _WAV_DEF_H
 
 const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B (wide) box";
-  #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards! ST
+  #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards! ST7272
   #define ESP32_CAN_RX_PIN GPIO_NUM_16  // 
 
 Arduino_DataBus *bus = new Arduino_SWSPI(
@@ -31,9 +31,9 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(  // MY BOARD modifi
   1,2,42,41,40, //R pins R3,4,5,6,R7  1,2,42,41,40
   39,0,45,48,47,21, //G pins
   14,38,18,17,10,    //B pins
-  0 /* hsync_polarity */, 8 /* hsync_front_porch */, 4 /* hsync_pulse_width */, 8 /* hsync_back_porch */,
-  0 /* vsync_polarity */, 8 /* vsync_front_porch */, 4 /* vsync_pulse_width */, 8 /* vsync_back_porch */,
-  1 /* pclk_active_neg */, 16000000 /* prefer_speed */, false /* useBigEndian */,
+  0 /* hsync_polarity */, 8 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
+  0 /* vsync_polarity */, 8 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
+  1 /* pclk_active_neg */, 13000000 /* prefer_speed */, false /* useBigEndian */,
   0 /* de_idle_high */, 0 /* pclk_idle_high */, 0 /* bounce_buffer_size_px */);
 
 // Initialize display 

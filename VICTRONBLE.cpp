@@ -62,8 +62,9 @@ BLEScan *pBLEScan;
 // int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
 // generic button for displays to modify h,v width and height from Vconfig file. Will start with settings relative to Vic_Inst_Master :
 _sButton DisplayOuterbox;
-_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, ColorSettings.BackColor, ColorSettings.TextColor, ColorSettings.BorderColor };  //WHITE, BLACK, BLUE };
-  //
+_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, GREEN, NEAR_BLACK, WHITE,0 };  //WHITE, NEAR_BLACK, BLUE };
+  //_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, ColorSettings.BackColor, ColorSettings.TextColor, ColorSettings.BorderColor,0 };  //WHITE, BLACK, BLUE };
+
 #define socbar 20
 #define greyoutTime 12000
 #define AES_KEY_BITS 128
@@ -521,7 +522,7 @@ void DrawBar(_sButton box, char *title, uint16_t color, float data) {
   int printheight;
   printheight = box.height - (box.bordersize * 2);
   float bar = data * printheight / 100;
-  gfx->fillRect(top, (box.v + box.bordersize) + printheight - int(bar), socbar,
+  page->fillRect(top, (box.v + box.bordersize) + printheight - int(bar), socbar,
                 int(bar), color);
   // page->AddTitleBorderBox(0, box, title);
 }
@@ -531,7 +532,7 @@ void DrawBar(_sButton box, char *title, uint16_t color, float data) {
 void Setup_N_Display(int i) {  // setsup the display box , but changes position and height colours  as required
   // use Vic_Inst_Master box master struct and ColorSettings for the colours border size etc, etc ...
   //pointers so we avoid stack crash?
-  DisplayOuterbox.bordersize = Vic_Inst_Master.bordersize;
+  DisplayOuterbox.bordersize = 5;// was Vic_Inst_Master.bordersize;
 
   DisplayOuterbox.width = CommonDisplayWidth;
   DisplayOuterbox.TextColor = ColorSettings.TextColor;
@@ -546,7 +547,7 @@ void Setup_N_Display(int i) {  // setsup the display box , but changes position 
   } else {
     strncpy(borderdisplay, victronDevices.DeviceVictronName[i], 30);
   }
-  page->GFXBorderBoxPrintf(DisplayOuterbox, "");  //Used to blank the previous stuff!
+  page->GFXBorderBoxPrintf(DisplayOuterbox, "");  //in gfx , Used to blank the previous stuff!
 }
 
 void DebugRawVdata(unsigned char *outputData, int datasize) {
@@ -657,7 +658,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a victronDevices structure with index i
   // we know the victronDevices data should be for one of our device MAC, and only victron data is accepted
   char debugMsg[200];
-
   if (victronDevices.greyed[i]) {  // DEBUG_PORT.printf("%i is Greyed\n",i);// added greying (outdated data) test
     return;
   }
@@ -674,7 +674,6 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   if (victronDevices.BLEDebug) {  // setup VictronBuffer messages for debug
     snprintf(debugMsg, 120, "Victron<%i>,", i);
     strcat(VictronBuffer, debugMsg);
-
     if (victronDevices.greyed[i]) {
       snprintf(debugMsg, 120, "-Greying-");  // not essential, but makes DATALOG and data display tidier
       strcat(VictronBuffer, debugMsg);
@@ -782,12 +781,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     if (Display_Page == -87) {
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
-      if (victronDevices.Simulate) {
-        page->AddTitleInsideBox(DisplayOuterbox,7, 1, "%s", victronDevices.FileCommentName[i]);
-        page->AddTitleInsideBox(DisplayOuterbox,7, 1, "%s", victronDevices.DeviceVictronName[i]);
-        page->AddTitleInsideBox(DisplayOuterbox,7, 4, "-simulated-");
-        page->AddTitleInsideBox(DisplayOuterbox,7, 3, " %i ", i);
-      }  
+ 
       DisplayOuterbox.PrintLine = 5;
       if (strstr(victronDevices.DisplayShow[i], "P")) { page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%3dw", pv_power); }
       if (strstr(victronDevices.DisplayShow[i], "V")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV", battery_voltage); }
@@ -798,6 +792,12 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
         page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", DeviceStateToChar(device_state));
         page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", ErrorCodeToChar(charger_error));
       }
+      if (victronDevices.Simulate) {
+        page->Addtitletobutton(DisplayOuterbox,1,0, "%s", victronDevices.FileCommentName[i]);
+        page->Addtitletobutton(DisplayOuterbox,1,0, "%s", victronDevices.DeviceVictronName[i]);
+        page->Addtitletobutton(DisplayOuterbox,4,0, "-simulated-");
+        page->Addtitletobutton(DisplayOuterbox,2,0, " %i ", i);
+      } 
     }
   }
 
@@ -821,14 +821,9 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
       DisplayOuterbox.PrintLine = 5;
-      if (victronDevices.Simulate) {
-        page->AddTitleInsideBox(DisplayOuterbox,7, 1, "%s", victronDevices.FileCommentName[i]);
-        page->AddTitleInsideBox(DisplayOuterbox,7, 1, "%s", victronDevices.DeviceVictronName[i]);
-        page->AddTitleInsideBox(DisplayOuterbox,7, 4,  "-simulated-");
-        page->AddTitleInsideBox(DisplayOuterbox,7, 3,  " %i ", i);
-      } 
-      if (strstr(victronDevices.DisplayShow[i], "S")) { DrawBar(DisplayOuterbox, victronDevices.FileCommentName[i], GREEN, state_of_charge); }
-      if (strstr(victronDevices.DisplayShow[i], "V")) { page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FV", battery_voltage); }
+ 
+      
+      if (strstr(victronDevices.DisplayShow[i], "V")) {page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FV", battery_voltage); }
       if (strstr(victronDevices.DisplayShow[i], "I")) {
         if (abs(battery_current) >= 9.9) {
           page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA", battery_current);
@@ -846,6 +841,14 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
           page->UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "AUX %2.1fV", aux_input);
         }
       }
+      if (strstr(victronDevices.DisplayShow[i], "S")) { DrawBar(DisplayOuterbox, victronDevices.FileCommentName[i], GREEN, state_of_charge); }
+           if (victronDevices.Simulate) {
+        page->Addtitletobutton(DisplayOuterbox,1,0, "%s", victronDevices.FileCommentName[i]);
+        page->Addtitletobutton(DisplayOuterbox,1,0, "%s", victronDevices.DeviceVictronName[i]);
+        page->Addtitletobutton(DisplayOuterbox,4,0,  "-simulated-");
+        page->Addtitletobutton(DisplayOuterbox,2,0,  " %i ", i);
+      } 
+    
     }
   }
 
@@ -873,12 +876,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       Setup_N_Display(i);
       if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
       DisplayOuterbox.PrintLine = 5;
-      if (victronDevices.Simulate) {
-               page->AddTitleInsideBox(DisplayOuterbox,7, 1, "%s", victronDevices.FileCommentName[i]);
-        page->AddTitleInsideBox(DisplayOuterbox,7, 1, "%s", victronDevices.DeviceVictronName[i]);
-        page->AddTitleInsideBox(DisplayOuterbox,7, 4,  "-sim-");
-        page->AddTitleInsideBox(DisplayOuterbox,7, 3,  " %i ", i);
-      }
+
       
       if (strstr(victronDevices.DisplayShow[i], "V")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV1", battery_voltage_1); }
       if (strstr(victronDevices.DisplayShow[i], "I")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA1", battery_current_1); }
@@ -888,6 +886,12 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       if (strstr(victronDevices.DisplayShow[i], "E")) { page->UpdateTwoSize_MultiLine(1, false, false, 8, 8, DisplayOuterbox, "%s", DeviceStateToChar(device_state)); }
       if (strstr(victronDevices.DisplayShow[i], "A")) { page->UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "%2.0f deg", temperature - 273.15); }
       if (strstr(victronDevices.DisplayShow[i], "E")) { page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", ErrorCodeToChar(charger_error)); }
+            if (victronDevices.Simulate) {
+               page->Addtitletobutton(DisplayOuterbox,1,7, "%s", victronDevices.FileCommentName[i]);
+        page->Addtitletobutton(DisplayOuterbox,1,0, "%s", victronDevices.DeviceVictronName[i]);
+        page->Addtitletobutton(DisplayOuterbox,4,0,  "-sim-");
+        page->Addtitletobutton(DisplayOuterbox,2,0,  " %i ", i);
+      }
     }
   }
   victronDevices.displayed[i] = true;

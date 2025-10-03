@@ -57,7 +57,7 @@ void Display(int pageIndex) {
 }
 
 void Display(bool reset, int pageIndex) {  // setups for alternate pages to be selected by pageIndex.
-  DEBUG_PORT.printf("IN void Display page<%i> reset:%s \n",pageIndex,reset True_False);delay(50);  // Give UART time to flush
+ // DEBUG_PORT.printf("IN void Display page<%i> reset:%s \n",pageIndex,reset True_False);delay(50);  // Give UART time to flush
 
   static unsigned long flashinterval;
   static bool flash;
@@ -84,23 +84,23 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   //String tempstring;
   // int FS = 1;  // for font size test
   // int tempint;
-  DEBUG_PORT.println("IN Display_Page");
+  //DEBUG_PORT.println("IN Display_Page");
   if (pageIndex != LastPageselected) {
     WIFIGFXBoxdisplaystarted = false;  // will have reset the screen, so turn off the auto wifibox blanking if there was a wifiiterrupt box
                                        // this (above) saves a timed screen refresh that can clear keyboard stuff
-    DEBUG_PORT.println("IN Display_Page.. load config (Different page)");
+   // DEBUG_PORT.println("IN Display_Page.. load config (Different page)");
     LoadConfiguration();               //Reload configuration in case new data stored
     RunSetup = true;
   }
   if (reset) {
     WIFIGFXBoxdisplaystarted = false;
-    DEBUG_PORT.println("IN Display_Page.. load config (reset)");
+ //   DEBUG_PORT.println("IN Display_Page.. load config (reset)");
     LoadConfiguration();  //Reload configuration in case new data stored
     page->clearCanvas(BLUE);
     RunSetup = true;
   }
   //generic setup stuff for ALL pages
- page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
+ //page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
   if (RunSetup) {
     DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
     page->clearCanvas(BLUE);
@@ -226,9 +226,11 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       //************** VICTRON PAGES - different way to displa, Single 'button is altered (V H Height ) for each variable display
     case -87:  // pageIndex for graphic display of Vicron data
       if (RunSetup) {
-        jpegDraw("/vicback.jpg", jpegDrawCallback, true /* useBigEndian */,
-                 0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        // Serial.println("redrawing background");
+        // jpegDraw("/vicback.jpg", jpegDrawCallback, true /* useBigEndian */,
+        //          0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
+        // // Serial.println("redrawing background");
+                 page->clearCanvas(NEAR_BLACK);
+               
       }
       // all graphics done in VICTRONBLE
       if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
@@ -313,9 +315,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         setFont(3);
         page->GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,0, 0, "TERMINAL");
+          page->Addtitletobutton(Terminal,1, 0, "TERMINAL");
         } else {
-          page->Addtitletobutton(Terminal,0, 0, "-Paused-");
+          page->Addtitletobutton(Terminal,1, 0, "-Paused-");
         }
         DataChanged = false;
       }
@@ -327,9 +329,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         Terminal.debugpause = !Terminal.debugpause;
         DataChanged = true;
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,0, 0, "-running-");
+          page->Addtitletobutton(Terminal,1, 0, "-running-");
         } else {
-          page->Addtitletobutton(Terminal,0, 0, "-paused-");
+          page->Addtitletobutton(Terminal,1, 0, "-paused-");
         }
       }
       // if (CheckButton(Switch9)) {
@@ -663,7 +665,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->Addtitletobutton( Switch3,1,0, "ESP-Now");
        // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
         page->GFXBorderBoxPrintf(Switch4, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->Addtitletobutton(Switch4, -1,0,"EEPROM");
+        page->Addtitletobutton(Switch4,1,0,"EEPROM");
         page->GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
         setFont(3);
         DataChanged = false;
@@ -1137,28 +1139,38 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
     timefont = 13;
   }
   if (RunSetup) slowdown = 0;
- if ((Choice == "WIND") &&(BoatData.WindSpeedK.data!= NMEA0183DoubleNA) ){
+ if ((Choice == "WIND") &&(BoatData.WindSpeedK.data!= NMEA0183DoubleNA) && (!BoatData.WindAngleApp.displayed))
+ {
        page->DrawCompass(Position);
       page->drawCompassPointer(Position, 20, 50, BoatData.WindAngleApp.data, WHITE,true);
       page->AddTitleInsideBox(Position, 6, 9, "Apparent:%.1fkts",BoatData.WindSpeedK.data);
+      BoatData.WindAngleApp.displayed=true;
   }
   /*if (selected dta .data != NMEA0183DoubleNA) */
  page->setShadowX(4); page->setShadowY(4);
-  if ((Choice == "SOG")&&(BoatData.SOG.data!= NMEA0183DoubleNA) ){ page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.SOG.data);
+  if ((Choice == "SOG")&&(BoatData.SOG.data!= NMEA0183DoubleNA) && (!BoatData.SOG.displayed))
+  { page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.SOG.data);
                             page->AddTitleInsideBox(Position, 6, 9, " SOG ");
-                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");}
-  if ((Choice == "STW") &&(BoatData.STW.data!= NMEA0183DoubleNA) ) {  page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.STW.data);
+                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");
+                             BoatData.SOG.displayed=true;}
+  if ((Choice == "STW") &&(BoatData.STW.data!= NMEA0183DoubleNA) && (!BoatData.STW.displayed)) 
+  {  page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.STW.data);
                             page->AddTitleInsideBox(Position, 6, 9, " STW ");
-                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");}
-  if ((Choice == "DEPTH") &&(BoatData.WaterDepth.data!= NMEA0183DoubleNA) ) { page->AutoPrint2Size(Position, "199.9", "%.1f",BoatData.WaterDepth.data);
+                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");
+                             BoatData.STW.displayed=true;}
+  if ((Choice == "DEPTH") &&(BoatData.WaterDepth.data!= NMEA0183DoubleNA)&& (!BoatData.WaterDepth.displayed) ) 
+  { page->AutoPrint2Size(Position, "199.9", "%.1f",BoatData.WaterDepth.data);
                             page->AddTitleInsideBox(Position, 6, 9, " DEPTH ");
-                            page->AddTitleInsideBox(Position, 3, 9, " m ");} 
+                            page->AddTitleInsideBox(Position, 3, 9, " m ");
+                             BoatData.WaterDepth.displayed=true;} 
   page->setShadowX(0); page->setShadowY(0);
- if (Choice == "DGRAPH") { page->DrawScrollingGraph(Position, DepthBuffer,10,0); //int min= 20;int max=0;    min, max);
+ if (Choice == "DGRAPH") 
+ { page->DrawScrollingGraph(Position, DepthBuffer,10,0); //int min= 20;int max=0;    min, max);
                        page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 10m");
                        page->AddTitleInsideBox(Position, 2, 0, "surface");
                        page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ",20);}
-  if (Choice == "DGRAPH2") { page->DrawScrollingGraph(Position, DepthBuffer,50,0); //int min= 20;int max=0;    min, max);
+  if (Choice == "DGRAPH2") 
+  { page->DrawScrollingGraph(Position, DepthBuffer,50,0); //int min= 20;int max=0;    min, max);
                        page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 50m");
                        page->AddTitleInsideBox(Position, 2, 0, "surface");
                        page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ",50);}

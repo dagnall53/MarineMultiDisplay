@@ -32,9 +32,9 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 const char soft_version[] = " V0.20";
 
 //**********  SET DEFINES ************************************************
-//Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
+//Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
 #define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-#define WIDEBOX    // 4.3inch 800 by 400 display Setup
+#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -358,7 +358,7 @@ bool NewPagesetupstuff(){
  bool sucess = true;
   headingDeltaBuffer.fill(0.0); 
   DEBUG_PORT.printf("Free PSRAM after gfx->begin(): %d bytes\n", ESP.getFreePsram());
-  page = new MarinePageGFX(gfx, 480, 480);  // Allocate after display init
+  page = new MarinePageGFX(gfx, TOUCH_WIDTH, TOUCH_HEIGHT);  // Allocate after display init
   page->begin();                            // begin the processes.. 
   page->fillScreen(NEAR_NEAR_BLACK);  
 /*  FOF dislay using Page ..   will need this in loop eg..
@@ -442,44 +442,41 @@ void setup() {
  }
 
 void loop() {
+  static unsigned long PageInterval;
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchTimer;
   static int WiFiChannel;
-  //EventTiming("Timeing ",10); // place start and stop where I want timing 
   delay(1);
  // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
                           // SD_CS("HIGH");
    if (!HaltOtherOperations) { 
-     DEBUG_PORT.println("before Filemanager ");
     SD_CS("LOW");
     filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
     SD_CS("HIGH");
     //approx 2ms to here
-    DEBUG_PORT.println("before read Touch ");
+ //   DEBUG_PORT.println("before read Touch ");
     if(Touch_available){ts.read();}
     //~3.2ms
-    DEBUG_PORT.println("before ESP Heartbeat ");
     EXTHeartbeat();//~3.3ms
-    DEBUG_PORT.println("before check inputs ");
     CheckAndUseInputs(); // for the 'serial' 0183 type inputs 
-    DEBUG_PORT.println("before BLEloop ");
     ///  BLEloop DO not try to do N2000 interrupt driven inputs and BLE interrupts at the same time ?
     if ((Current_Settings.BLE_enable) && ((Display_Page == -86) || (Display_Page == -87))) {
       BLEloop();
     }
-    else{if (Current_Settings.N2K_ON) {  DEBUG_PORT.println("before BLEN2K parse ");NMEA2000.ParseMessages(); }}
- DEBUG_PORT.println("before page swap ");
+    else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
+// DEBUG_PORT.println("before page swap ");
+ if (millis() >= PageInterval)  {
+  PageInterval=millis()+400;
   page->swap();
-DEBUG_PORT.println("before fill NEAR_BLACK ");
-
   page->fillScreen(NEAR_BLACK);
-  DEBUG_PORT.printf("before Display_Page(%i)\n",Display_Page);delay(10);
-    Display(false,Display_Page);
+  Display(false,Display_Page);
+  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%ims>",Display_Config.PanelName,Display_Page, millis()-DebugInterval);  // common to all pages  
+  DebugInterval=millis();
   page->compositeCanvas();
   page->push();
-
+ }
     // repeat at intervals to connect to station.   
     if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  
       SSIDSearchTimer = millis() + scansearchinterval;   if (millis()<= 30000){SSIDSearchTimer = millis() + 200;}                       // fast scan for first 30 secs
@@ -623,9 +620,9 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
     char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
     if (known) {
-      page->UpdateLinef(NEAR_BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(NEAR_BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     } else {
-      page->UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     }
     //52685 is light gray in RBG565 light gray for pgns we do not decode. (based on handler setup)
   }
@@ -1593,6 +1590,7 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
 }
 
 void SD_CS(bool state) {
+  if (!hasSD) {return;}
 #ifdef WAVSHARE
   static bool laststate;
     if (laststate != state) {

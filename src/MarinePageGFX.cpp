@@ -217,7 +217,8 @@ void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int1
   int16_t radius = (button.height - 2 * button.bordersize) / 2;
 
   // Angle math
-  float angleRad = angleDeg * DEG_TO_RAD;
+  
+  float angleRad = (angleDeg-90) * DEG_TO_RAD; // align with convention up is 0/360
   float perpRad = angleRad + PI / 2;
 
   // Tip and tail
@@ -606,6 +607,7 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
   // Measure text
   int16_t x, y;
   uint16_t w, h;
+  _textCanvas->setTextBound(0, 0, 1024, 1024);  // artificially large bounds
   _textCanvas->getTextBounds(buffer, 0, 0, &x, &y, &w, &h);
 
   // Positioning logic
@@ -620,23 +622,23 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
 
     case 2: // Top Right
       tx = button.h + button.width - margin - w;
-      ty = button.v - margin - h;
+      ty = button.v + margin - h;
       break;
 
     case 3: // Bottom Right
       tx = button.h + button.width - margin - w;
-      ty = button.v + button.height - margin - h - y;
+      ty = button.v + button.height + margin ;
       break;
 
     case 4: // Bottom Left
       tx = button.h + margin;
-      ty = button.v + button.height - margin - h - y;
+      ty = button.v + button.height + margin  ;
       break;
 	case 5: // Bottom Center
       tx = button.h + (button.width - w) / 2 - x;;
-      ty = button.v + button.height - margin - h - y;
+      ty = button.v + button.height + margin - h ;
       break;
-	  	case 6: // Top Center
+	case 6: // Top Center
       tx = button.h + (button.width - w) / 2 - x;;
       ty = button.v + margin - y;
       break;
@@ -644,12 +646,16 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
     default:
 	  tx = button.h + margin;
       ty = button.v + margin - h;
-      return;  // Invalid position
+    return;  
   }
-  if (ty<=0){ty=0;}
+  if (ty<=0){ty=0;}if (ty>=480){ty=480-h-margin;}
   if (tx<=0){tx=0;}
+
   // Draw text
-  _textCanvas->setTextColor(button.BackColor,button.BorderColor);
+   if (button.BackColor!=button.BorderColor){
+  _textCanvas->setTextColor(button.BackColor,button.BorderColor);}
+  else{
+  _textCanvas->setTextColor(WHITE,NEAR_BLACK); }
   _textCanvas->setCursor(tx, ty);
   _textCanvas->print(buffer);
 
@@ -1232,9 +1238,8 @@ void MarinePageGFX:: UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool
   typingspaceW = button.width - 2- (2 * button.bordersize);  // small one pixel inset either side
   setFontByIndex(bigfont);  _textCanvas->setTextSize(magnify);//is now set in used in message buildup AND TEXT SIZING 
    //_textCanvas->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  _textCanvas->setTextBound(0, 0, 480, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
+  _textCanvas->setTextBound(0, 0, 1024, 1024);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
   _textCanvas->getTextBounds("9", 0, 0, &TBx1, &TBy1, &TextW, &TextH);  // so that TextH can be simply obtained and used in better h centering
-
   if (horizCenter ) {
     _textCanvas->setTextWrap(false);
   } else {
@@ -1263,12 +1268,12 @@ void MarinePageGFX:: UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool
   }
                                                  // here so the text_offset is correct for bigger font
   x = button.h + button.bordersize + 1;                            //starting point left..
-   if(button.lastY<=button.v+button.bordersize){DrawBox(button); //USE TO AUTO DRAW BOX FIRST TIME?
-      button.lastY=  button.v+button.bordersize;}
+  //  if(button.lastY<=button.v+button.bordersize){DrawBox(button); //USE TO AUTO DRAW BOX FIRST TIME?
+  //     button.lastY=  button.v+button.bordersize;}
   y = button.lastY+ TextH;
  //y = button.v + button.bordersize +(magnify * TextH)+ button.PrintLine;  // Printline here will be GFX pixels down inside.. not LINES starting bpoint 'down' allow for magnify !! bigger font for front half and use printline to set start
   //_textCanvas->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  _textCanvas->setTextBound(0, 0, 480, 480);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
+  _textCanvas->setTextBound(0, 0, 1024, 1024);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
   _textCanvas->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
    //button.PrintLine=button.PrintLine+(magnify * TextH)+button.bordersize; // do here before text offset gets set for smaller font! 
   setFontByIndex(smallfont);
@@ -1308,7 +1313,7 @@ void MarinePageGFX:: UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool
   }
    button.lastY = _textCanvas->getCursorY()-TextH;// top left?
   _textCanvas->setTextColor(button.TextColor);
-  _textCanvas->setTextBound(0, 0, 480, 480);  //MUST reset it for other functions that do not set it themselves!
+  //MUST reset it for other functions that do not set it themselves!?
   _textCanvas->setTextSize(1);
 }
 
