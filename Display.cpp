@@ -134,9 +134,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
     case -200:
       if (RunSetup) {  //logo examples
-        showPicture("/logo.jpg");
-        // jpegDraw("/logo.jpg", jpegDrawCallback, true /* useBigEndian */,
-        //          0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
+        page->showPicture("/logo.jpg");
         page->GFXBorderBoxPrintf(Full0Center, "Jpg tests -Return to Menu-");
         page->GFXBorderBoxPrintf(Full1Center, "logo.jpg");
         page->GFXBorderBoxPrintf(Full2Center, "logo1.jpg");
@@ -147,29 +145,19 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
       if (CheckButton(Full0Center)) { Display_Page = 0; }
       if (CheckButton(Full1Center)) {
-        jpegDraw("/logo.jpg", jpegDrawCallback, true /* useBigEndian */,
-                 0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        page->GFXBorderBoxPrintf(Full0Center, "logo");
+        page->showPicture("/logo.jpg");
       }
       if (CheckButton(Full2Center)) {
-        jpegDraw("/logo1.jpg", jpegDrawCallback, true /* useBigEndian */,
-                 0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        page->GFXBorderBoxPrintf(Full0Center, "logo1");
+        page->showPicture("/logo1.jpg");
       }
       if (CheckButton(Full3Center)) {
-        jpegDraw("/logo2.jpg", jpegDrawCallback, false /* useBigEndian */,
-                 0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        page->GFXBorderBoxPrintf(Full0Center, "logo2");
+        page->showPicture("/logo2.jpg");
       }
       if (CheckButton(Full4Center)) {
-        jpegDraw("/logo4.jpg", jpegDrawCallback, true /* useBigEndian */,
-                 0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        page->GFXBorderBoxPrintf(Full0Center, "logo4");
+        page->showPicture("/logo4.jpg");
       }
       if (CheckButton(Full5Center)) {
-        jpegDraw("/logo5.jpg", jpegDrawCallback, true /* useBigEndian */,
-                 0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        page->GFXBorderBoxPrintf(Full0Center, "logo5");
+        page->showPicture("/logo5.jpg");
       }
 
       break;
@@ -225,12 +213,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
       //************** VICTRON PAGES - different way to displa, Single 'button is altered (V H Height ) for each variable display
     case -87:  // pageIndex for graphic display of Vicron data
-      if (RunSetup) {
-        // jpegDraw("/vicback.jpg", jpegDrawCallback, true /* useBigEndian */,
-        //          0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
-        // // Serial.println("redrawing background");
-                 page->clearCanvas(NEAR_BLACK);
-               
+      if (RunSetup) {page->clearCanvas(BLACK);
+      page->drawJPEGToTextCanvas("/vicback.jpg"); // page->Jpegshow ?? 
+    
       }
       // all graphics done in VICTRONBLE
       if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings

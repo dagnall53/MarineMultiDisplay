@@ -33,8 +33,8 @@ const char soft_version[] = " V0.20";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
-#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-#define WIDEBOX    // 4.3inch 800 by 480 display Setup
+//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+//#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -271,11 +271,11 @@ _sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, NEAR_BLACK };
 _sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, NEAR_BLACK };
 _sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, NEAR_BLACK };  //also used for showing the current settings
 
-_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };   //8B is dark blue?
+_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
+_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
+_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
+_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
 
 
 _sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, NEAR_BLACK, NEAR_BLACK };
@@ -469,7 +469,7 @@ void loop() {
     else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
 // DEBUG_PORT.println("before page swap ");
  if (millis() >= PageInterval)  {
-  PageInterval=millis()+400;
+  PageInterval=millis()+200;
   page->swap();
   page->fillScreen(NEAR_BLACK);
   Display(false,Display_Page);
@@ -623,9 +623,9 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
     char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
     if (known) {
-      page->UpdateLinef(NEAR_BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(NEAR_BLACK, 7, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     } else {
-      page->UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(52685, 7, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     }
     //52685 is light gray in RBG565 light gray for pgns we do not decode. (based on handler setup)
   }
@@ -1098,18 +1098,13 @@ void PrintJsonFile(fs::FS& fs,const char* comment, const char* filename) {
 }
 
 void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
-  // int local;
-  // local = MasterFont;
-  // SETS MasterFont, so cannot use MasterFont directly in last line and have to save it!
   long rssiValue = WiFi.RSSI();
-  gfx->setTextSize(1);
-  gfx->setTextColor(CurrentSettingsBox.TextColor);
-  CurrentSettingsBox.PrintLine = 0;
+  CurrentSettingsBox.lastY = CurrentSettingsBox.v;
   // 7 is smallest Bold Font
-  page->UpdateLinef(7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>", Text, A.ssid, A.password, A.UDP_PORT);
-  page->UpdateLinef(7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
-  page->UpdateLinef(7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
-  // page->UpdateLinef(7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>\n", Text, A.ssid, A.password, A.UDP_PORT);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>\n", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
+  // page->UpdateLinef(WHITE,7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
 }
 void ShowToplinesettings(String Text) {
   ShowToplinesettings(Current_Settings, Text);
@@ -1309,7 +1304,7 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       DEBUG_PORT.print("The ESP32 has received IP address :");
       DEBUG_PORT.println(WiFi.localIP());
       udp_st = Get_UDP_IP(WiFi.localIP(), subnet);
-      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO<%s>IP:%i.%i.%i.%i\n", WiFi.SSID(),
+      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO <%s>   IP:%i.%i.%i.%i\n", WiFi.SSID(),
                        WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
       break;
 
@@ -1828,14 +1823,14 @@ void UseNMEA(char* buf, int type) {
     }
     // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
     if ((Display_Page == -86)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
-      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 8, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
+      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 7, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
     }
 
     if ((Display_Page == -21)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
-      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 8, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
-      if (type == 2) {page->UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
-      if (type == 3) {page->UpdateLinef(RED, 8, Terminal, "ESP:%s\n", buf);} // add lf as esp does not have it 
-      if (type == 1) { page->UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf);}
+      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 7, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
+      if (type == 2) {page->UpdateLinef(BLUE, 7, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
+      if (type == 3) {page->UpdateLinef(RED, 7, Terminal, "ESP:%s\n", buf);} // add lf as esp does not have it 
+      if (type == 1) { page->UpdateLinef(GREEN, 7, Terminal, "Ser:%s", buf);}
     }
     // now decode it for the displays to use
     if (ColorSettings.SerialOUT) {DEBUG_PORT.println(buf);}

@@ -1,8 +1,14 @@
 #include "MarinePageGFX.h"
 #include <stdarg.h>
 #include <math.h>
-
+#include <SPIFFS.h>
 #include "..\FontType.h"
+#include "..\debug_port.h"
+static int _x, _y, _x_bound, _y_bound;
+static JPEGDEC _jpeg;
+static File _f;
+
+
 
 
 #define DEG_TO_RAD 0.0174532925f
@@ -13,9 +19,118 @@ const GFXfont* _currentFont = nullptr;
 static int _ShadowX = 0;
 static int _ShadowY = 0;
 static bool _ShadowON = 0;
-extern int MasterFont;
-extern int Screen_Width;
 
+
+
+static Arduino_GFX* _jpegTargetCanvas = nullptr; //This will hold the canvas you want to draw to—whe
+
+static void setJPEGTargetCanvas(Arduino_Canvas* canvas) {
+    _jpegTargetCanvas = canvas;
+}
+
+
+// new pixel drawing callback
+int MarinePageGFX::jpegDrawCallback(JPEGDRAW *pDraw){
+    if (!_jpegTargetCanvas) return 0;
+
+    _jpegTargetCanvas->draw16bitBeRGBBitmap(
+        pDraw->x, pDraw->y,
+        pDraw->pPixels,
+        pDraw->iWidth, pDraw->iHeight
+    );
+    return 1;
+}
+
+void *jpegOpenFile(const char *szFilename, int32_t *pFileSize) {
+    // DEBUG_PORT.println("jpegOpenFile");
+
+ #if defined(ESP32)
+    // _f = FFat.open(szFilename, "r");
+    //_f = LittleFS.open(szFilename, "r");
+    // _f = SPIFFS.open(szFilename, "r");
+    //SD_CS(LOW);
+    // _f = SD.open(szFilename, "r");
+ #else
+    //_f = SD.open(szFilename, FILE_READ);
+ #endif
+   _f = SPIFFS.open(szFilename, "r");
+    *pFileSize = _f.size();
+    return &_f;
+}
+
+void jpegCloseFile(void *pHandle){
+    // DEBUG_PORT.println("jpegCloseFile");
+    File *f = static_cast<File *>(pHandle);
+    f->close();
+
+}
+
+int32_t jpegReadFile(JPEGFILE *pFile, uint8_t *pBuf, int32_t iLen){
+    // DEBUG_PORT.printf("jpegReadFile, iLen: %d\n", iLen);
+    File *f = static_cast<File *>(pFile->fHandle);
+    size_t r = f->read(pBuf, iLen);
+    return r;
+}
+
+int32_t jpegSeekFile(JPEGFILE *pFile, int32_t iPosition){
+    // DEBUG_PORT.printf("jpegSeekFile, pFile->iPos: %d, iPosition: %d\n", pFile->iPos, iPosition);
+    File *f = static_cast<File *>(pFile->fHandle);
+    f->seek(iPosition);
+    return iPosition;
+}
+
+void jpegDraw(
+    const char *filename, JPEG_DRAW_CALLBACK *jpegDrawCallback, bool useBigEndian,
+    int x, int y, int widthLimit, int heightLimit){
+    _x = x;
+    _y = y;
+    _x_bound = _x + widthLimit - 1;
+    _y_bound = _y + heightLimit - 1;
+
+    _jpeg.open(filename, jpegOpenFile, jpegCloseFile, jpegReadFile, jpegSeekFile, jpegDrawCallback);
+
+    // scale to fit height
+    int _scale;
+    int iMaxMCUs;
+    float ratio = (float)_jpeg.getHeight() / heightLimit;
+    if (ratio <= 1)
+    {
+        _scale = 0;
+        iMaxMCUs = widthLimit / 16;
+    }
+    else if (ratio <= 2)
+    {
+        _scale = JPEG_SCALE_HALF;
+        iMaxMCUs = widthLimit / 8;
+    }
+    else if (ratio <= 4)
+    {
+        _scale = JPEG_SCALE_QUARTER;
+        iMaxMCUs = widthLimit / 4;
+    }
+    else
+    {
+        _scale = JPEG_SCALE_EIGHTH;
+        iMaxMCUs = widthLimit / 2;
+    }
+    _jpeg.setMaxOutputSize(iMaxMCUs);
+    if (useBigEndian)
+    {
+        _jpeg.setPixelType(RGB565_BIG_ENDIAN);
+    }
+    _jpeg.decode(x, y, _scale);
+    _jpeg.close();
+}
+void MarinePageGFX::drawJPEGToTextCanvas(const char* filename) {
+    setJPEGTargetCanvas(_textCanvas);
+    jpegDraw(filename, jpegDrawCallback, true, 0, 0, _textCanvas->width(), _textCanvas->height());
+}
+void MarinePageGFX::showPicture(const char* name) {
+  jpegDraw(name, jpegDrawCallback, true /* useBigEndian */,
+           0 /* x */, 0 /* y */, _textCanvas->width() /* widthLimit */, _textCanvas->height() /* heightLimit */);
+}
+
+//******************************************************************************************
 int getShadowY() { return _ShadowY;}
 void MarinePageGFX::setShadowY(int value) {_ShadowY = value;}
 
@@ -98,7 +213,7 @@ void MarinePageGFX::fillScreen(uint16_t color) {
 void MarinePageGFX::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) {
   for (int16_t i = 0; i < h; ++i) {
     for (int16_t j = 0; j < w; ++j) {
-      drawPixel(x + j, y + i, color);
+       _textCanvas->drawPixel(x + j, y + i, color);
     }
   }
 }
@@ -236,20 +351,34 @@ void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int1
   // Shadow rendering
   if (shadow) {
     int16_t offset = 2;
-    drawTriangleToCanvas(tipX + offset, tipY + offset,
-                         baseX1 + offset, baseY1 + offset,
-                         baseX2 + offset, baseY2 + offset,
-                         NEAR_BLACK);
+    // drawTriangleToCanvas(tipX + offset, tipY + offset,
+    //                      baseX1 + offset, baseY1 + offset,
+    //                      baseX2 + offset, baseY2 + offset,
+    //                      NEAR_BLACK);
 
-    drawTriangleToCanvas(tailX + offset, tailY + offset,
-                         baseX2 + offset, baseY2 + offset,
-                         baseX1 + offset, baseY1 + offset,
-                         NEAR_BLACK);
+    // drawTriangleToCanvas(tailX + offset, tailY + offset,
+    //                      baseX2 + offset, baseY2 + offset,
+    //                      baseX1 + offset, baseY1 + offset,
+    //                      NEAR_BLACK);
+   _textCanvas->fillTriangle(tailX + offset, tailY + offset,   // D
+                     baseX1 + offset, baseY1 + offset, // A
+                     tipX + offset, tipY + offset, // B
+                     NEAR_BLACK);
+
+// Draw triangle DCB
+    _textCanvas->fillTriangle(tailX + offset, tailY + offset,   // D
+                     baseX2 + offset, baseY2 + offset,     // C
+                     tipX + offset, tipY + offset, // B
+                     NEAR_BLACK);
+
+
+
+
   }
 
   // Main pointer
-  drawTriangleToCanvas(tipX, tipY, baseX1, baseY1, baseX2, baseY2, color);
-  drawTriangleToCanvas(tailX, tailY, baseX2, baseY2, baseX1, baseY1, color);
+  _textCanvas->fillTriangle(tailX, tailY, baseX1, baseY1, tipX, tipY, SILVER_GRAY);
+  _textCanvas->fillTriangle(tailX, tailY, baseX2, baseY2, tipX, tipY, color);
   drawLineToCanvas(tipX, tipY, tailX, tailY, NEAR_BLACK);
 }
 
@@ -401,7 +530,9 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
     }
   } 
   // SET chosen magnify and font for printing 
-  _textCanvas->setTextSize(magnify);
+  button.lastY = button.v+button.bordersize;
+  UpdateTwoSize_MultiLine(magnify, true, true, chosenFont, chosenFont-1, button,"%s", valueBuffer);
+ /* _textCanvas->setTextSize(magnify);
   setFontByIndex(chosenFont);  
   _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1); // repeat in case we do a magnify before this .. 
   _textCanvas->getTextBounds(valueBuffer, 0, 0, &x1, &y1, &w2, &h2);
@@ -413,7 +544,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
   _textCanvas->setTextBound(button.h + button.bordersize, button.v+button.bordersize,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize); 
  // DEBUG_PORT.printf("print  %s  at v%i h%i in font %i, magnification %i \n",valueBuffer,refV,valH,chosenFont,magnify );
   PrintSubshadow(button,valueBuffer,valH,refV,chosenFont);
-
+*/
   _textCanvas->setTextSize(1); // reset magnify for other functions
   button.PrintLine = 0;button.lastY = button.v+button.bordersize;
  }
@@ -555,13 +686,13 @@ void MarinePageGFX::AddTitleInsideBox(_sButton& button, int position, int font, 
       break;
 
     case 2: // Top Right
-      tx = button.h + button.width - margin - w;
+      tx = button.h + button.width - button.bordersize- margin - w;
       ty = button.v + margin - y;
       break;
 
     case 3: // Bottom Right
       tx = button.h + button.width - margin - w;
-      ty = button.v + button.height - margin - h - y;
+      ty = button.v + button.height - button.bordersize- margin - h - y;
       break;
 
     case 4: // Bottom Left
@@ -617,35 +748,35 @@ void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, c
   switch (position) {
     case 1: // Top Left
       tx = button.h + margin;
-      ty = button.v + margin - h;
+      ty = button.v - margin - y;
       break;
 
     case 2: // Top Right
       tx = button.h + button.width - margin - w;
-      ty = button.v + margin - h;
+      ty = button.v - margin - y;
       break;
 
     case 3: // Bottom Right
       tx = button.h + button.width - margin - w;
-      ty = button.v + button.height + margin ;
+      ty = button.v + button.height - margin -y;
       break;
 
     case 4: // Bottom Left
       tx = button.h + margin;
-      ty = button.v + button.height + margin  ;
+      ty = button.v + button.height - margin -y ;
       break;
 	case 5: // Bottom Center
       tx = button.h + (button.width - w) / 2 - x;;
-      ty = button.v + button.height + margin - h ;
+      ty = button.v + button.height - margin - y ;
       break;
 	case 6: // Top Center
       tx = button.h + (button.width - w) / 2 - x;;
-      ty = button.v + margin - y;
+      ty = button.v - margin - y;
       break;
 
     default:
 	  tx = button.h + margin;
-      ty = button.v + margin - h;
+      ty = button.v - margin - y;
     return;  
   }
   if (ty<=0){ty=0;}if (ty>=480){ty=480-h-margin;}
@@ -672,19 +803,23 @@ void MarinePageGFX::GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...) {
   va_end(args);
 
   // Font selection
-    setFontByIndex(button.Font);
+    setFontByIndex(button.Font); 
   // Set text size to 1 (no magnification)
-  _textCanvas->setTextSize(1);
+   
 
   // Measure text bounds
   int16_t x, y;
-  uint16_t w, h;
+  uint16_t w, h; 
+  _textCanvas->setTextWrap(true);
     _textCanvas->setTextBound(0, 0, 1024, 1024);  // artificially large bounds
+    _textCanvas->setTextBound(0, 0,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize);
+ 
   _textCanvas->getTextBounds(buffer, 0, 0, &x, &y, &w, &h);
 
   // Calculate centered position
   int16_t tx = button.h + (button.width - w) / 2 - x;
   int16_t ty = button.v + (button.height - h) / 2 - y;
+   _textCanvas->setTextBound(button.h + button.bordersize, button.v+button.bordersize,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize);
 
   // Draw background
   DrawBox(button);
@@ -1156,17 +1291,10 @@ void MarinePageGFX::CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint
   uint16_t TBw1, TBh1,TextW,TextH;
   int typingspaceH, typingspaceW;
   int local;
-  int MasterFont = getFontByIndex();
   // can now change font inside this function
   setFontByIndex(font);
   typingspaceH = button.height - (2 * button.bordersize);
   typingspaceW = button.width - (2 * button.bordersize);
-                                                    
-  if (horizCenter || vertCenter) {
-    _textCanvas->setTextWrap(false);
-  } else {
-    _textCanvas->setTextWrap(true);
-  }
   // get bounds as would be printed at top of box..
   // set text bounds first so that can be taken into account ! Use same zero starts as in Sub_for_UpdateTwoSize
   _textCanvas->setTextBound(0, 0, 1024, 500);   
@@ -1180,15 +1308,14 @@ void MarinePageGFX::CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint
   if (horizCenter) { x = x + ((typingspaceW - (TBw1)) / 2) - TBx1; }                                   // subtract any start text offset
   if (vertCenter) { y = TextH + button.bordersize + button.v + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
   //page->fillRect(x,y-TextH,TBw1,TBh1, button.BackColor); // Background exactly the text - needed for STATUS to make flash work in status!
-  
-  _textCanvas->setCursor(x, y);
-  _textCanvas->setTextColor(color, button.BackColor);  // Background colour the text
-  _textCanvas->print(msg); 
+  int OLDColor= button.TextColor;
+  button.TextColor=color;
+  PrintSubshadow(button, msg, x,y, font);
+  button.TextColor=OLDColor; // put it back!
   button.lastY = _textCanvas->getCursorY()+2-TextH;// top left?
   //NOTE TEXT WRAP uses the last variable in the GFXFont setting, which should be roughly twice the character height.
   //But often seems to be set larger,
   // which gives a text wrap of TWO lines..
-
   if ((button.lastY + TextH) >= (button.v+typingspaceH-button.bordersize)) {
     button.screenfull = true;
     if (!button.debugpause) {
@@ -1223,35 +1350,32 @@ void MarinePageGFX:: UpdateLinef(int font, _sButton &button, const char *fmt, ..
   CommonSub_UpdateLine(false, false, button.TextColor, font, button, msg);
 }
 
-void MarinePageGFX:: UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
-  //Serial.print(" UD2S: ");Serial.println(data); this version does not use the border for the height evaluation ! 
+void MarinePageGFX:: UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton &button, const char *fmt, ...) {  // TWO font print. separates at decimal point Centers text in space GREYS if data is OLD
+  
   static char msg[300] = { '\0' };
   char digits[30];
   char decimal[30];
   static char *token;
   const char delimiter[2] = ".";  // Or space, etc.
-  int16_t x, y, TBx1, TBy1, TBx2, TBy2, TBx3, TBy3;
-  uint16_t TBw1, TBh1, TBw2, TBh2, TBw3, TBh3,TextW,TextH;
+  int16_t x, y, TBx1, TBy1, TBx2, TBy2, Textx, Texty;
+  uint16_t TBw1, TBh1, TBw2, TBh2,  TextW,TextH;
   int typingspaceH, typingspaceW;
-  ////// buttton width and height are for the OVERALL box. subtract border! for sides only as this function may be used in lines..
-  typingspaceH = button.height -2;// (2 * button.bordersize);
-  typingspaceW = button.width - 2- (2 * button.bordersize);  // small one pixel inset either side
+  ////// button width and height are for the OVERALL box. subtract border! for sides only as this function may be used in lines..
+  typingspaceH = button.height - (2 * button.bordersize);
+  if (vertCenter){typingspaceW = button.width - 2- (2 * button.bordersize);}// ??tracing issue and fault finding CF main and victron isplaypages and Debug 
+  else {typingspaceW = button.width - 2;}  // small one pixel inset either side Why not for false vert ??
   setFontByIndex(bigfont);  _textCanvas->setTextSize(magnify);//is now set in used in message buildup AND TEXT SIZING 
    //_textCanvas->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
-  _textCanvas->setTextBound(0, 0, 1024, 1024);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
-  _textCanvas->getTextBounds("9", 0, 0, &TBx1, &TBy1, &TextW, &TextH);  // so that TextH can be simply obtained and used in better h centering
-  if (horizCenter ) {
-    _textCanvas->setTextWrap(false);
-  } else {
-    _textCanvas->setTextWrap(true);
-  }
-
+ 
   va_list args;  // extract the fmt..
   va_start(args, fmt);
   vsnprintf(msg, 300, fmt, args);
   va_end(args);
   int len = strlen(msg);
-  // split msg at the decimal point .. so must have decimal point!
+  // split msg at the decimal point .. so must have decimal point!//
+ // DEBUG_PORT.print(" UD2S: ");DEBUG_PORT.print(msg);
+  // DEBUG_PORT.print(" lastY :");DEBUG_PORT.print(button.lastY);
+  //  DEBUG_PORT.print(" BoxY: ");DEBUG_PORT.print(button.v+button.bordersize); DEBUG_PORT.print(" to: ");DEBUG_PORT.print(button.v+button.height-button.bordersize); 
   // if (typingspaceW >=300){
   // Serial.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
 
@@ -1268,52 +1392,37 @@ void MarinePageGFX:: UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool
   }
                                                  // here so the text_offset is correct for bigger font
   x = button.h + button.bordersize + 1;                            //starting point left..
-  //  if(button.lastY<=button.v+button.bordersize){DrawBox(button); //USE TO AUTO DRAW BOX FIRST TIME?
-  //     button.lastY=  button.v+button.bordersize;}
-  y = button.lastY+ TextH;
- //y = button.v + button.bordersize +(magnify * TextH)+ button.PrintLine;  // Printline here will be GFX pixels down inside.. not LINES starting bpoint 'down' allow for magnify !! bigger font for front half and use printline to set start
-  //_textCanvas->setTextBound(button.h + button.bordersize+1, button.v + button.bordersize+1, typingspaceW-2, typingspaceH-2);
+
   _textCanvas->setTextBound(0, 0, 1024, 1024);  // test.. set a full (width) text bound to be certain that the get does not take into account any 'wrap'
   _textCanvas->getTextBounds(digits, 0, 0, &TBx1, &TBy1, &TBw1, &TBh1);  // get text bound for digits use 0,0 for start to ensure we get a usable TBx1 and TBx2 later
-   //button.PrintLine=button.PrintLine+(magnify * TextH)+button.bordersize; // do here before text offset gets set for smaller font! 
+  _textCanvas->getTextBounds("9", 0, 0, &Textx, &Texty, &TextW, &TextH);  // "Textn" for fixed "9" character keesp display from moving with small character offsets ?so that offsets and width and height TextH can be simply obtained and used in better h centering
+ 
+   y = button.lastY+ TextH;
+ 
   setFontByIndex(smallfont);
   _textCanvas->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);    // get text bounds for decimal
                                                                     // if (typingspaceW >=300){
                                                                     //   Serial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
                                                                     //   }
-  // if (((TBw1 + TBw2) >= typingspaceW) || (TBh1 >= typingspaceH)) {  // too big!!
-  //   if ((TBw1 <= typingspaceW) && (TBh1 <= typingspaceH)) {         //just print digits not decimals
-  //     TBw2 = 0;
-  //     decimal[0] = 0;
-  //     decimal[1] = 0;
-  //   } else {  // Serial.print("***DEBUG <"); Serial.print(msg);Serial.print("> became <");Serial.print(digits);
-  //             // Serial.print(decimal);Serial.println("> and was too big to print in box");
-  //     _textCanvas->setTextBound(0, 0, 480, 480);
-  //     return;
-  //   }
-  // }
   setFontByIndex(bigfont);                                                                                                // Reset to big font for Digits..
-  if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }                    //offset to horizontal center
- // if (vertCenter) { y = button.v + button.bordersize + (magnify * text_offset) + ((typingspaceH - (TBh1)) / 2); }  // vertical centering
-  if (erase) {
-    _textCanvas->setTextColor(button.BackColor);
-  } else {
-    _textCanvas->setTextColor(button.TextColor);
-  }
+  if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); } //offset to horizontal center
+  if (vertCenter) { y = button.v + button.bordersize + TextH+((typingspaceH - TBh1) / 2); }
+    // vertical centering (fixed at spacing of BigFont "9")
+ //DEBUG_PORT.print("Print Starts X: "); DEBUG_PORT.print((x - TBx2)); DEBUG_PORT.print(" Y: "); DEBUG_PORT.println(y);
   _textCanvas->setTextBound(button.h + button.bordersize, button.v + button.bordersize, typingspaceW, typingspaceH);
   x = x - TBx1;  // NOTE TBx1 is normally zero for most fonts, but some print with offsets that will be corrected by TBx1.
-  _textCanvas->setCursor(x, y);
-  _textCanvas->print(digits);
+  PrintSubshadow(button, digits, x,y, bigfont);
+
   button.lastY = _textCanvas->getCursorY()-TextH;// top left?
   x = _textCanvas->getCursorX();
   if (TBw2 != 0) {
     setFontByIndex(smallfont);
-    _textCanvas->setCursor((x - TBx2), y);  // Set decimals start position based on where Digits ended and allow for any font start offset TBx2
-    _textCanvas->print(decimal);
+    
+    PrintSubshadow(button, decimal, (x - TBx2),y, smallfont);// Set decimals start position based on where Digits ended and allow for any font start offset TBx2
   }
    button.lastY = _textCanvas->getCursorY()-TextH;// top left?
   _textCanvas->setTextColor(button.TextColor);
   //MUST reset it for other functions that do not set it themselves!?
   _textCanvas->setTextSize(1);
 }
-
+

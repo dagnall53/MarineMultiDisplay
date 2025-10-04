@@ -4,8 +4,15 @@
 #include "..\CanvasBridge.h"
 #include "..\Structures.h"
 #include "..\FontType.h"
-
+/*******************************************************************************
+ * Adding JPEGDEC related functions
+ *
+ * Dependent libraries:
+ * JPEGDEC: https://github.com/bitbank2/JPEGDEC.git
+ ******************************************************************************/
+#include <JPEGDEC.h>
 #define NEAR_BLACK 0x0001  // One bit on
+#define SILVER_GRAY 0xBEEF
 
 
 class MarinePageGFX {
@@ -23,6 +30,9 @@ public:
   void setShadowY(int value);
   bool getShadow_ON();
   void setShadow_ON(bool value);
+
+  void drawJPEGToTextCanvas(const char* filename);
+  void showPicture(const char* name);
   
   
   void DrawCompass(_sButton& button);
@@ -41,7 +51,7 @@ public:
   void CommonSub_UpdateLine(bool horizCenter, bool vertCenter, uint16_t color, int font, _sButton &button, const char *msg);
   void UpdateLinef(uint16_t color, int font, _sButton &button, const char *fmt, ...);
   void UpdateLinef(int font, _sButton &button, const char *fmt, ...);
-  void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool erase, int bigfont, int smallfont, _sButton &button, const char *fmt, ...);
+  void UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool vertCenter, int bigfont, int smallfont, _sButton &button, const char *fmt, ...);
   
   // Drawing primitives
 
@@ -118,4 +128,13 @@ private:
   uint16_t _textColor;
   uint8_t _textSize;
   const GFXfont* _gfxFont = nullptr;
+
+  static int jpegDrawCallback(JPEGDRAW* pDraw);
+  static void* jpegOpenFile(const char* szFilename, int32_t* pFileSize);
+  static void jpegCloseFile(void* pHandle);
+  static int32_t jpegReadFile(JPEGFILE* pFile, uint8_t* pBuf, int32_t iLen);
+  static int32_t jpegSeekFile(JPEGFILE* pFile, int32_t iPosition);
+
+
+
 };
