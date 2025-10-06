@@ -41,17 +41,7 @@ Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
      800 /* width */, 480 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */);
 
 /* Exploring Wavshare type X inits for correct colours .. 
-MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Display.h Line 511     WRITE_COMMAND_8, 0x21,   // 0x20 normal, 0x21 IPS
-1 wrong, inverted but readable
-2 wrong
-3,4,5,6,7,8 unusabl
-8 wrong, different Top part unused? (like 2?)
-9 wrong but usable
- ------------NOTES ------------------------------------
- WRITE_C8_D8, 0xCD, 0x00 //  08/ 00(Line 1358)
- //WRITE_COMMAND_8, 0x20, // 0x20 normal, 0x21 IPS (Line 1450)
- WRITE_C8_D8, 0x3A, 0x60, // 0x70 RGB888, 0x60 RGB666, 0x50 RGB565 (Line 1451)
- 
+?? 
 */
 
 /*******************************************************************************

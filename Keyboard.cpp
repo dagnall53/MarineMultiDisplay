@@ -8,6 +8,12 @@
 // Based on Felix Biego's keyboard   https://github.com/fbiego/esp32-touch-keyboard/tree/main
 // modified to use strings (char array) and not Strings.
 #include "FONTS/fonts.h"
+#include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "CanvasBridge.h"
+#include "FontType.h"
+#include "Structures.h"
+
+extern MarinePageGFX* page;
 
 #include "src/TAMC_GT911.h"
 
@@ -45,11 +51,12 @@ extern int text_offset;
 
 
 void WriteinKey(int h, int v, int size, const char* TEXT) {  //Write WHITE text in filled BLACK box of text height at h,v (using fontoffset to use TOP LEFT of text convention)
-  gfx->fillRect(h, v, 480, text_height * size, WHITE);
-  gfx->setTextColor(BLACK);
-  gfx->setTextSize(size);
-  gfx->setCursor(h, v + (text_offset));         // offset up/down for GFXFONTS that start at Bottom left. Standard fonts start at TOP LEFT
-  gfx->print(TEXT);
+  page->fillRect(h, v, 480, text_height * size, WHITE);
+  page->drawTextAt(h, v + (text_offset), TEXT, size,4, NEAR_BLACK);
+  // page->setTextColor(BLACK);
+  // page->setTextSize(size);
+  // page->setCursor(h, v + (text_offset));         // offset up/down for GFXFONTS that start at Bottom left. Standard fonts start at TOP LEFT
+  // page->print(TEXT);
 }
 
 void Use_Keyboard(char* DATA, int sizeof_data) {
@@ -134,9 +141,10 @@ int KEYBOARD_X(void){
   return Keyboard_X;
 }
 void DrawKey(int KBD_size, int x, int rows_down, int width, String text ){
-      gfx->drawRoundRect(Keyboard_X+(x*KBD_size), Keyboard_Y + (30*rows_down*KBD_size), width*KBD_size, 25*KBD_size, 3, RED);
-      gfx->setCursor(Keyboard_X+(x*KBD_size)+(2*KBD_size), Keyboard_Y + (30*rows_down*KBD_size)+voffset);
-      gfx->print(text);
+      page->drawRoundRect(Keyboard_X+(x*KBD_size), Keyboard_Y + (30*rows_down*KBD_size), width*KBD_size, 25*KBD_size, 3, RED);
+    //  page->setCursor(Keyboard_X+(x*KBD_size)+(2*KBD_size), Keyboard_Y + (30*rows_down*KBD_size)+voffset);
+      page->drawTextAt(Keyboard_X+(x*KBD_size)+(2*KBD_size), Keyboard_Y + (30*rows_down*KBD_size)+voffset, text.c_str(), 1,4, NEAR_BLACK);
+    //  page->print(text);
 } 
 
      
@@ -149,41 +157,49 @@ void keyboard(int type) {
   caps=type;
   DEBUG_PORT.printf("\n*** Start keyboard type %i  last type%i \n",type,lasttype);
   lasttype=type;
-  ///gfx->setFont(&FreeMonoBold18pt7b);
+  ///page->setFont(&FreeMonoBold18pt7b);
   setFont(2);
 
-  gfx->setTextSize(1);
-  gfx->setTextColor(WHITE);// reset in case its has been changed!
-  gfx->fillRect(Keyboard_X,Keyboard_Y-5,480-Keyboard_X,240,BLACK);
+  page->setTextSize(1);
+  page->setTextColor(WHITE);// reset in case its has been changed!
+  page->fillRect(Keyboard_X,Keyboard_Y-5,480-Keyboard_X,240,BLACK);
   for (int x = 0; x < 10; x++) {
     int a = KBD_size*((x * 4) + (20 * x) + 2) + Keyboard_X;
-    gfx->drawRoundRect(a, Keyboard_Y, 20*KBD_size, 25*KBD_size, 3, WHITE);
-    gfx->setCursor(a + hoffset, Keyboard_Y + voffset);
-    gfx->print(TOP[((x * sz) + type)]);
+    page->drawRoundRect(a, Keyboard_Y, 20*KBD_size, 25*KBD_size, 3, WHITE);
+    std::string temp(1, TOP[((x * sz) + type)]);
+
+    page->drawTextAt(a + hoffset, Keyboard_Y + voffset, temp.c_str(), 1,4,WHITE);
+   // page->setCursor(a + hoffset, Keyboard_Y + voffset);
+   // page->print(TOP[((x * sz) + type)]);
   }
 
   for (int x = 0; x < 9; x++) {
     int a = KBD_size*((x * 4) + (20 * x) + 13) + Keyboard_X;
-    gfx->drawRoundRect(a, Keyboard_Y + (30*KBD_size), 20*KBD_size, 25*KBD_size, 3, WHITE);
-    gfx->setCursor(a + hoffset, Keyboard_Y + (30*KBD_size) + voffset);
-    gfx->print(MIDDLE[((x * sz) + type)]);
+    page->drawRoundRect(a, Keyboard_Y + (30*KBD_size), 20*KBD_size, 25*KBD_size, 3, WHITE);
+    std::string temp(1, MIDDLE[((x * sz) + type)]);
+    page->drawTextAt(a + hoffset, Keyboard_Y + (60*KBD_size) + voffset, temp.c_str(), 1, 4, WHITE);
+    
+   // page->setCursor(a + hoffset, Keyboard_Y + (30*KBD_size) + voffset);
+    //page->print(MIDDLE[((x * sz) + type)]);
   }
 
   for (int x = 0; x < 8; x++) {
     int a = KBD_size*((x * 4) + (20 * x) + 25) + Keyboard_X;
-    gfx->drawRoundRect(a, Keyboard_Y + (60*KBD_size), 20*KBD_size, 25*KBD_size, 3, x == 0 ? GREEN : WHITE);
-    gfx->setCursor(a + hoffset, Keyboard_Y + (60*KBD_size) + voffset);
-    gfx->print(BOTTOM[((x * sz) + type)]);
+    page->drawRoundRect(a, Keyboard_Y + (60*KBD_size), 20*KBD_size, 25*KBD_size, 3, x == 0 ? GREEN : WHITE);
+    std::string temp(1, BOTTOM[((x * sz) + type)]);
+    page->drawTextAt(a + hoffset, Keyboard_Y + (60*KBD_size) + voffset, temp.c_str(), 1, 4, WHITE);
+    //   page->setCursor(a + hoffset, Keyboard_Y + (60*KBD_size) + voffset);
+   // page->print(BOTTOM[((x * sz) + type)]);
   }
-   ///gfx->setFont(&FreeMonoBold12pt7b);
+   ///page->setFont(&FreeMonoBold12pt7b);
    setFont(1); // smaller font for the bottm row keys
    DrawKey(2,50, 3,30,"CLR");
    DrawKey(2,155, 3,30,"DEL");
    DrawKey(2,190, 3,50,"ENT");
    DrawKey(2,5, 3,30,"MEM");
-  gfx->drawRoundRect((90*KBD_size)+ Keyboard_X, Keyboard_Y + (90*KBD_size), 60*KBD_size, 25*KBD_size, 3, WHITE);
+  page->drawRoundRect((90*KBD_size)+ Keyboard_X, Keyboard_Y + (90*KBD_size), 60*KBD_size, 25*KBD_size, 3, WHITE);
   setFont(0);
-  gfx->setTextSize(1);
+  page->setTextSize(1);
 }
 
 
@@ -210,9 +226,9 @@ bool KeyOver(int x, int y, char* Key, int type){ //char array version
    //DEBUG_PORT.printf(" In TOP ROW  KBD_size;(%i) x%i y%i   looking in space x%i y%i\n",KBD_size,x,y );
    /*  for (int x = 0; x < 10; x++) {
     int a = KBD_size*((x * 4) + (20 * x) + 2) + Keyboard_X;
-    gfx->drawRoundRect(a, Keyboard_Y, 20*KBD_size, 25*KBD_size, 3, WHITE);
-    gfx->setCursor(a + hoffset, Keyboard_Y + voffset);
-    gfx->print(TOP[((x * sz) + type)]);
+    page->drawRoundRect(a, Keyboard_Y, 20*KBD_size, 25*KBD_size, 3, WHITE);
+    page->setCursor(a + hoffset, Keyboard_Y + voffset);
+    page->print(TOP[((x * sz) + type)]);
    */
     for (int z = 0; z < 10; z++) {
       int a = (KBD_size*((z * 4) + (20 * z) + 2)) + Keyboard_X;

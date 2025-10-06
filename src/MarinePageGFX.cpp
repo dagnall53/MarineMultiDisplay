@@ -1147,9 +1147,9 @@ void MarinePageGFX::clearCanvas(uint16_t color) {
   }
 }
 
-void MarinePageGFX::drawText(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color) {
+void MarinePageGFX::drawTextAt(int16_t x, int16_t y, const char* text, uint8_t size,int font, uint16_t color) {
   if (!_textCanvas || !isReady()) return;
-  _textCanvas->setFont(_gfxFont);
+  setFontByIndex(font);
   _textCanvas->setTextSize(size);
   _textCanvas->setTextColor(color);
   _textCanvas->setCursor(x, y);

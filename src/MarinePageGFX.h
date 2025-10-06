@@ -71,7 +71,7 @@ public:
                           int16_t x2, int16_t y2,
                           uint16_t color);
 
-  void drawText(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color);
+  //void drawText(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color);
   void drawTextAlign(int16_t x, int16_t y, const char* text, uint8_t size, uint16_t color, uint8_t align);
   void drawTextCentered(int16_t centerX, int16_t centerY, const char* text, uint8_t size, uint16_t color);
   void drawTextOverlay(const char* label, uint16_t color);
@@ -100,6 +100,7 @@ public:
 
   // Text rendering
     // Text rendering
+  void  drawTextAt(int16_t x, int16_t y, const char* text, uint8_t size,int font, uint16_t color);
   void PrintSubshadow(_sButton& button, const char* valueBuffer, int16_t valH,int16_t valV, int chosenFont);
   void SplitInterDecimal(const char* buffer, char* Integer, char* Fraction, char* Dot);
   void DrawBox(_sButton& button);
