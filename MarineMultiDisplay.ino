@@ -29,7 +29,7 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.21";
+const char soft_version[] = " V0.30";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
@@ -149,7 +149,7 @@ extern bool HaltOtherOperations;
 #include "Display.h"
 //*********** for keyboard*************
 #include "Keyboard.h"
-
+extern char resultBuffer[25]; // same as Password size for simplicity  
 
 
 // Load the PCA9554 Library
@@ -226,7 +226,7 @@ _sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
 _sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
 _sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
 _sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE };
+_sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE ,7};// 7 is the smallest font 
 // for the quarter screens on the main page
 _sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };  //h  reduced by 15 to give 30 space at the bottom
 _sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
@@ -246,20 +246,25 @@ _sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
 
 
 #define sw_width 65
-//switches at line 180
-_sButton Switch1 = { 20, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch2 = { 100, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch3 = { 180, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch5 = { 260, 180, sw_width, 35, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch4 = { 345, 180, 120, 35, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
-_sButton Switch4a = { 345, 140, 120, 35, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
-//switches at line 60
-_sButton Switch6 = { 20, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
-_sButton Switch7 = { 100, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
-_sButton Switch8 = { 180, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
-_sButton Switch9 = { 260, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
-_sButton Switch10 = { 340, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
-_sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+//switches at line 250 for WIFI settings
+_sButton Switch0 = { 20+(1*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch1 = { 20+(3*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch2 = { 20+(5*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch3 = { 20+(7*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE }; 
+_sButton Switch4 = { 20+(9*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE }; //new not used ? 
+_sButton Switch5 = { 20+(11*sw_width/2), 250, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE }; //was 4 // big one for eeprom update
+
+// at line140 in wif scan update
+_sButton Switch5a = { 345, 140, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
+
+
+//switches at line 60 for the terminal display page index  -21
+_sButton Switch6 = { 20+(1*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch7 = { 20+(3*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch8 = { 20+(5*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch9 = { 20+(7*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch10 = { 20+(9*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch11 = { 20+(11*sw_width/2) , 60, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK }; // for the flash settings words - wider 
 
 
 //WIDTH dependant settings, h, v, width, height, bordersize
@@ -271,26 +276,26 @@ _sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, NEAR_BLACK };
 _sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, NEAR_BLACK };
 _sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, NEAR_BLACK };  //also used for showing the current settings
 
-_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };   //8B is dark blue?
-_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
-_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
-_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
-_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B };
+_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};   //8B is dark blue?
+_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};
+_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};
+_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B,9};
+_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};
 
 
 _sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, NEAR_BLACK, NEAR_BLACK };
 //for selections
-_sButton FullTopCenter = { 80, 0, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton FullTopCenter = { 20, 0, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
 
-_sButton Full0Center = { 80, 55, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Full1Center = { 80, 110, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Full2Center = { 80, 165, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Full3Center = { 80, 220, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Full4Center = { 80, 275, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Full5Center = { 80, 330, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, NEAR_BLACK };  // inteferes with settings box do not use!
+_sButton Full0Center = { 20, 55, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full1Center = { 20, 110, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full2Center = { 20, 165, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK ,4};
+_sButton Full3Center = { 20, 220, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full4Center = { 20, 275, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full5Center = { 20, 330, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full6Center = { 20, 385, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };  // inteferes with settings box do not use!
 
-
+_sButton WIFISHOW = {0,0, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,8 };  // For displaying list of wifi networksnteferes with settings box do not use!
 
 
 //#include "esp_task_wdt.h"
@@ -467,13 +472,14 @@ void loop() {
       BLEloop();
     }
     else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
-// DEBUG_PORT.println("before page swap ");
+ 
  if (millis() >= PageInterval)  {
-  PageInterval=millis()+200;
+ // DEBUG_PORT.printf("swap  %s",resultBuffer);
+  PageInterval=millis()+10;
   page->swap();
   page->fillScreen(NEAR_BLACK);
   Display(false,Display_Page);
-  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%ims>",Display_Config.PanelName,Display_Page, millis()-DebugInterval);  // common to all pages  
+  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%ifps>",Display_Config.PanelName,Display_Page, 1000/(millis()-DebugInterval));  // common to all pages  
   DebugInterval=millis();
   if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);}
   else{WIFIGFXBoxdisplaystarted = false;}
@@ -1103,7 +1109,7 @@ void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
   // 7 is smallest Bold Font
   page->UpdateLinef(WHITE,7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>\n", Text, A.ssid, A.password, A.UDP_PORT);
   page->UpdateLinef(WHITE,7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
-  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>\n", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>N2K<%s>Log<%s>NMEA<%s>\n", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.N2K_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
   // page->UpdateLinef(WHITE,7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
 }
 void ShowToplinesettings(String Text) {

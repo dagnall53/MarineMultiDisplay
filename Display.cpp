@@ -7,10 +7,7 @@
 #include "Keyboard.h"             // for keyboard functions
 #include "JpegFunc.h"
 #include "VICTRONBLE.h"  //sets #ifndef Victronble_h
-#include "src/MarinePageGFX.h"  // Double-buffered graphics
-#include "CanvasBridge.h"
-#include "FontType.h"
-#include "Structures.h"
+
 
 extern MarinePageGFX* page;
 #include "Globals.h"
@@ -32,32 +29,53 @@ extern const char* Setupfilename;
 
 extern void SaveConfiguration();
 extern bool LoadConfiguration();  // replacement for EEPROM READ
-extern bool ScanAndConnect(bool display,bool forceFull);
+extern bool ScanAndConnect(bool display, bool forceFull);
 
 extern void ShowToplinesettings(String Text);
 extern void ShowToplinesettings(_sWiFi_settings_Config A, String Text);
 extern char* LongtoString(double data);
 extern char* LattoString(double data);
 
-extern void DATA_Log_File_Create(fs::FS &fs);
+extern void DATA_Log_File_Create(fs::FS& fs);
 
 
 extern boolean CompStruct(_sWiFi_settings_Config A, _sWiFi_settings_Config B);
 extern boolean IsConnected;        // may be used in AP_AND_STA to flag connection success (got IP)
 extern boolean AttemptingConnect;  // to note that WIFI.begin has been started
 extern int NetworksFound;
+//for the (new) keyboard
+extern char resultBuffer[25];  // same as Password size for simplicity
+extern KeyboardMode currentMode;
+extern _sButton WIFISHOW ;     // for the list of WIFI scanned 
+char labelBuffer[64];             // Adjust size as needed
+const char* label = labelBuffer;  // Now label points to the formatted string
 
 #include "src/TAMC_GT911.h"
 extern TAMC_GT911 ts;
 extern bool Touch_available;
 
 void Display(int pageIndex) {
-  DEBUG_PORT.printf("IN oVERLAY void Display page<%i> \n",pageIndex);
+  DEBUG_PORT.printf("IN overlay void Display page<%i> \n", pageIndex);
   Display(false, pageIndex);
 }
 
+void DoNewKeyboard() {
+  static bool wasTouched;
+  drawKeyboard(currentMode);
+  if ((ts.isTouched)) {  // Touch is active
+    int x = ts.points[0].x;
+    int y = ts.points[0].y;
+    if (!wasTouched) {
+      handleTouch(x, y);  // Process key press once
+      wasTouched = true;  // Mark as touched to prevent repeat
+    }
+  } else {
+    wasTouched = false;  // Reset when touch is released
+  }
+}
+
 void Display(bool reset, int pageIndex) {  // setups for alternate pages to be selected by pageIndex.
- // DEBUG_PORT.printf("IN void Display page<%i> reset:%s \n",pageIndex,reset True_False);delay(50);  // Give UART time to flush
+                                           // DEBUG_PORT.printf("IN void Display page<%i> reset:%s \n",pageIndex,reset True_False);delay(50);  // Give UART time to flush
 
   static unsigned long flashinterval;
   static bool flash;
@@ -69,43 +87,40 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   static int LastPageselected;
   static bool DataChanged;
   static int wifissidpointer;
+
   // some local variables for tests;
   //char blank[] = "null";
-  static int SwipeTestLR, SwipeTestUD, volume;
   static bool RunSetup;
   static unsigned int slowdown, timer2;
   //static float wind, SOG, Depth;
   float temp;
   static _sInstData LocalCopy;  // needed only where two digital displays wanted for the same data variable.
   static int fontlocal;
-  static int FileIndex, Playing;  // static to hold after selection and before pressing play!
-  static int V_offset;            // used in the audio file selection to sort print area
-  char Tempchar[30];
-  //String tempstring;
-  // int FS = 1;  // for font size test
-  // int tempint;
-  //DEBUG_PORT.println("IN Display_Page");
+  char Tempchar[30];  //for fontnames for display
+
+
+
   if (pageIndex != LastPageselected) {
-    WIFIGFXBoxdisplaystarted = false;  // will have reset the screen, so turn off the auto wifibox blanking if there was a wifiiterrupt box
+    WIFIGFXBoxdisplaystarted = false;  // will have reset the screen, so turns off the wifibox if there is a  page index change
                                        // this (above) saves a timed screen refresh that can clear keyboard stuff
-   // DEBUG_PORT.println("IN Display_Page.. load config (Different page)");
+                                       // DEBUG_PORT.println("IN Display_Page.. load config (Different page)");
     LoadConfiguration();               //Reload configuration in case new data stored
     RunSetup = true;
   }
   if (reset) {
     WIFIGFXBoxdisplaystarted = false;
- //   DEBUG_PORT.println("IN Display_Page.. load config (reset)");
+    //   DEBUG_PORT.println("IN Display_Page.. load config (reset)");
     LoadConfiguration();  //Reload configuration in case new data stored
     page->clearCanvas(BLUE);
     RunSetup = true;
   }
   //generic setup stuff for ALL pages
- //page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
+  //page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
   if (RunSetup) {
     DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
     page->clearCanvas(BLUE);
     page->setTextColor(WHITE);
-   }
+  }
 
   // if ((millis() >= flashinterval)) {
   //   flashinterval = millis() + 1000;
@@ -124,7 +139,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   // Now specific stuff for each pageIndex
 
   switch (pageIndex) {  // A pageIndex just to blank.
-    case -99:      // pageIndex for just a blank
+    case -99:           // pageIndex for just a blank
       if (RunSetup) {
         page->fillScreen(BLACK);
       }
@@ -167,8 +182,6 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->fillScreen(BLACK);
         page->setTextColor(WHITE);
         fontlocal = 0;
-        SwipeTestLR = 0;
-        SwipeTestUD = 0;
         setFont(fontlocal);
         page->GFXBorderBoxPrintf(CurrentSettingsBox, "-TEST Colours- ");
       }
@@ -213,48 +226,53 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
       //************** VICTRON PAGES - different way to displa, Single 'button is altered (V H Height ) for each variable display
     case -87:  // pageIndex for graphic display of Vicron data
-      if (RunSetup) {page->clearCanvas(BLACK);
-      page->drawJPEGToTextCanvas("/vicback.jpg"); // page->Jpegshow ?? 
-    
+      if (RunSetup) {
+        page->clearCanvas(BLACK);
+        page->drawJPEGToTextCanvas("/vicback.jpg");  // page->Jpegshow ??
       }
       // all graphics done in VICTRONBLE
       if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
       if (CheckButton(FullTopCenter)) { Display_Page = -86; }
       break;
-    case -86:                                              // pageIndex for text display of Vicron data
+    case -86:                                                    // pageIndex for text display of Vicron data
       if (RunSetup) { page->GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
         setFont(3);  // different from most pages, displays in terminal from see ~line 2145
-        page->GFXBorderBoxPrintf(FullTopCenter, "Return to VICTRON graphic display");
+        page->GFXBorderBoxPrintf(FullTopCenter, "VICTRON Graphic Display");
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,1,0, "-running-");
+          page->Addtitletobutton(Terminal, 1, 0, "-running-");
         } else {
-          page->Addtitletobutton(Terminal,1,0, "-paused-");
+          page->Addtitletobutton(Terminal, 1, 0, "-paused-");
         }
-        page->GFXBorderBoxPrintf(Switch6, Current_Settings.Data_Log_ON On_Off);
-        page->Addtitletobutton(Switch6,1,0, " LOG ");
+        // page->GFXBorderBoxPrintf(Switch6, Current_Settings.Data_Log_ON On_Off);
+        // page->Addtitletobutton(Switch6, 1, 0, " LOG ");
 
         page->GFXBorderBoxPrintf(Switch7, victronDevices.Beacons On_Off);
-        page->Addtitletobutton(Switch7,1,0, "Beacons");
+        page->Addtitletobutton(Switch7, 1, 0, "Beacon");
         page->GFXBorderBoxPrintf(Switch8, victronDevices.BLEDebug On_Off);
-        page->Addtitletobutton(Switch8,1,0, "V-Debug");
+        page->Addtitletobutton(Switch8, 1, 0, "V-Debug");
         page->GFXBorderBoxPrintf(Switch9, victronDevices.Simulate On_Off);
-        page->Addtitletobutton(Switch9,1,0, " Sim.");
+        page->Addtitletobutton(Switch9, 1, 0, " Sim.");
         page->GFXBorderBoxPrintf(Switch10, Current_Settings.BLE_enable On_Off);
-        page->Addtitletobutton(Switch10,1,0, "BLE-ON");
+        page->Addtitletobutton(Switch10, 1, 0, "BLE-ON");
         page->GFXBorderBoxPrintf(Switch11, ColorSettings.SerialOUT On_Off);
-        page->Addtitletobutton(Switch11,1,0, "Copy>serial");
+        page->Addtitletobutton(Switch11, 1, 0, "Send>USB");
         DataChanged = false;
+      }
+      if (!Terminal.debugpause) {
+        page->Addtitletobutton(Terminal, 1, 0, "-running-");
+      } else {
+        page->Addtitletobutton(Terminal, 1, 0, "-paused-");
       }
       // if (millis() > slowdown + 500) {
       //   slowdown = millis();
       // }
 
-      if (CheckButton(Switch6)) {
-        Current_Settings.Data_Log_ON = !Current_Settings.Data_Log_ON;
-       if (Current_Settings.Data_Log_ON) {DATA_Log_File_Create(FFat); }
-        DataChanged = true;
-      };
+      // if (CheckButton(Switch6)) {
+      //   Current_Settings.Data_Log_ON = !Current_Settings.Data_Log_ON;
+      //   if (Current_Settings.Data_Log_ON) { DATA_Log_File_Create(FFat); }
+      //   DataChanged = true;
+      // };
       if (CheckButton(Switch7)) {
         victronDevices.Beacons = !victronDevices.Beacons;
         DataChanged = true;
@@ -272,7 +290,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         Current_Settings.BLE_enable = !Current_Settings.BLE_enable;
         DataChanged = true;
       };
-            if (CheckButton(Switch11)) {
+      if (CheckButton(Switch11)) {
         ColorSettings.SerialOUT = !ColorSettings.SerialOUT;
         DataChanged = true;
       };
@@ -286,23 +304,23 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         Terminal.debugpause = !Terminal.debugpause;
         DataChanged = true;  // for more immediate visual response to touch!
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,1,0, "-running-");
+          page->Addtitletobutton(Terminal, 1, 0, "-running-");
         } else {
-          page->Addtitletobutton(Terminal,1,0, "-paused-");
+          page->Addtitletobutton(Terminal, 1, 0, "-paused-");
         }
       }
 
       break;
 
-    case -22:                                              //  "EXPERIMENT in N2K data"
+    case -22:                                                    //  "EXPERIMENT in N2K data"
       if (RunSetup) { page->GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
         setFont(3);
         page->GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,1, 0, "TERMINAL");
+          page->Addtitletobutton(Terminal, 1, 0, "TERMINAL");
         } else {
-          page->Addtitletobutton(Terminal,1, 0, "-Paused-");
+          page->Addtitletobutton(Terminal, 1, 0, "-Paused-");
         }
         DataChanged = false;
       }
@@ -314,9 +332,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         Terminal.debugpause = !Terminal.debugpause;
         DataChanged = true;
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,1, 0, "-running-");
+          page->Addtitletobutton(Terminal, 1, 0, "-running-");
         } else {
-          page->Addtitletobutton(Terminal,1, 0, "-paused-");
+          page->Addtitletobutton(Terminal, 1, 0, "-paused-");
         }
       }
       // if (CheckButton(Switch9)) {
@@ -358,8 +376,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -21:  //  "Log and debug "
       if (RunSetup) {
         Terminal.debugpause = false;
-         page->clearCanvas(BLUE);
-         page->GFXBorderBoxPrintf(Terminal, "will fill with data");
+        page->clearCanvas(BLUE);
+        page->GFXBorderBoxPrintf(Terminal, "will fill with data");
       }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
         setFont(3);
@@ -369,31 +387,31 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         // page->GFXBorderBoxPrintf(Switch7, Current_Settings.Data_Log_ON On_Off);
         // page->Addtitletobutton(Switch7, "N LOG");}
         page->GFXBorderBoxPrintf(Switch8, Current_Settings.UDP_ON On_Off);
-        page->Addtitletobutton(Switch8,1,0, "UDP");
+        page->Addtitletobutton(Switch8, 1, 0, "UDP");
         page->GFXBorderBoxPrintf(Switch9, Current_Settings.ESP_NOW_ON On_Off);
-        page->Addtitletobutton(Switch9,1,0, "ESP-N");
+        page->Addtitletobutton(Switch9, 1, 0, "ESP-N");
         page->GFXBorderBoxPrintf(Switch10, Current_Settings.N2K_ON On_Off);
-        page->Addtitletobutton(Switch10,1,0, "N2K");
+        page->Addtitletobutton(Switch10, 1, 0, "N2K");
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,1,0, "TERMINAL");
+          page->Addtitletobutton(Terminal, 1, 0, "TERMINAL");
         } else {
-          page->Addtitletobutton(Terminal,1,0, "-Paused-");
+          page->Addtitletobutton(Terminal, 1, 0, "-Paused-");
         }
         DataChanged = false;
       }
       if (millis() > slowdown + 1000) {
         slowdown = millis();
-        page->GFXBorderBoxPrintf(Switch11, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE?");
-        page->Addtitletobutton(Switch11,1,0, "FLASH");
+        page->GFXBorderBoxPrintf(Switch11, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+        page->Addtitletobutton(Switch11, 1, 0, "FLASH");
       }
       if (CheckButton(FullTopCenter)) { Display_Page = 0; }
       if (CheckButton(Terminal)) {
         Terminal.debugpause = !Terminal.debugpause;
         DataChanged = true;
         if (!Terminal.debugpause) {
-          page->Addtitletobutton(Terminal,1,0, "-running-");
+          page->Addtitletobutton(Terminal, 1, 0, "-running-");
         } else {
-          page->Addtitletobutton(Terminal,1,0, "-paused-");
+          page->Addtitletobutton(Terminal, 1, 0, "-paused-");
         }
       }
       // if (CheckButton(Switch6) && hasSD) {
@@ -490,10 +508,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       }
       break;
 
-    case -5:  ///Wifiscan
-
+    case -5:                            ///Wifiscan
+     
       if (RunSetup || DataChanged) {
-        setFont(4);
         if (IsConnected) {
           page->GFXBorderBoxPrintf(TOPButton, "Connected<%s>", Current_Settings.ssid);
         } else {
@@ -501,28 +518,27 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         }
         page->GFXBorderBoxPrintf(TopRightbutton, "Scan");
         page->GFXBorderBoxPrintf(SecondRowButton, " Saved results");
-        page->setCursor(0, 140);  //(location of terminal. make better later!)
-
         if (NetworksFound <= 0) {  // note scan error can give negative number
           NetworksFound = 0;
-          page->GFXBorderBoxPrintf(SecondRowButton, " Use keyboard ");
+          page->GFXBorderBoxPrintf(SecondRowButton, "Use keyboard");
         } else {
           page->GFXBorderBoxPrintf(SecondRowButton, " %i Networks Found", NetworksFound);
-          page->fillRect(0, 200, 480, 280, BLUE);  // clear the place wherethe wifi wil be printed
           for (int i = 0; i < NetworksFound; ++i) {
-            page->setCursor(0, 200 + ((i + 1) * text_height));
             // Print SSID and RSSI for each network found
-            
-            if (WiFi.SSID(i).length() > 20) { page->printf("..(toolong).."); }
-            page->printf("%i %s ",i + 1,WiFi.SSID(i).substring(0, 20));
-           // if (WiFi.SSID(i).length() > 20) { page->printf(".."); }
-           // Serial.print(WiFi.SSID(i));
-           // Serial.println(WiFi.channel(i));
-            page->printf(" (%i) ch<%i> \n",WiFi.RSSI(i),WiFi.channel(i));
-
-           // page->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
-            delay(10);
+            if (WiFi.SSID(i).length() > 20) {
+              //drawBoxedKey(WIFISHOW, 0, 200 + ((i + 1) * WIFISHOW.height), 400, 40, " Too long", 9);
+            } else {
+              snprintf(labelBuffer, sizeof(labelBuffer),
+                       "%i %s (%i) ch<%i>",
+                       i + 1,
+                       WiFi.SSID(i).substring(0, 20).c_str(),
+                       WiFi.RSSI(i),
+                       WiFi.channel(i));
+            }
+            drawBoxedKey(WIFISHOW, 0, 200 + ((i + 1) * WIFISHOW.height), 400, 40, label, 8);
           }
+          // page->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+          delay(10);
         }
         DataChanged = false;
       }
@@ -530,13 +546,13 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (millis() > slowdown + 1000) {
         slowdown = millis();
         //other stuff?
-        page->GFXBorderBoxPrintf(Switch4a, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->Addtitletobutton(Switch4a,1,0, "EEPROM");
+        page->GFXBorderBoxPrintf(Switch5a, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+        page->Addtitletobutton(Switch5a, 1, 0, "EEPROM");
       }
       if (Touch_available) {
         if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
           //TouchCrosshair(1);
-          wifissidpointer = ((ts.points[0].y - 200) / text_height) - 1;
+          wifissidpointer = ((ts.points[0].y - 200) / WIFISHOW.height) - 1;
           int str_len = WiFi.SSID(wifissidpointer).length() + 1;
           char result[str_len];
           //  Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
@@ -554,14 +570,14 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         }
       }
       if (CheckButton(TopRightbutton)) {
-        page->GFXBorderBoxPrintf(SecondRowButton, " Starting WiFi re-SCAN / reconnect ");
+        page->GFXBorderBoxPrintf(SecondRowButton, "WiFi re-SCAN");
         AttemptingConnect = false;  // so that Scan can do a full scan..
-        ScanAndConnect(false,true);
-        AttemptingConnect = true; // so scanandconnect in main loop does not run again! (updates networks and makes screen wrong!)
+        ScanAndConnect(false, true);
+        AttemptingConnect = true;  // so scanandconnect in main loop does not run again! (updates networks and makes screen wrong!)
         DataChanged = true;
       }  // do the scan again
 
-      if (CheckButton(Switch4a)) {
+      if (CheckButton(Switch5a)) {
         SaveConfiguration();  //(Display_Config, Current_Settings);
         delay(50);
         // Display_Page = 0;
@@ -570,7 +586,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (CheckButton(SecondRowButton)) {
         // Serial.printf(" * Debug wifissidpointer=%i \n",wifissidpointer);
         if ((NetworksFound >= 1) && (wifissidpointer <= NetworksFound)) {
-            WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
+          WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
           //   Serial.printf("Update ssid to <%s> \n", Current_Settings.ssid);
         } else {
           Serial.println("Update ssid via keyboard");
@@ -581,48 +597,66 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
 
     case -4:  // Keyboard setting of UDP port - note keyboard (2) numbers start
-      if (RunSetup) {
-        setFont(4);
-        page->GFXBorderBoxPrintf(TOPButton, "Current <%s>", Current_Settings.UDP_PORT);
-        page->GFXBorderBoxPrintf(Full0Center, "Set UDP PORT");
-        keyboard(-1);  //reset
-        keyboard(2);
-        //Use_Keyboard(blank, sizeof(blank));
-        Use_Keyboard(Current_Settings.UDP_PORT, sizeof(Current_Settings.UDP_PORT));
+      if (RunSetup || DataChanged) {
+        page->GFXBorderBoxPrintf(TOPButton, "IS<%s>", Current_Settings.UDP_PORT);
       }
-      Use_Keyboard(Current_Settings.UDP_PORT, sizeof(Current_Settings.UDP_PORT));
+      page->GFXBorderBoxPrintf(ThirdRowButton, "Set<%s>?", resultBuffer);
+      DoNewKeyboard();
+      if (CheckButton(ThirdRowButton)) {
+        strncpy(Current_Settings.UDP_PORT, resultBuffer, sizeof(Current_Settings.UDP_PORT));
+        Current_Settings.UDP_PORT[sizeof(Current_Settings.UDP_PORT) - 1] = '\0';
+        SaveConfiguration();
+        DataChanged = true;
+        Display_Page = -1;
+      }
+
       if (CheckButton(TOPButton)) { Display_Page = -1; }
       break;
 
     case -3:  // keyboard setting of Password
-      if (RunSetup) {
-        setFont(4);
-        page->GFXBorderBoxPrintf(TOPButton, "Current <%s>", Current_Settings.password);
-        page->GFXBorderBoxPrintf(Full0Center, "Set Password");
-        keyboard(-1);  //reset
-        Use_Keyboard(Current_Settings.password, sizeof(Current_Settings.password));
-        keyboard(1);
+      if (RunSetup || DataChanged) {
+        page->GFXBorderBoxPrintf(TOPButton, "IS<%s>", Current_Settings.password);
       }
-      Use_Keyboard(Current_Settings.password, sizeof(Current_Settings.password));
-      if (CheckButton(Full0Center)) { Display_Page = -1; }
+      page->GFXBorderBoxPrintf(ThirdRowButton, "Set<%s>?", resultBuffer);
+      DoNewKeyboard();
+      // drawKeyboard(currentMode);
+      // if ((ts.isTouched)) {  // Touch is active
+      //   int x = ts.points[0].x;
+      //   int y = ts.points[0].y;
+      //   if (!wasTouched) {
+      //     handleTouch(x, y);  // Process key press once
+      //     wasTouched = true;  // Mark as touched to prevent repeat
+      //   }
+      // } else {
+      //   wasTouched = false;  // Reset when touch is released
+      // }
+
+      if (CheckButton(ThirdRowButton)) {
+        strncpy(Current_Settings.password, resultBuffer, sizeof(Current_Settings.password));
+        Current_Settings.password[sizeof(Current_Settings.password) - 1] = '\0';
+        SaveConfiguration();
+        DataChanged = true;
+        Display_Page = -1;
+      }
       if (CheckButton(TOPButton)) { Display_Page = -1; }
 
       break;
 
     case -2:  //Keyboard set of SSID
-      if (RunSetup) {
-        setFont(4);
-        page->GFXBorderBoxPrintf(Full0Center, "Set SSID");
-        page->GFXBorderBoxPrintf(TopRightbutton, "Scan");
-        page->Addtitletobutton(TopRightbutton,1,0, "WiFi");
-        keyboard(-1);  //reset
-        Use_Keyboard(Current_Settings.ssid, sizeof(Current_Settings.ssid));
-        keyboard(1);
+      if (RunSetup || DataChanged) {
+        page->GFXBorderBoxPrintf(TOPButton, "IS<%s>", Current_Settings.ssid);
+      }
+      page->GFXBorderBoxPrintf(ThirdRowButton, "Set<%s>?", resultBuffer);
+      DoNewKeyboard();
+      if (CheckButton(ThirdRowButton)) {
+        strncpy(Current_Settings.ssid, resultBuffer, sizeof(Current_Settings.ssid));
+        Current_Settings.ssid[sizeof(Current_Settings.ssid) - 1] = '\0';
+        SaveConfiguration();
+        DataChanged = true;
+        Display_Page = -1;
       }
 
-      Use_Keyboard(Current_Settings.ssid, sizeof(Current_Settings.ssid));
-      if (CheckButton(Full0Center)) { Display_Page = -1; }
-      if (CheckButton(TopRightbutton)) { Display_Page = -5; }
+      if (CheckButton(TOPButton)) { Display_Page = -1; }
       break;
 
     case -1:  // this is the WIFI settings pageIndex
@@ -630,27 +664,27 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->fillScreen(BLACK);
         page->setTextColor(BLACK);
         page->setTextSize(1);
-        ShowToplinesettings(Saved_Settings, "EEPROM");
-        setFont(4);
-        page->GFXBorderBoxPrintf(SecondRowButton, "SSID <%s>", Current_Settings.ssid);
+        ShowToplinesettings(Saved_Settings, " Flash/JSON ");
+        page->GFXBorderBoxPrintf(Full0Center, "SSID <%s>", Current_Settings.ssid);
         if (IsConnected) {
-          page->Addtitletobutton(SecondRowButton,1,0, "Current Setting <CONNECTED>");
+          page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <CONNECTED>");
         } else {
-          page->Addtitletobutton(SecondRowButton,1,0, "Current Setting <NOT CONNECTED>");
+          page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <NOT CONNECTED>");
         }
-        page->GFXBorderBoxPrintf(ThirdRowButton, "Password <%s>", Current_Settings.password);
-        page->Addtitletobutton(ThirdRowButton,1,0, "Current Setting");
-        page->GFXBorderBoxPrintf(FourthRowButton, "UDP Port <%s>", Current_Settings.UDP_PORT);
-        page->Addtitletobutton(FourthRowButton,1,0, "Current Setting");
-        page->GFXBorderBoxPrintf(Switch1, Current_Settings.Serial_on On_Off);  //A.Serial_on On_Off,  A.UDP_ON On_Off, A.ESP_NOW_ON On_Off
-        page->Addtitletobutton(Switch1,1,0, "Serial");
-        page->GFXBorderBoxPrintf(Switch2, Current_Settings.UDP_ON On_Off);
-        page->Addtitletobutton(Switch2,1,0, "UDP");
-        page->GFXBorderBoxPrintf(Switch3, Current_Settings.ESP_NOW_ON On_Off);
-        page->Addtitletobutton( Switch3,1,0, "ESP-Now");
-       // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->GFXBorderBoxPrintf(Switch4, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->Addtitletobutton(Switch4,1,0,"EEPROM");
+        page->GFXBorderBoxPrintf(Full1Center, "Password <%s>", Current_Settings.password);
+        page->Addtitletobutton(Full1Center, 1, 0, "Current Setting");
+        page->GFXBorderBoxPrintf(Full2Center, "UDP Port <%s>", Current_Settings.UDP_PORT);
+        page->Addtitletobutton(Full2Center, 1, 0, "Current Setting");
+
+        page->GFXBorderBoxPrintf(Switch0, Current_Settings.Serial_on On_Off);  //A.Serial_on On_Off,  A.UDP_ON On_Off, A.ESP_NOW_ON On_Off
+        page->Addtitletobutton(Switch0, 1, 0, "Serial");
+        page->GFXBorderBoxPrintf(Switch1, Current_Settings.UDP_ON On_Off);
+        page->Addtitletobutton(Switch1, 1, 0, "UDP");
+        page->GFXBorderBoxPrintf(Switch2, Current_Settings.ESP_NOW_ON On_Off);
+        page->Addtitletobutton(Switch2, 1, 0, "ESP-Now");
+        // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+        page->GFXBorderBoxPrintf(Switch5, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+        page->Addtitletobutton(Switch5, 1, 0, "EEPROM");
         page->GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
         setFont(3);
         DataChanged = false;
@@ -659,44 +693,43 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         slowdown = millis();
       }
       //runsetup to repopulate the text in the boxes!
-      if (CheckButton(Switch1)) {
+      if (CheckButton(Switch0)) {
         Current_Settings.Serial_on = !Current_Settings.Serial_on;
         DataChanged = true;
       };
-      if (CheckButton(Switch2)) {
+      if (CheckButton(Switch1)) {
         Current_Settings.UDP_ON = !Current_Settings.UDP_ON;
         DataChanged = true;
       };
-      if (CheckButton(Switch3)) {
+      if (CheckButton(Switch2)) {
         Current_Settings.ESP_NOW_ON = !Current_Settings.ESP_NOW_ON;
         DataChanged = true;
       };
 
-      if (CheckButton(Switch4)) {
+      if (CheckButton(Switch5)) {
         SaveConfiguration();  //(Display_Config, Current_Settings);
         delay(50);
         // Display_Page = 0;
         DataChanged = true;
       };
 
-      if (CheckButton(TOPButton)) { Display_Page = 0; }
+      //if (CheckButton(TOPButton)) { Display_Page = 0; }
       //if (CheckButton(Full0Center)) { Display_Page = 0; }
-      if (CheckButton(SecondRowButton)) { Display_Page = -5; };
-      if (CheckButton(ThirdRowButton)) { Display_Page = -3; };
-      if (CheckButton(FourthRowButton)) { Display_Page = -4; };
+      if (CheckButton(Full0Center)) { Display_Page = -5; };
+      if (CheckButton(Full1Center)) { Display_Page = -3; };
+      if (CheckButton(Full2Center)) { Display_Page = -4; };
       if (CheckButton(Full5Center)) { Display_Page = -21; };
       break;
 
     case 0:  // main settings
       if (RunSetup) {
-        ShowToplinesettings("Now");
-        setFont(4);
+        ShowToplinesettings("Settings Now: ");
         page->GFXBorderBoxPrintf(Full0Center, "-Experimental-");
         page->GFXBorderBoxPrintf(Full1Center, "WIFI Settings");
         page->GFXBorderBoxPrintf(Full2Center, "NMEA DISPLAY");
-        page->GFXBorderBoxPrintf(Full3Center, "Debug + LOG");
+        page->GFXBorderBoxPrintf(Full3Center, "NMEA Debug");
         page->GFXBorderBoxPrintf(Full4Center, "GPS Display");
-        page->GFXBorderBoxPrintf(Full5Center, "Victron Data Display");
+        page->GFXBorderBoxPrintf(Full5Center, "BLE DEBUG");
         page->GFXBorderBoxPrintf(Full6Center, "Save / Reset ");
       }
       if (millis() > slowdown + 500) {
@@ -725,7 +758,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(topRightquarter, "will fill with data");
         page->GFXBorderBoxPrintf(bottomRightquarter, "will fill with data");
         page->GFXBorderBoxPrintf(bottomLeftquarter, "will fill with data");
-         if (_WideDisplay) {page->GFXBorderBoxPrintf(WideScreenCentral,"will fill with data");}
+        if (_WideDisplay) { page->GFXBorderBoxPrintf(WideScreenCentral, "will fill with data"); }
       }
       ButtonDataSelect(topLeftquarter, 0, Display_Config.FourWayTL, RunSetup);
       ButtonDataSelect(topRightquarter, 1, Display_Config.FourWayTR, RunSetup);
@@ -772,10 +805,10 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
         setFont(10);
       }
-  page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight, 154, "%.1f",BoatData.SOG.data);
-  page->AddTitleInsideBox(TopHalfBigSingleTopRight, 6, 8, " SOG ");
-   page->BorderPrintCanvasTwoSize(BottomHalfBigSingleTopRight,154, "%.1f",BoatData.COG.data);
-  page->AddTitleInsideBox(BottomHalfBigSingleTopRight, 6, 8, " COG ");
+      page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight, 154, "%.1f", BoatData.SOG.data);
+      page->AddTitleInsideBox(TopHalfBigSingleTopRight, 6, 8, " SOG ");
+      page->BorderPrintCanvasTwoSize(BottomHalfBigSingleTopRight, 154, "%.1f", BoatData.COG.data);
+      page->AddTitleInsideBox(BottomHalfBigSingleTopRight, 6, 8, " COG ");
 
       if (millis() > slowdown + 1000) {
         slowdown = millis();
@@ -785,17 +818,17 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         BigSingleDisplay.PrintLine = 0;
         if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(8, BigSingleDisplay, "Satellites in view %.0f ", BoatData.SatsInView); }
         if (BoatData.GPSTime != NMEA0183DoubleNA) {
-        page->UpdateLinef(9, BigSingleDisplay, "\n");
-        page->UpdateLinef(9, BigSingleDisplay, "Date: %06i \n", int(BoatData.GPSDate));
-        page->UpdateLinef(9, BigSingleDisplay, "\n");
-        page->UpdateLinef(9, BigSingleDisplay, "TIME: %02i:%02i:%02i\n",
-                      int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
+          page->UpdateLinef(9, BigSingleDisplay, "\n");
+          page->UpdateLinef(9, BigSingleDisplay, "Date: %06i \n", int(BoatData.GPSDate));
+          page->UpdateLinef(9, BigSingleDisplay, "\n");
+          page->UpdateLinef(9, BigSingleDisplay, "TIME: %02i:%02i:%02i\n",
+                            int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
         }
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-        page->UpdateLinef(9, BigSingleDisplay, "/n");
-        page->UpdateLinef(9, BigSingleDisplay, "LAT %s/n", LattoString(BoatData.Latitude.data));
-        page->UpdateLinef(9, BigSingleDisplay, "LON %s/n", LongtoString(BoatData.Longitude.data));
-        page->UpdateLinef(9, BigSingleDisplay, "/n");
+          page->UpdateLinef(9, BigSingleDisplay, "/n");
+          page->UpdateLinef(9, BigSingleDisplay, "LAT %s/n", LattoString(BoatData.Latitude.data));
+          page->UpdateLinef(9, BigSingleDisplay, "LON %s/n", LongtoString(BoatData.Longitude.data));
+          page->UpdateLinef(9, BigSingleDisplay, "/n");
         }
 
         if (BoatData.MagHeading.data != NMEA0183DoubleNA) { page->UpdateLinef(9, BigSingleDisplay, "Mag Heading: %.4f\n", BoatData.MagHeading); }
@@ -814,7 +847,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         if (BoatData.GPSTime != NMEA0183DoubleNA) {
           page->UpdateLinef(8, BigSingleTopLeft, "Date: %06i ", int(BoatData.GPSDate));
           page->UpdateLinef(8, BigSingleTopLeft, "TIME: %02i:%02i:%02i",
-                      int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
+                            int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
         }
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
           page->UpdateLinef(8, BigSingleTopLeft, "LAT: %f", BoatData.Latitude.data);
@@ -832,16 +865,16 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         // do this one once a second.. I have not yet got simplified functions testing if previously displayed and greyed yet
         ///page->setTextColor(BigSingleDisplay.TextColor);
         BigSingleTopLeft.PrintLine = 0;
-       page->UpdateLinef(3,BigSingleTopLeft, "%.0f Satellites in view", BoatData.SatsInView);
+        page->UpdateLinef(3, BigSingleTopLeft, "%.0f Satellites in view", BoatData.SatsInView);
         if (BoatData.GPSTime != NMEA0183DoubleNA) {
           page->UpdateLinef(8, BigSingleTopLeft, "Date: %06i ", int(BoatData.GPSDate));
           page->UpdateLinef(8, BigSingleTopLeft, "TIME: %02i:%02i:%02i",
-                      int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
+                            int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
         }
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
           page->UpdateLinef(8, BigSingleTopLeft, "LAT: %s", LattoString(BoatData.Latitude.data));
           page->UpdateLinef(8, BigSingleTopLeft, "LON: %s", LongtoString(BoatData.Longitude.data));
-         // DrawGPSPlot(false, BigSingleDisplay, BoatData, magnification);
+          // DrawGPSPlot(false, BigSingleDisplay, BoatData, magnification);
         }
       }
       if (CheckButton(topLeftquarter)) { Display_Page = 9; }
@@ -868,11 +901,11 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
 
     case 15:  // wind instrument TRUE Ground ref - experimental
-    
+
       if (millis() > slowdown + 500) {
         slowdown = millis();
       }
-          if (CheckButton(topLeftquarter)) { Display_Page = 4; }
+      if (CheckButton(topLeftquarter)) { Display_Page = 4; }
       if (CheckButton(BigSingleDisplay)) { Display_Page = 5; }
       break;
 
@@ -890,7 +923,7 @@ void TouchCrosshair(int size) {
   }
 }
 void TouchCrosshair(int point, int size, uint16_t colour) {
- page->setCursor(ts.points[point].x, ts.points[point].y);
+  page->setCursor(ts.points[point].x, ts.points[point].y);
   page->printf("%i %i  ", ts.points[point].x, ts.points[point].y);
   page->drawFastVLine(ts.points[point].x, ts.points[point].y - size, 2 * size, colour);
   page->drawFastHLine(ts.points[point].x - size, ts.points[point].y, 2 * size, colour);
@@ -945,7 +978,7 @@ void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes increment
                                // used : 0,1,2,4 for keyboard
                                //      : 0,3,4,8,10,11 in main
   MasterFont = fontinput;
- // page->setFontByIndex(fontinput);
+  // page->setFontByIndex(fontinput);
   switch (fontinput) {  //select font and automatically set height/offset based on character '['
       // set the heights and offset to print [ in boxes. Heights in pixels are NOT the point heights!
 
@@ -1092,23 +1125,23 @@ void ShowGPSinBox(int font, _sButton button) {
   //Serial.printf("In ShowGPSinBox  %i\n",int(BoatData.GPSTime));
   if ((BoatData.GPSTime != NMEA0183DoubleNA) && (BoatData.GPSTime != lastTime)) {
     lastTime = BoatData.GPSTime;
-  //  page->GFXBorderBoxPrintf(button, "");
-    page->AddTitleInsideBox(button,9, 2, " GPS");
+    //  page->GFXBorderBoxPrintf(button, "");
+    page->AddTitleInsideBox(button, 9, 2, " GPS");
     button.PrintLine = 0;
-    if (BoatData.SatsInView != NMEA0183DoubleNA) {page->UpdateLinef(font, button, "Satellites in view %.0f ", BoatData.SatsInView); }
+    if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(font, button, "Satellites in view %.0f ", BoatData.SatsInView); }
     if (BoatData.GPSTime != NMEA0183DoubleNA) {
       //UpdateLinef(font, button, "");
-    page->UpdateLinef(font, button, "Date: %06i ", int(BoatData.GPSDate));
+      page->UpdateLinef(font, button, "Date: %06i ", int(BoatData.GPSDate));
       //UpdateLinef(font, button, "");
-    page->UpdateLinef(font, button, "TIME: %02i:%02i:%02i",
-                  int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
+      page->UpdateLinef(font, button, "TIME: %02i:%02i:%02i",
+                        int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
     }
     if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-    page->UpdateLinef(font, button, "LAT");
-    page->UpdateLinef(font, button, "%s", LattoString(BoatData.Latitude.data));
-    page->UpdateLinef(font, button, "LON");
-    page->UpdateLinef(font, button, "%s", LongtoString(BoatData.Longitude.data));
-    page->UpdateLinef(font, button, "");
+      page->UpdateLinef(font, button, "LAT");
+      page->UpdateLinef(font, button, "%s", LattoString(BoatData.Latitude.data));
+      page->UpdateLinef(font, button, "LON");
+      page->UpdateLinef(font, button, "%s", LongtoString(BoatData.Longitude.data));
+      page->UpdateLinef(font, button, "");
     }
   }
 }
@@ -1124,43 +1157,49 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
     timefont = 13;
   }
   if (RunSetup) slowdown = 0;
- if ((Choice == "WIND") &&(BoatData.WindSpeedK.data!= NMEA0183DoubleNA) && (!BoatData.WindAngleApp.displayed))
- {
-       page->DrawCompass(Position);
-      page->drawCompassPointer(Position, 20, 50, BoatData.WindAngleApp.data, WHITE,true);
-      page->AddTitleInsideBox(Position, 6, 9, "Apparent:%.1fkts",BoatData.WindSpeedK.data);
-      BoatData.WindAngleApp.displayed=true;
+  if ((Choice == "WIND") && (BoatData.WindSpeedK.data != NMEA0183DoubleNA) && (!BoatData.WindAngleApp.displayed)) {
+    page->DrawCompass(Position);
+    page->drawCompassPointer(Position, 20, 50, BoatData.WindAngleApp.data, WHITE, true);
+    page->AddTitleInsideBox(Position, 6, 9, "Apparent:%.1fkts", BoatData.WindSpeedK.data);
+    BoatData.WindAngleApp.displayed = true;
   }
   /*if (selected dta .data != NMEA0183DoubleNA) */
- page->setShadowX(4); page->setShadowY(4);
-  if ((Choice == "SOG")&&(BoatData.SOG.data!= NMEA0183DoubleNA) && (!BoatData.SOG.displayed))
-  { page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.SOG.data);
-                            page->AddTitleInsideBox(Position, 6, 9, " SOG ");
-                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");
-                             BoatData.SOG.displayed=true;}
-  if ((Choice == "STW") &&(BoatData.STW.data!= NMEA0183DoubleNA) && (!BoatData.STW.displayed)) 
-  {  page->AutoPrint2Size(Position, "19.9", "%.1f",BoatData.STW.data);
-                            page->AddTitleInsideBox(Position, 6, 9, " STW ");
-                            page->AddTitleInsideBox(Position, 3, 9, " Kts ");
-                             BoatData.STW.displayed=true;}
-  if ((Choice == "DEPTH") &&(BoatData.WaterDepth.data!= NMEA0183DoubleNA)&& (!BoatData.WaterDepth.displayed) ) 
-  { page->AutoPrint2Size(Position, "199.9", "%.1f",BoatData.WaterDepth.data);
-                            page->AddTitleInsideBox(Position, 6, 9, " DEPTH ");
-                            page->AddTitleInsideBox(Position, 3, 9, " m ");
-                             BoatData.WaterDepth.displayed=true;} 
-  page->setShadowX(0); page->setShadowY(0);
- if (Choice == "DGRAPH") 
- { page->DrawScrollingGraph(Position, DepthBuffer,10,0); //int min= 20;int max=0;    min, max);
-                       page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 10m");
-                       page->AddTitleInsideBox(Position, 2, 0, "surface");
-                       page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ",20);}
-  if (Choice == "DGRAPH2") 
-  { page->DrawScrollingGraph(Position, DepthBuffer,50,0); //int min= 20;int max=0;    min, max);
-                       page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 50m");
-                       page->AddTitleInsideBox(Position, 2, 0, "surface");
-                       page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ",50);}
+  page->setShadowX(4);
+  page->setShadowY(4);
+  if ((Choice == "SOG") && (BoatData.SOG.data != NMEA0183DoubleNA) && (!BoatData.SOG.displayed)) {
+    page->AutoPrint2Size(Position, "19.9", "%.1f", BoatData.SOG.data);
+    page->AddTitleInsideBox(Position, 6, 9, " SOG ");
+    page->AddTitleInsideBox(Position, 3, 9, " Kts ");
+    BoatData.SOG.displayed = true;
+  }
+  if ((Choice == "STW") && (BoatData.STW.data != NMEA0183DoubleNA) && (!BoatData.STW.displayed)) {
+    page->AutoPrint2Size(Position, "19.9", "%.1f", BoatData.STW.data);
+    page->AddTitleInsideBox(Position, 6, 9, " STW ");
+    page->AddTitleInsideBox(Position, 3, 9, " Kts ");
+    BoatData.STW.displayed = true;
+  }
+  if ((Choice == "DEPTH") && (BoatData.WaterDepth.data != NMEA0183DoubleNA) && (!BoatData.WaterDepth.displayed)) {
+    page->AutoPrint2Size(Position, "199.9", "%.1f", BoatData.WaterDepth.data);
+    page->AddTitleInsideBox(Position, 6, 9, " DEPTH ");
+    page->AddTitleInsideBox(Position, 3, 9, " m ");
+    BoatData.WaterDepth.displayed = true;
+  }
+  page->setShadowX(0);
+  page->setShadowY(0);
+  if (Choice == "DGRAPH") {
+    page->DrawScrollingGraph(Position, DepthBuffer, 10, 0);  //int min= 20;int max=0;    min, max);
+    page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 10m");
+    page->AddTitleInsideBox(Position, 2, 0, "surface");
+    page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ", 20);
+  }
+  if (Choice == "DGRAPH2") {
+    page->DrawScrollingGraph(Position, DepthBuffer, 50, 0);  //int min= 20;int max=0;    min, max);
+    page->AddTitleInsideBox(Position, 1, 0, "Fathmometer 50m");
+    page->AddTitleInsideBox(Position, 2, 0, "surface");
+    page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ", 50);
+  }
 
-  
+
   // if (Choice == "DGRAPH2") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
   // if (Choice == "STWGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.STW, 0, 10, 8, "STW-Graph ", "kts"); }
   // if (Choice == "SOGGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.SOG, 0, 10, 8, "SOG-Graph ", "kts"); }
@@ -1170,8 +1209,8 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
       slowdown = millis();
       setFont(timefont);
       page->GFXBorderBoxPrintf(Position, "%02i:%02i",
-                         int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
-      page->AddTitleInsideBox(Position,9, 3,  "UTC ");
+                               int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
+      page->AddTitleInsideBox(Position, 9, 3, "UTC ");
       setFont(10);
     }
   }
@@ -1180,11 +1219,9 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
       slowdown = millis();
       setFont(timefont);
       page->GFXBorderBoxPrintf(Position, "%02i:%02i",
-                         int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
-      page->AddTitleInsideBox(Position,9, 3,  "LOCAL ");
+                               int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
+      page->AddTitleInsideBox(Position, 9, 3, "LOCAL ");
       setFont(10);
     }
   }
-
- 
 }

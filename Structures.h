@@ -112,7 +112,7 @@ void fill(double val) {
 
 
 
-//_sButton(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor; 
+//_sButton(h,v,width,height,bordersize, backcol,textcol,bordercol,fontinteger ....); 
 struct _sButton { //_sButton(h,v,width,height,bordersize, backC,textC,borderC,Font ; 
   int h, v, width, height, bordersize;
   uint16_t BackColor, TextColor, BorderColor;

@@ -74,12 +74,12 @@ extern _sButton FifthRowButton;
 
 
 //switches at line 180
+extern _sButton Switch0;
 extern _sButton Switch1;
-extern _sButton Switch2;
+extern _sButton Switch2 ;
 extern _sButton Switch3 ;
-extern _sButton Switch5 ;
-extern _sButton Switch4 ;  // big one for eeprom update
-extern _sButton Switch4a ;  // big one for eeprom update one line up
+extern _sButton Switch5 ;  // big one for eeprom update
+extern _sButton Switch5a ;  // big one for eeprom update one line up
 
 extern _sButton Switch6;
 extern _sButton Switch7 ;

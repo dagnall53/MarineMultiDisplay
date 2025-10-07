@@ -623,9 +623,9 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
       snprintf(debugMsg, 120, "Beacon:mac<%s> <%s>", advertisedDevice.getAddress().toString().c_str(), Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
       strcat(VictronBuffer, debugMsg);
       if (advertisedDevice.haveName()) {
-        snprintf(debugMsg, 120, " name<%s> len<%i> rssi %i", advertisedDevice.getName().c_str(), advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
+        snprintf(debugMsg, 120, " name<%s> len<%i> rssi %i \n", advertisedDevice.getName().c_str(), advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
       } else {
-        snprintf(debugMsg, 120, " len<%i> rssi %i", advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
+        snprintf(debugMsg, 120, " len<%i> rssi %i \n", advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
       }
       strcat(VictronBuffer, debugMsg);
     }                                                                                     // end of MFR DATA and IS BEACON debug snprintf's
@@ -638,7 +638,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
           victronDevices.updated[i] = millis();
           if (advertisedDevice.haveName()) { strcpy(victronDevices.DeviceVictronName[i], advertisedDevice.getName().c_str()); }
           if (victronDevices.BLEDebug) {  //  DEBUG_PORT.printf("Recognised as my device '%x'  building data \n", i);
-            snprintf(debugMsg, 120, " is my device (%i)", i);
+            snprintf(debugMsg, 120, " IS my device (%i)\n", i);
             strcat(VictronBuffer, debugMsg);
           }
           victronDevices.ManuDataLength[i] = advertisedDevice.getManufacturerData().length();

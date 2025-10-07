@@ -62,13 +62,13 @@
 #define GT911_PANEL_DUMP_SHIFT         (uint16_t)0x806D
 #define GT911_DRV_FRAME_CONTROL        (uint16_t)0x806E
 #define GT911_CHARGING_LEVEL_UP        (uint16_t)0x806F
-#define GT911_MODULE_SWITCH3           (uint16_t)0x8070
+#define GT911_MODULE_Switch2           (uint16_t)0x8070
 #define GT911_GESTURE_DIS              (uint16_t)0X8071
 #define GT911_GESTURE_LONG_PRESS_TIME  (uint16_t)0x8072
 #define GT911_X_Y_SLOPE_ADJUST         (uint16_t)0X8073
 #define GT911_GESTURE_CONTROL          (uint16_t)0X8074
-#define GT911_GESTURE_SWITCH1          (uint16_t)0X8075
-#define GT911_GESTURE_SWITCH2          (uint16_t)0X8076
+#define GT911_GESTURE_Switch0          (uint16_t)0X8075
+#define GT911_GESTURE_Switch1          (uint16_t)0X8076
 #define GT911_GESTURE_REFRESH_RATE     (uint16_t)0x8077
 #define GT911_GESTURE_TOUCH_LEVEL      (uint16_t)0x8078
 #define GT911_NEWGREENWAKEUPLEVEL      (uint16_t)0x8079
