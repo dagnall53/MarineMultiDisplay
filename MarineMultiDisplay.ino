@@ -34,7 +34,7 @@ const char soft_version[] = " V0.30";
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
 #define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-//#define WIDEBOX    // 4.3inch 800 by 480 display Setup
+#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -255,7 +255,7 @@ _sButton Switch4 = { 20+(9*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK,
 _sButton Switch5 = { 20+(11*sw_width/2), 250, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE }; //was 4 // big one for eeprom update
 
 // at line140 in wif scan update
-_sButton Switch5a = { 345, 140, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
+_sButton Switch5a = { 345, 90, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
 
 
 //switches at line 60 for the terminal display page index  -21
@@ -295,7 +295,7 @@ _sButton Full4Center = { 20, 275, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK
 _sButton Full5Center = { 20, 330, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
 _sButton Full6Center = { 20, 385, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };  // inteferes with settings box do not use!
 
-_sButton WIFISHOW = {0,0, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,8 };  // For displaying list of wifi networksnteferes with settings box do not use!
+_sButton WIFISHOW = {0,0, TOUCH_WIDTH-50, 40, 2, BLUE, WHITE, NEAR_BLACK,8 };  // For displaying list of wifi networksnteferes with settings box do not use!
 
 
 //#include "esp_task_wdt.h"
@@ -432,7 +432,6 @@ void setup() {
     // for tests !readFile(FFat,"/config.txt");
     // FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices   scanI2CMatrix();
   InitNMEA2000();
-  keyboard(-1);  //just reset keyboard's static variables
   ConnectWiFiusingCurrentSettings(); // listDir(FFat,"/",1); readFile(FFat,"/config.txt");delay(500);
   SetupWebstuff();  
   Udp.begin(atoi(Current_Settings.UDP_PORT));
@@ -1367,8 +1366,8 @@ void WiFiInterrupttoCanvas(_sButton& button,char* buf){
   delay(100);
 }
 void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {   // same parameters as old version 
-   if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
-  if (Display_Config.Start_Page == -87) { return; }                        // do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
+   if (Display_Page <= -1) { return; }                                      // do not interrupt debug  pages?
+  if (Display_Config.Start_Page == -87) { return; }                        // ?? redundant ?do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
    WiFiMsg[0] = '\0';
   va_list args;
   va_start(args, fmt);
@@ -1382,8 +1381,8 @@ void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {   // s
 
 
 void WifiGFXinterrupt(int variable, int font, _sButton& button, const char* fmt, ...) {  //quick interrupt use of this original by adding another variable 
-  if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
-  if (Display_Config.Start_Page == -87) { return; }                        // do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
+  if (Display_Page <= -1) { return; }                                      // do not interrupt the debug pages?
+  if (Display_Config.Start_Page == -87) { return; }                        // ?? redundant ? do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
   static char msg[300] = { '\0' };
   va_list args;
   va_start(args, fmt);

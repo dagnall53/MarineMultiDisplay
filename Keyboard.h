@@ -13,17 +13,15 @@ void drawKeyboard(KeyboardMode mode);
 void handleTouch(int tx, int ty);
 
 void TESTFUNC();
-void Setup_K_Display(int h,int v,const char text);
-void keyboard(int type);
-void Use_Keyboard(char* DATA, int sizeof_data);
+// void Setup_K_Display(int h,int v,const char text);
+// void keyboard(int type);
+// void Use_Keyboard(char* DATA, int sizeof_data);
 
-void DrawKey(int Keysize, int x, int rows_down, int width, String text );
+// void DrawKey(int Keysize, int x, int rows_down, int width, String text );
 
-bool KeyOver(int x, int y, char * Key,int type);
+
 bool XYinBox(int x,int y, int h,int v,int width,int height); // also used in CheckButton function 
 
-int KEYBOARD_Y(void);
-int KEYBOARD_X(void);
 
 
 #endif

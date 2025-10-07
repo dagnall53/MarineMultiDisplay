@@ -20,7 +20,7 @@ extern GraphBuffer DepthBuffer;
 
 extern int text_offset;
 extern int MasterFont;
-extern void setFont(int);
+//extern void setFont(int);
 extern int text_height;
 extern int Display_Page;
 extern _MyColors ColorSettings;

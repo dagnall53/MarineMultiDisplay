@@ -17,7 +17,7 @@ extern int Display_Page;
 void Display(int pageIndex);
 void Display(bool reset, int pageIndex) ;
 bool CheckButton(_sButton & button);
-void setFont(int fontinput);
+//void setFont(int fontinput);
 void ShowGPSinBox(int font, _sButton button);
 void TouchCrosshair(int size);
 void TouchCrosshair(int point, int size, uint16_t colour);

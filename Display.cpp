@@ -46,7 +46,7 @@ extern int NetworksFound;
 //for the (new) keyboard
 extern char resultBuffer[25];  // same as Password size for simplicity
 extern KeyboardMode currentMode;
-extern _sButton WIFISHOW ;     // for the list of WIFI scanned 
+extern _sButton WIFISHOW;         // for the list of WIFI scanned
 char labelBuffer[64];             // Adjust size as needed
 const char* label = labelBuffer;  // Now label points to the formatted string
 
@@ -78,7 +78,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
                                            // DEBUG_PORT.printf("IN void Display page<%i> reset:%s \n",pageIndex,reset True_False);delay(50);  // Give UART time to flush
 
   static unsigned long flashinterval;
-  static bool flash;
+  static bool flash, DoScan;
   static double startposlat, startposlon;
   double LatD, LongD;  //deltas
   double wind_gnd;
@@ -91,6 +91,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   // some local variables for tests;
   //char blank[] = "null";
   static bool RunSetup;
+  static bool TooLong;
   static unsigned int slowdown, timer2;
   //static float wind, SOG, Depth;
   float temp;
@@ -182,7 +183,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->fillScreen(BLACK);
         page->setTextColor(WHITE);
         fontlocal = 0;
-        setFont(fontlocal);
+        //setFont(fontlocal);
         page->GFXBorderBoxPrintf(CurrentSettingsBox, "-TEST Colours- ");
       }
 
@@ -237,7 +238,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -86:                                                    // pageIndex for text display of Vicron data
       if (RunSetup) { page->GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        setFont(3);  // different from most pages, displays in terminal from see ~line 2145
+        //setFont(3);  // different from most pages, displays in terminal from see ~line 2145
         page->GFXBorderBoxPrintf(FullTopCenter, "VICTRON Graphic Display");
         if (!Terminal.debugpause) {
           page->Addtitletobutton(Terminal, 1, 0, "-running-");
@@ -315,7 +316,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -22:                                                    //  "EXPERIMENT in N2K data"
       if (RunSetup) { page->GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        setFont(3);
+        //setFont(3);
         page->GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
           page->Addtitletobutton(Terminal, 1, 0, "TERMINAL");
@@ -352,8 +353,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -20:  // Experimental / extra stuff
       if (RunSetup || DataChanged) {
         ShowToplinesettings("Now");
-        setFont(3);
-        setFont(3);
+        //setFont(3);
+        //setFont(3);
         page->GFXBorderBoxPrintf(Full0Center, "-Test JPegs-");
         page->GFXBorderBoxPrintf(Full1Center, "Check Touch crosshairs");
         page->GFXBorderBoxPrintf(Full2Center, "Check Fonts");
@@ -380,7 +381,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(Terminal, "will fill with data");
       }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        setFont(3);
+        //setFont(3);
         page->GFXBorderBoxPrintf(FullTopCenter, "Boat/NMEA  Source selects");
         //if (hasSD) {page->GFXBorderBoxPrintf(Switch6, Current_Settings.Log_ON On_Off);
         // page->Addtitletobutton(Switch6, "B LOG");
@@ -452,7 +453,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -10:  // a test pageIndex for fonts
       if (RunSetup || DataChanged) {
         page->fillScreen(BLUE);
-        setFont(3);
+        //setFont(3);
         // page->GFXBorderBoxPrintf(Full0Center, "-Font test -");
         page->GFXBorderBoxPrintf(BottomLeftbutton, "Smaller");
         page->GFXBorderBoxPrintf(BottomRightbutton, "Larger");
@@ -469,14 +470,14 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         timer2 = millis();
         temp = random(-9000, 9000);
         temp = temp / 1000;
-        setFont(fontlocal);
+        //setFont(fontlocal);
         Fontname.toCharArray(Tempchar, 30, 0);
         int FontHt;
-        setFont(fontlocal);
+        //setFont(fontlocal);
         FontHt = text_height;
-        setFont(3);
+        //setFont(3);
         page->GFXBorderBoxPrintf(CurrentSettingsBox, "FONT:%i name%s height<%i>", fontlocal, Tempchar, FontHt);
-        setFont(fontlocal);
+        //setFont(fontlocal);
         page->GFXBorderBoxPrintf(FontBox, "Test %4.2f", temp);
         DataChanged = false;
       }
@@ -493,7 +494,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
     case -9:  ///Touchscreen pointer tests
       if (RunSetup || DataChanged) {
-        setFont(4);
+        //setFont(4);
         DataChanged = false;
       }
       if (millis() > slowdown + 1000) {
@@ -508,69 +509,98 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       }
       break;
 
-    case -5:                            ///Wifiscan
-     
-      if (RunSetup || DataChanged) {
-        if (IsConnected) {
-          page->GFXBorderBoxPrintf(TOPButton, "Connected<%s>", Current_Settings.ssid);
-        } else {
-          page->GFXBorderBoxPrintf(TOPButton, "NOT FOUND:%s", Current_Settings.ssid);
+    case -5:  ///Wifiscan
+
+      if (RunSetup) {
+        DoScan = true;
+      } else {
+        if (DoScan) {
+          AttemptingConnect = false;  // so that Scan can do a full scan..
+          ScanAndConnect(false, true);
+          AttemptingConnect = true;
+          DoScan = false;
         }
-        page->GFXBorderBoxPrintf(TopRightbutton, "Scan");
-        page->GFXBorderBoxPrintf(SecondRowButton, " Saved results");
-        if (NetworksFound <= 0) {  // note scan error can give negative number
-          NetworksFound = 0;
-          page->GFXBorderBoxPrintf(SecondRowButton, "Use keyboard");
-        } else {
-          page->GFXBorderBoxPrintf(SecondRowButton, " %i Networks Found", NetworksFound);
-          for (int i = 0; i < NetworksFound; ++i) {
-            // Print SSID and RSSI for each network found
-            if (WiFi.SSID(i).length() > 20) {
-              //drawBoxedKey(WIFISHOW, 0, 200 + ((i + 1) * WIFISHOW.height), 400, 40, " Too long", 9);
-            } else {
-              snprintf(labelBuffer, sizeof(labelBuffer),
-                       "%i %s (%i) ch<%i>",
-                       i + 1,
-                       WiFi.SSID(i).substring(0, 20).c_str(),
-                       WiFi.RSSI(i),
-                       WiFi.channel(i));
-            }
-            drawBoxedKey(WIFISHOW, 0, 200 + ((i + 1) * WIFISHOW.height), 400, 40, label, 8);
+      }
+      if (IsConnected) {
+        page->GFXBorderBoxPrintf(TOPButton, "Connected<%s>", Current_Settings.ssid);
+      } else {
+        page->GFXBorderBoxPrintf(TOPButton, "NOT Connected:%s", Current_Settings.ssid);
+      }
+
+      if (DoScan) {
+        page->GFXBorderBoxPrintf(SecondRowButton, "WiFi scanning");
+      } else {
+        page->GFXBorderBoxPrintf(TopRightbutton, "re Scan?");
+      }
+
+
+      if (NetworksFound <= 0) {  // note scan error can give negative number
+        NetworksFound = 0;
+      } else {
+        //page->GFXBorderBoxPrintf(SecondRowButton, " %i Networks Found", NetworksFound);
+        for (int i = 0; i < NetworksFound; ++i) {
+          // Print SSID and RSSI for each network found
+          if (WiFi.SSID(i).length() > 20) {
+            snprintf(labelBuffer, sizeof(labelBuffer),
+                     "%i %s ",
+                     i + 1,
+                     WiFi.SSID(i).substring(0, 20).c_str());
+            //drawBoxedKey(WIFISHOW, 0, 75 + ((i + 1) * WIFISHOW.height), 400, 40, " Too long", 9);
+          } else {
+            snprintf(labelBuffer, sizeof(labelBuffer),
+                     "%i %s (%i) ch<%i>",
+                     i + 1,
+                     WiFi.SSID(i).substring(0, 20).c_str(),
+                     WiFi.RSSI(i),
+                     WiFi.channel(i));
           }
-          // page->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
-          delay(10);
+          drawBoxedKey(WIFISHOW, 0, 75 + ((i + 1) * WIFISHOW.height), 400, 40, label, 8);
         }
+        // page->println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+        delay(10);
         DataChanged = false;
       }
+
+      page->GFXBorderBoxPrintf(Switch5a, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+      page->Addtitletobutton(Switch5a, 1, 0, "EEPROM");
 
       if (millis() > slowdown + 1000) {
         slowdown = millis();
         //other stuff?
-        page->GFXBorderBoxPrintf(Switch5a, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->Addtitletobutton(Switch5a, 1, 0, "EEPROM");
       }
+      
       if (Touch_available) {
-        if ((ts.isTouched) && (ts.points[0].y >= 200)) {  // nb check on location on screen or it will get reset when you press one of the boxes
+        if ((ts.isTouched) && (ts.points[0].y >= 105)) {  // nb check on location on screen or scan will get reset when you press one of the top boxes
           //TouchCrosshair(1);
-          wifissidpointer = ((ts.points[0].y - 200) / WIFISHOW.height) - 1;
-          int str_len = WiFi.SSID(wifissidpointer).length() + 1;
+          wifissidpointer = ((ts.points[0].y - 75) / WIFISHOW.height) - 1;
+         int  str_len = WiFi.SSID(wifissidpointer).length() + 1;
           char result[str_len];
-          //  Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
-          //  Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
+          // Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
+          // Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
           if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
             WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
-            if (str_len == 1) {
+            if (str_len == 1) {TooLong=true;
               page->GFXBorderBoxPrintf(SecondRowButton, "Set via Keyboard?");
             } else {
-              page->GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);
+              page->GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);TooLong = false;
             }
-          } else {
-            page->GFXBorderBoxPrintf(SecondRowButton, "ssid too long ");
+          } else {TooLong=true;
+            page->GFXBorderBoxPrintf(SecondRowButton, "ssid too long ! ");
           }
         }
       }
+      if (CheckButton(SecondRowButton)) {
+        if (!TooLong){
+        WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
+        SaveConfiguration();
+        Display_Page = -1;}
+        else{Display_Page = -2;}
+        //  
+      }
+
+
       if (CheckButton(TopRightbutton)) {
-        page->GFXBorderBoxPrintf(SecondRowButton, "WiFi re-SCAN");
+
         AttemptingConnect = false;  // so that Scan can do a full scan..
         ScanAndConnect(false, true);
         AttemptingConnect = true;  // so scanandconnect in main loop does not run again! (updates networks and makes screen wrong!)
@@ -583,22 +613,12 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         // Display_Page = 0;
         DataChanged = true;
       };
-      if (CheckButton(SecondRowButton)) {
-        // Serial.printf(" * Debug wifissidpointer=%i \n",wifissidpointer);
-        if ((NetworksFound >= 1) && (wifissidpointer <= NetworksFound)) {
-          WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
-          //   Serial.printf("Update ssid to <%s> \n", Current_Settings.ssid);
-        } else {
-          Serial.println("Update ssid via keyboard");
-          Display_Page = -2;
-        }
-      }
-      if (CheckButton(TOPButton)) { Display_Page = -1; }
+      //if (CheckButton(TOPButton)) { Display_Page = -1; }
       break;
 
     case -4:  // Keyboard setting of UDP port - note keyboard (2) numbers start
       if (RunSetup || DataChanged) {
-        page->GFXBorderBoxPrintf(TOPButton, "IS<%s>", Current_Settings.UDP_PORT);
+        page->GFXBorderBoxPrintf(TOPButton, "UDP_PORT is<%s>", Current_Settings.UDP_PORT);
       }
       page->GFXBorderBoxPrintf(ThirdRowButton, "Set<%s>?", resultBuffer);
       DoNewKeyboard();
@@ -615,21 +635,11 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
     case -3:  // keyboard setting of Password
       if (RunSetup || DataChanged) {
-        page->GFXBorderBoxPrintf(TOPButton, "IS<%s>", Current_Settings.password);
+        page->GFXBorderBoxPrintf(TOPButton, "pw=<%s>", Current_Settings.password);
       }
       page->GFXBorderBoxPrintf(ThirdRowButton, "Set<%s>?", resultBuffer);
       DoNewKeyboard();
-      // drawKeyboard(currentMode);
-      // if ((ts.isTouched)) {  // Touch is active
-      //   int x = ts.points[0].x;
-      //   int y = ts.points[0].y;
-      //   if (!wasTouched) {
-      //     handleTouch(x, y);  // Process key press once
-      //     wasTouched = true;  // Mark as touched to prevent repeat
-      //   }
-      // } else {
-      //   wasTouched = false;  // Reset when touch is released
-      // }
+
 
       if (CheckButton(ThirdRowButton)) {
         strncpy(Current_Settings.password, resultBuffer, sizeof(Current_Settings.password));
@@ -644,7 +654,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
     case -2:  //Keyboard set of SSID
       if (RunSetup || DataChanged) {
-        page->GFXBorderBoxPrintf(TOPButton, "IS<%s>", Current_Settings.ssid);
+        page->GFXBorderBoxPrintf(TOPButton, "ssid=<%s>", Current_Settings.ssid);
       }
       page->GFXBorderBoxPrintf(ThirdRowButton, "Set<%s>?", resultBuffer);
       DoNewKeyboard();
@@ -661,10 +671,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
     case -1:  // this is the WIFI settings pageIndex
       if (RunSetup || DataChanged) {
-        page->fillScreen(BLACK);
-        page->setTextColor(BLACK);
-        page->setTextSize(1);
         ShowToplinesettings(Saved_Settings, " Flash/JSON ");
+      }
         page->GFXBorderBoxPrintf(Full0Center, "SSID <%s>", Current_Settings.ssid);
         if (IsConnected) {
           page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <CONNECTED>");
@@ -686,9 +694,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(Switch5, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
         page->Addtitletobutton(Switch5, 1, 0, "EEPROM");
         page->GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
-        setFont(3);
-        DataChanged = false;
-      }
+
+      
       if (millis() > slowdown + 1000) {
         slowdown = millis();
       }
@@ -722,7 +729,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
 
     case 0:  // main settings
-      if (RunSetup) {
+      if (RunSetup) {page->clearCanvas(BLUE);
         ShowToplinesettings("Settings Now: ");
         page->GFXBorderBoxPrintf(Full0Center, "-Experimental-");
         page->GFXBorderBoxPrintf(Full1Center, "WIFI Settings");
@@ -752,7 +759,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
     case 4:  // Quad display
       if (RunSetup) {
-        setFont(10);
+        //setFont(10);
         page->fillScreen(BLACK);
         page->GFXBorderBoxPrintf(topLeftquarter, "will fill with data");
         page->GFXBorderBoxPrintf(topRightquarter, "will fill with data");
@@ -798,12 +805,12 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
     case 9:  // GPS pageIndex
       if (RunSetup) {
-        setFont(8);
+        //setFont(8);
         page->GFXBorderBoxPrintf(BigSingleDisplay, "");
         page->GFXBorderBoxPrintf(TopHalfBigSingleTopRight, "");
         page->GFXBorderBoxPrintf(BottomHalfBigSingleTopRight, "");
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
-        setFont(10);
+        //setFont(10);
       }
       page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight, 154, "%.1f", BoatData.SOG.data);
       page->AddTitleInsideBox(TopHalfBigSingleTopRight, 6, 8, " SOG ");
@@ -841,7 +848,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case 10:  // GPS pageIndex 2 sort of anchor watch
       static double magnification;
       if (RunSetup || DataChanged) {
-        setFont(8);
+        //setFont(8);
         page->GFXBorderBoxPrintf(BigSingleDisplay, "");
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "");
         if (BoatData.GPSTime != NMEA0183DoubleNA) {
@@ -973,153 +980,153 @@ static const int fontHeightTable[FONT_COUNT] = {
   88  // FONT_FreeSansBold60      13
 };
 */
-void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes incrementing by 1.5
-                               //Notes: May remove some later to save program mem space?
-                               // used : 0,1,2,4 for keyboard
-                               //      : 0,3,4,8,10,11 in main
-  MasterFont = fontinput;
-  // page->setFontByIndex(fontinput);
-  switch (fontinput) {  //select font and automatically set height/offset based on character '['
-      // set the heights and offset to print [ in boxes. Heights in pixels are NOT the point heights!
+// void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes incrementing by 1.5
+//                                //Notes: May remove some later to save program mem space?
+//                                // used : 0,1,2,4 for keyboard
+//                                //      : 0,3,4,8,10,11 in main
+//   MasterFont = fontinput;
+//   // page->setFontByIndex(fontinput);
+//   switch (fontinput) {  //select font and automatically set height/offset based on character '['
+//       // set the heights and offset to print [ in boxes. Heights in pixels are NOT the point heights!
 
-    case 0:                        // SMALL 8pt
-      Fontname = "FreeMono8pt7b";  //9 to 14 high?
-      gfx->setFont(&FreeMono8pt7b);
-      text_height = (FreeMono8pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMono8pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
-      break;
-    case 1:  // standard 12pt
-      Fontname = "FreeMono12pt7b";
-      gfx->setFont(&FreeMono12pt7b);
-      text_height = (FreeMono12pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMono12pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
+//     case 0:                        // SMALL 8pt
+//       Fontname = "FreeMono8pt7b";  //9 to 14 high?
+//       gfx->setFont(&FreeMono8pt7b);
+//       text_height = (FreeMono8pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMono8pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 1:  // standard 12pt
+//       Fontname = "FreeMono12pt7b";
+//       gfx->setFont(&FreeMono12pt7b);
+//       text_height = (FreeMono12pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMono12pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
 
-      break;
-    case 2:  //standard 18pt
-      Fontname = "FreeMono18pt7b";
-      gfx->setFont(&FreeMono18pt7b);
-      text_height = (FreeMono18pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMono18pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
+//       break;
+//     case 2:  //standard 18pt
+//       Fontname = "FreeMono18pt7b";
+//       gfx->setFont(&FreeMono18pt7b);
+//       text_height = (FreeMono18pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMono18pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
 
-      break;
-    case 3:  //BOLD 8pt
-      Fontname = "FreeMonoBOLD8pt7b";
-      gfx->setFont(&FreeMonoBold8pt7b);
-      text_height = (FreeMonoBold8pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMonoBold8pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
+//       break;
+//     case 3:  //BOLD 8pt
+//       Fontname = "FreeMonoBOLD8pt7b";
+//       gfx->setFont(&FreeMonoBold8pt7b);
+//       text_height = (FreeMonoBold8pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMonoBold8pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
 
-      break;
-    case 4:  //BOLD 12pt
-      Fontname = "FreeMonoBOLD12pt7b";
-      gfx->setFont(&FreeMonoBold12pt7b);
-      text_height = (FreeMonoBold12pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMonoBold12pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
+//       break;
+//     case 4:  //BOLD 12pt
+//       Fontname = "FreeMonoBOLD12pt7b";
+//       gfx->setFont(&FreeMonoBold12pt7b);
+//       text_height = (FreeMonoBold12pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMonoBold12pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
 
-      break;
-    case 5:  //BOLD 18 pt
-      Fontname = "FreeMonoBold18pt7b";
-      gfx->setFont(&FreeMonoBold18pt7b);
-      text_height = (FreeMonoBold18pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMonoBold18pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
-      break;
-    case 6:  //BOLD 27 pt
-      Fontname = "FreeMonoBold27pt7b";
-      gfx->setFont(&FreeMonoBold27pt7b);
-      text_height = (FreeMonoBold27pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMonoBold27pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
-      break;
-    case 7:  //SANS BOLD 6 pt
-      Fontname = "FreeSansBold6pt7b";
-      gfx->setFont(&FreeSansBold6pt7b);
-      text_height = (FreeSansBold6pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold6pt7bGlyphs[0x38].yOffset);
-      text_char_width = 12;
-      break;
-    case 8:  //SANS BOLD 8 pt
-      Fontname = "FreeSansBold8pt7b";
-      gfx->setFont(&FreeSansBold8pt7b);
-      text_height = (FreeSansBold8pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold8pt7bGlyphs[0x38].yOffset);  // yAdvance is the last variable.. and the one that affects the extra lf on wrap.
-      text_char_width = 12;
-      break;
-    case 9:  //SANS BOLD 12 pt
-      Fontname = "FreeSansBold12pt7b";
-      gfx->setFont(&FreeSansBold12pt7b);
-      text_height = (FreeSansBold12pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold12pt7bGlyphs[0x38].yOffset);
-      text_char_width = 12;
-      break;
-    case 10:  //SANS BOLD 18 pt
-      Fontname = "FreeSansBold18pt7b";
-      gfx->setFont(&FreeSansBold18pt7b);
-      text_height = (FreeSansBold18pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold18pt7bGlyphs[0x38].yOffset);
-      text_char_width = 12;
-      break;
-    case 11:  //sans BOLD 27 pt
-      Fontname = "FreeSansBold27pt7b";
-      gfx->setFont(&FreeSansBold27pt7b);
-      text_height = (FreeSansBold27pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold27pt7bGlyphs[0x38].yOffset);
-      text_char_width = 12;
-      break;
-    case 12:  //sans BOLD 40 pt
-      Fontname = "FreeSansBold40pt7b";
-      gfx->setFont(&FreeSansBold40pt7b);
-      text_height = (FreeSansBold40pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold40pt7bGlyphs[0x38].yOffset);
-      text_char_width = 12;
-      break;
+//       break;
+//     case 5:  //BOLD 18 pt
+//       Fontname = "FreeMonoBold18pt7b";
+//       gfx->setFont(&FreeMonoBold18pt7b);
+//       text_height = (FreeMonoBold18pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMonoBold18pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 6:  //BOLD 27 pt
+//       Fontname = "FreeMonoBold27pt7b";
+//       gfx->setFont(&FreeMonoBold27pt7b);
+//       text_height = (FreeMonoBold27pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMonoBold27pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 7:  //SANS BOLD 6 pt
+//       Fontname = "FreeSansBold6pt7b";
+//       gfx->setFont(&FreeSansBold6pt7b);
+//       text_height = (FreeSansBold6pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold6pt7bGlyphs[0x38].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 8:  //SANS BOLD 8 pt
+//       Fontname = "FreeSansBold8pt7b";
+//       gfx->setFont(&FreeSansBold8pt7b);
+//       text_height = (FreeSansBold8pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold8pt7bGlyphs[0x38].yOffset);  // yAdvance is the last variable.. and the one that affects the extra lf on wrap.
+//       text_char_width = 12;
+//       break;
+//     case 9:  //SANS BOLD 12 pt
+//       Fontname = "FreeSansBold12pt7b";
+//       gfx->setFont(&FreeSansBold12pt7b);
+//       text_height = (FreeSansBold12pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold12pt7bGlyphs[0x38].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 10:  //SANS BOLD 18 pt
+//       Fontname = "FreeSansBold18pt7b";
+//       gfx->setFont(&FreeSansBold18pt7b);
+//       text_height = (FreeSansBold18pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold18pt7bGlyphs[0x38].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 11:  //sans BOLD 27 pt
+//       Fontname = "FreeSansBold27pt7b";
+//       gfx->setFont(&FreeSansBold27pt7b);
+//       text_height = (FreeSansBold27pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold27pt7bGlyphs[0x38].yOffset);
+//       text_char_width = 12;
+//       break;
+//     case 12:  //sans BOLD 40 pt
+//       Fontname = "FreeSansBold40pt7b";
+//       gfx->setFont(&FreeSansBold40pt7b);
+//       text_height = (FreeSansBold40pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold40pt7bGlyphs[0x38].yOffset);
+//       text_char_width = 12;
+//       break;
 
-    case 13:  //sans BOLD 60 pt
-      Fontname = "FreeSansBold60pt7b";
-      gfx->setFont(&FreeSansBold60pt7b);
-      text_height = (FreeSansBold60pt7bGlyphs[0x38].height) + 1;
-      text_offset = -(FreeSansBold60pt7bGlyphs[0x38].yOffset);
-      text_char_width = 12;
-      break;
+//     case 13:  //sans BOLD 60 pt
+//       Fontname = "FreeSansBold60pt7b";
+//       gfx->setFont(&FreeSansBold60pt7b);
+//       text_height = (FreeSansBold60pt7bGlyphs[0x38].height) + 1;
+//       text_offset = -(FreeSansBold60pt7bGlyphs[0x38].yOffset);
+//       text_char_width = 12;
+//       break;
 
-      //   case 21:  //Mono oblique BOLD 27 pt
-      //   Fontname = "FreeMonoBoldOblique27pt7b";
-      //   gfx->setFont(&FreeMonoBoldOblique27pt7b);
-      //   text_height = (FreeMonoBoldOblique27pt7bGlyphs[0x38].height) + 1;
-      //   text_offset = -(FreeMonoBoldOblique27pt7bGlyphs[0x38].yOffset);
-      //   text_char_width = 12;
-      //   break;
-      // case 22:  //Mono oblique BOLD 40 pt
-      //   Fontname = "FreeMonoBoldOblique40pt7b";
-      //   gfx->setFont(&FreeMonoBoldOblique40pt7b);
-      //   text_height = (FreeMonoBoldOblique40pt7bGlyphs[0x38].height) + 1;
-      //   text_offset = -(FreeMonoBoldOblique40pt7bGlyphs[0x38].yOffset);
-      //   text_char_width = 12;
-      //   break;
-      //       case 23:  //Mono oblique BOLD 60 pt
-      //   Fontname = "FreeMonoBoldOblique60pt7b";
-      //   gfx->setFont(&FreeMonoBoldOblique60pt7b);
-      //   text_height = (FreeMonoBoldOblique60pt7bGlyphs[0x38].height) + 1;
-      //   text_offset = -(FreeMonoBoldOblique60pt7bGlyphs[0x38].yOffset);
-      //   text_char_width = 12;
-      //   break;
+//       //   case 21:  //Mono oblique BOLD 27 pt
+//       //   Fontname = "FreeMonoBoldOblique27pt7b";
+//       //   gfx->setFont(&FreeMonoBoldOblique27pt7b);
+//       //   text_height = (FreeMonoBoldOblique27pt7bGlyphs[0x38].height) + 1;
+//       //   text_offset = -(FreeMonoBoldOblique27pt7bGlyphs[0x38].yOffset);
+//       //   text_char_width = 12;
+//       //   break;
+//       // case 22:  //Mono oblique BOLD 40 pt
+//       //   Fontname = "FreeMonoBoldOblique40pt7b";
+//       //   gfx->setFont(&FreeMonoBoldOblique40pt7b);
+//       //   text_height = (FreeMonoBoldOblique40pt7bGlyphs[0x38].height) + 1;
+//       //   text_offset = -(FreeMonoBoldOblique40pt7bGlyphs[0x38].yOffset);
+//       //   text_char_width = 12;
+//       //   break;
+//       //       case 23:  //Mono oblique BOLD 60 pt
+//       //   Fontname = "FreeMonoBoldOblique60pt7b";
+//       //   gfx->setFont(&FreeMonoBoldOblique60pt7b);
+//       //   text_height = (FreeMonoBoldOblique60pt7bGlyphs[0x38].height) + 1;
+//       //   text_offset = -(FreeMonoBoldOblique60pt7bGlyphs[0x38].yOffset);
+//       //   text_char_width = 12;
+//       //   break;
 
 
-    default:
-      Fontname = "FreeMono8pt7b";
-      // page->setFont(&FreeMono8pt7b);
-      text_height = (FreeMono8pt7bGlyphs[0x3D].height) + 1;
-      text_offset = -(FreeMono8pt7bGlyphs[0x3D].yOffset);
-      text_char_width = 12;
-      MasterFont = 0;
+//     default:
+//       Fontname = "FreeMono8pt7b";
+//       // page->setFont(&FreeMono8pt7b);
+//       text_height = (FreeMono8pt7bGlyphs[0x3D].height) + 1;
+//       text_offset = -(FreeMono8pt7bGlyphs[0x3D].yOffset);
+//       text_char_width = 12;
+//       MasterFont = 0;
 
-      break;
-  }
-}
+//       break;
+//   }
+// }
 void ShowGPSinBox(int font, _sButton button) {
   static double lastTime;
   //Serial.printf("In ShowGPSinBox  %i\n",int(BoatData.GPSTime));
@@ -1207,21 +1214,21 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
   if (Choice == "TIME") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
       slowdown = millis();
-      setFont(timefont);
+      //setFont(timefont);
       page->GFXBorderBoxPrintf(Position, "%02i:%02i",
                                int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
       page->AddTitleInsideBox(Position, 9, 3, "UTC ");
-      setFont(10);
+      //setFont(10);
     }
   }
   if (Choice == "TIMEL") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
       slowdown = millis();
-      setFont(timefont);
+      //setFont(timefont);
       page->GFXBorderBoxPrintf(Position, "%02i:%02i",
                                int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
       page->AddTitleInsideBox(Position, 9, 3, "LOCAL ");
-      setFont(10);
+      //setFont(10);
     }
   }
 }
