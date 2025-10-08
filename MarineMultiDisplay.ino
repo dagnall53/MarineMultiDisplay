@@ -1,16 +1,41 @@
 
-//********* for SERIAL on Wavshare.. MUST SET ******************
-//Tools-> CDC on boot ENABLED
 
-// not for s3 versions!! #include <NMEA2000_CAN.h>  // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
+/*
+*************** settings **************************
+USB CDC on boot enabled
+Erase All flash before sketch disable -- but also test Enable to check that the code rebuilds the configuration files
+Partition scheme  Default 16M(6.25Mb APP /3.4MB SPIFFS)
+PSRAM OPI PSRAM
+
+to activate the Default 16M(6.25Mb APP /3.4MB SPIFFS)  partition - which is default_16MB.csv in the 2.0.17/tools/partitions 
+you need to edit the Boards.text in 2.0.17/tools 
+after esp32s3.menu.PartitionScheme.default_8MB.upload.maximum_size=3342336
+add
+esp32s3.menu.PartitionScheme.default_16MB=Default 16M(6.25MB APP/3.43MB SPIFFS)
+esp32s3.menu.PartitionScheme.default_16MB.build.partitions=default_16MB
+esp32s3.menu.PartitionScheme.default_16MB.upload.maximum_size=6553600
+But NOTE: This will not be seen by Arduino until you delete its rapid access copy of its settings.
+
+This is all held in C:\Users\<yourname>dagna\AppData\Roaming\arduino-ide
+Close Arduino ide and then the whole directory needs to be deleted.
+I will be rebuilt next time you open Arduino, but now the 16M partition will be available as an option.
+See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/1170025
+
+*/
+
+
+
+
+// also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.12";
+const char soft_version[] = " V0.30";
 
-//**********  SET DEFINES FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x 480 (default or..)
+//**********  SET DEFINES ************************************************
+//Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
 #define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-#define WIDEBOX    // 4.3inch 800 by 400 display Setup
-//**********  SET DEFINES
+#define WIDEBOX    // 4.3inch 800 by 480 display Setup
+//**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
 
@@ -20,7 +45,7 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <Wire.h>  // Load the Wire Library
 #include <esp_now.h>
 #include <esp_wifi.h>
-#include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation'
+#include <Arduino_GFX_Library.h>  // aka 'by Moon on our Nation' V1.6.0
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 #include <SD.h>  // was SD.h  // pins set in 4inch.h
@@ -30,6 +55,25 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include <SD_MMC.h>
 #include <LittleFS.h>
 #include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
+
+
+
+//********* stuff t add my library for paged displays *****************
+
+#include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "CanvasBridge.h"       // must be after MARINEPAGEGFX    
+#include "FontType.h" // has include for all fonts and new FontID enum 
+#include "Structures.h"
+// allocate the (huge? buffers for the two pages)
+MarinePageGFX* page = nullptr;  // or assign to a valid instance
+
+//extern MarinePageGFX* page;  //overcome ARDUINO QUIRK 
+#define NEAR_NEAR_BLACK 0x0001  // One bit on from NEAR_BLACK - avoids the (useful) issue that NEAR_BLACK can be seen as Transparent.
+GraphBuffer headingDeltaBuffer;  // or voltageBuffer, tempBuffer, etc. 200 deep buffer of double valuesfor graphing
+
+
+
+
 
 //MAGIC TREK style File viewer see https://github.com/holgerlembke/
 #include <ESPFMfGK.h>  // the thing.
@@ -56,7 +100,7 @@ bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 #include "debug_port.h"
 #include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
 
-int Screen_Width;     // Solution to pass OUCH_WIDTH to stuff that does not see module data until later!
+int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
 
 #include "N2kMsg.h"
 #include "NMEA2000.h"
@@ -89,6 +133,7 @@ int StationsConnectedtomyAP;
 // assists for wifigfx interrupt  box that shows status..  to help turn it off after a time
 uint32_t WIFIGFXBoxstartedTime;
 bool WIFIGFXBoxdisplaystarted;
+char WiFiMsg [300];       // to take message to send to the display to advise any progress
 
 
 
@@ -104,7 +149,7 @@ extern bool HaltOtherOperations;
 #include "Display.h"
 //*********** for keyboard*************
 #include "Keyboard.h"
-
+extern char resultBuffer[25]; // same as Password size for simplicity  
 
 
 // Load the PCA9554 Library
@@ -135,6 +180,12 @@ bool dataUpdated;     // flag that Nmea Data has been updated
 // If the structure is changed, be sure to change the Key (first figure) so that new defaults and struct can be set.
 //
 //Config.txt holds both Default and Display settings in one file
+//for new graphs
+#include "Globals.h"
+GraphBuffer DepthBuffer;
+
+ // or voltageBuffer, tempBuffer, etc.
+
 const char* Setupfilename = "/config.txt";  // <- SD library uses 8.3 filenames
 _sDisplay_Config Saved_Display_Config;
 _sDisplay_Config Display_Config;
@@ -159,86 +210,92 @@ int Display_Page;
 
 _sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE };
 
-//_sButton WindDisplay = { 0, 0, 480, 480, 0, BLUE, WHITE, BLACK };  // full screen no border
+//_sButton WindDisplay = { 0, 0, 480, 480, 0, BLUE, WHITE, NEAR_BLACK };  // full screen no border
 
 //used for single data display
 // modified all to lift by 30 pixels to allow a common bottom row display (to show logs and get to settings)
 
 
-_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, BLACK };              // used for wind and graph displays
-_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, BLACK };             //  ''
-_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, BLACK };                //  ''
-_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, BLACK };      //  ''
-_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, BLACK };  //  ''
+_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, NEAR_BLACK };              // used for wind and graph displays
+_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, NEAR_BLACK };             //  ''
+_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, NEAR_BLACK };                //  ''
+_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, NEAR_BLACK };      //  ''
+_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, NEAR_BLACK };  //  ''
 //used for nmea RMC /GPS display // was only three lines to start!
-_sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, BLACK };
-_sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, BLACK };
-_sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, BLACK };
-_sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, BLACK };
+_sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE ,7};// 7 is the smallest font 
 // for the quarter screens on the main page
-_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };  //h  reduced by 15 to give 30 space at the bottom
-_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
-_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, BLACK };
+_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };  //h  reduced by 15 to give 30 space at the bottom
+_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
 // for wide display //        int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
-_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, BLACK };
-_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, BLACK }; 
+_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,8 }; 
 
 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
-_sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, BLACK };
-_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, BLACK };
+_sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
 
-_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, BLACK };
-_sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, BLACK };
+_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
 
 
 #define sw_width 65
-//switches at line 180
-_sButton Switch1 = { 20, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch2 = { 100, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch3 = { 180, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch5 = { 260, 180, sw_width, 35, 5, WHITE, BLACK, BLUE };
-_sButton Switch4 = { 345, 180, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
-_sButton Switch4a = { 345, 140, 120, 35, 5, WHITE, BLACK, BLUE };  // big one for eeprom update
-//switches at line 60
-_sButton Switch6 = { 20, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch7 = { 100, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch8 = { 180, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch9 = { 260, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch10 = { 340, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
-_sButton Switch11 = { 420, 60, sw_width, 40, 5, WHITE, BLACK, BLACK };
+//switches at line 250 for WIFI settings
+_sButton Switch0 = { 20+(1*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch1 = { 20+(3*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch2 = { 20+(5*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
+_sButton Switch3 = { 20+(7*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE }; 
+_sButton Switch4 = { 20+(9*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE }; //new not used ? 
+_sButton Switch5 = { 20+(11*sw_width/2), 250, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE }; //was 4 // big one for eeprom update
+
+// at line140 in wif scan update
+_sButton Switch5a = { 345, 90, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
+
+
+//switches at line 60 for the terminal display page index  -21
+_sButton Switch6 = { 20+(1*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch7 = { 20+(3*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch8 = { 20+(5*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch9 = { 20+(7*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch10 = { 20+(9*sw_width/2) , 60, sw_width, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK };
+_sButton Switch11 = { 20+(11*sw_width/2) , 60, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, NEAR_BLACK }; // for the flash settings words - wider 
 
 
 //WIDTH dependant settings, h, v, width, height, bordersize
 // read TOUCH_WIDTH nd subtract x..
 
-_sButton StatusBox = { 0, 460, TOUCH_WIDTH, 20, 0, BLACK, WHITE, BLACK };
-_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, BLACK };  // big central box for wifi events to pop up - v3.5
-_sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, BLACK };
-_sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, BLACK };
-_sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, BLACK };  //also used for showing the current settings
 
-_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
-_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, BLACK, BLUE };
+_sButton WifiStatus = { 60, 180, TOUCH_WIDTH-120, 120, 5, BLUE, WHITE, NEAR_BLACK,4 };  // big central box for wifi events to pop up - v3.5
+_sButton FullSize = { 10, 0, 460, TOUCH_WIDTH-20, 0, BLUE, WHITE, NEAR_BLACK };
+_sButton FullSizeShadow = { 5, 10, TOUCH_WIDTH-20, 460, 0, BLUE, WHITE, NEAR_BLACK };
+_sButton CurrentSettingsBox = { 0, 0, TOUCH_WIDTH, 80, 2, BLUE, WHITE, NEAR_BLACK };  //also used for showing the current settings
+
+_sButton TOPButton = { 20, 10, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};   //8B is dark blue?
+_sButton SecondRowButton = { 20, 60, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};
+_sButton ThirdRowButton = { 20, 100, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};
+_sButton FourthRowButton = { 20, 140, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B,9};
+_sButton FifthRowButton = { 20, 180, TOUCH_WIDTH-50, 35, 5, WHITE, NEAR_BLACK, 0x8B ,9};
 
 
-_sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, BLACK, BLUE };
+_sButton Terminal = { 0, 100, TOUCH_WIDTH, 330, 2, WHITE, NEAR_BLACK, NEAR_BLACK };
 //for selections
-_sButton FullTopCenter = { 80, 0, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
+_sButton FullTopCenter = { 20, 0, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
 
-_sButton Full0Center = { 80, 55, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full1Center = { 80, 110, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full2Center = { 80, 165, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full3Center = { 80, 220, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full4Center = { 80, 275, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full5Center = { 80, 330, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };
-_sButton Full6Center = { 80, 385, TOUCH_WIDTH-160, 50, 5, BLUE, WHITE, BLACK };  // inteferes with settings box do not use!
+_sButton Full0Center = { 20, 55, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full1Center = { 20, 110, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full2Center = { 20, 165, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK ,4};
+_sButton Full3Center = { 20, 220, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full4Center = { 20, 275, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full5Center = { 20, 330, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };
+_sButton Full6Center = { 20, 385, TOUCH_WIDTH-50, 50, 5, BLUE, WHITE, NEAR_BLACK,4 };  // inteferes with settings box do not use!
 
-
+_sButton WIFISHOW = {0,0, TOUCH_WIDTH-50, 40, 2, BLUE, WHITE, NEAR_BLACK,8 };  // For displaying list of wifi networksnteferes with settings box do not use!
 
 
 //#include "esp_task_wdt.h"
@@ -303,6 +360,33 @@ bool LoadConfigs(bool print,bool displ){
 return FilesOK;
 }
 
+bool NewPagesetupstuff(){
+ bool sucess = true;
+  headingDeltaBuffer.fill(0.0); 
+  DEBUG_PORT.printf("Free PSRAM after gfx->begin(): %d bytes\n", ESP.getFreePsram());
+  page = new MarinePageGFX(gfx, TOUCH_WIDTH, TOUCH_HEIGHT);  // Allocate after display init
+  page->begin();                            // begin the processes.. 
+  page->fillScreen(NEAR_NEAR_BLACK);  
+/*  FOF dislay using Page ..   will need this in loop eg..
+  page->swap();
+  page->fillScreen(NEAR_BLACK); // NEAR_BLACK is transparent!! Leaves previously printed stuff behind but makes for a clean start
+  .... other stuff
+  page->DrawCompass(bottomLeftquarter);
+  ... stuff
+  page->compositeCanvas(); (assembles all the page stuff )
+  page->push(); // actually instantly shows it on screen 
+*/
+    if (!page->isReady()) {
+    DEBUG_PORT.println("ERROR: Page buffers not initialized.");
+    gfx->print("PAGE Buffer init failed!");
+    sucess = false;
+    }
+   Serial0.println("MarinePageGFX initialized successfully.");
+  return sucess;
+}
+
+
+
 
 void setup() {
   DEBUG_PORT.begin(115200);
@@ -313,18 +397,22 @@ void setup() {
   #endif
   HaltOtherOperations = false;
   delay(100);
-  DEBUG_PORT.print("Starting NMEA Display");
-  DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
+  DEBUG_PORT.print(F("***Starting NMEA Display***"));
+  DEBUG_PORT.println(F(" using 'DEBUG_PORT.print' "));
   // Serial.println(F(" Using Serial.print "));
   // Serial0.println(F(" Using Serial0.print "));
   DEBUG_PORT.println(_device);DEBUG_PORT.println(soft_version); 
+  DEBUG_PORT.printf("Flash size reported: %u bytes\n", spi_flash_get_chip_size());
   Display_Config = Default_JSON;
   Current_Settings = Default_Settings_JSON;
   Init_GFX(); // must be before SD setup (at least for Guitron)
   DEBUG_PORT.println(F(" Printing to screen  "));
   gfx->print(_device);
   gfx->println(soft_version);delay(100);
-  //Fatfs_Setup();   // set up FATFS // includes gfx prints
+  if (NewPagesetupstuff()) {gfx->println(F("*** Paging display Setup ***"));
+     DEBUG_PORT.println("Paging display Setup");}
+  DEBUG_PORT.println("Setup Completed");
+   //Fatfs_Setup();   // set up FATFS // includes gfx prints
   SPIFFS_Setup(); 
   //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
@@ -344,31 +432,36 @@ void setup() {
     // for tests !readFile(FFat,"/config.txt");
     // FindI2CDevices("LISTING I2C devices");delay(100);// alternate - useful when there are lots of devices   scanI2CMatrix();
   InitNMEA2000();
-  keyboard(-1);  //just reset keyboard's static variables
   ConnectWiFiusingCurrentSettings(); // listDir(FFat,"/",1); readFile(FFat,"/config.txt");delay(500);
   SetupWebstuff();  
   Udp.begin(atoi(Current_Settings.UDP_PORT));
   Start_ESP_EXT();             //  Sets esp_now links to the current WiFi.channel etc.
   BLEsetup();                  // listDir(FFat,"/",1);  delay(500);                   // setup Victron BLE interface (does not do much!!)
-  setupFilemanager();          // listDir(FFat,"/",1); delay(500);  
-  DEBUG_PORT.println("Setup Completed");  delay(500); 
+  setupFilemanager();          // listDir(FFat,"/",1); delay(500);
+  DEBUG_PORT.println("Setup Completed");
+// include #include "MarineRuntimeOverlay.h"; if we wish to debug page sizes etc MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));
+  for (int i=0;i<=200;i++){ // fill buffer with zero to start
+    DepthBuffer.push(0);
+  }
+   delay(100); 
  }
 
 void loop() {
+  static unsigned long PageInterval;
   static unsigned long LogInterval;
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchTimer;
   static int WiFiChannel;
-  //EventTiming("Timeing ",10); // place start and stop where I want timing 
   delay(1);
  // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
                           // SD_CS("HIGH");
-  if (!HaltOtherOperations) { 
+   if (!HaltOtherOperations) { 
     SD_CS("LOW");
     filemgr.handleClient();  // trek style file manager with  SD CS low for any sd work BUT NOT WHILE TRYING TO DO OTA!!
     SD_CS("HIGH");
     //approx 2ms to here
+ //   DEBUG_PORT.println("before read Touch ");
     if(Touch_available){ts.read();}
     //~3.2ms
     EXTHeartbeat();//~3.3ms
@@ -378,8 +471,20 @@ void loop() {
       BLEloop();
     }
     else{if (Current_Settings.N2K_ON) { NMEA2000.ParseMessages(); }}
-
-    Display(Display_Page);
+ 
+ if (millis() >= PageInterval)  {
+ // DEBUG_PORT.printf("swap  %s",resultBuffer);
+  PageInterval=millis()+10;
+  page->swap();
+  page->fillScreen(NEAR_BLACK);
+  Display(false,Display_Page);
+  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%ifps>",Display_Config.PanelName,Display_Page, 1000/(millis()-DebugInterval));  // common to all pages  
+  DebugInterval=millis();
+  if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);}
+  else{WIFIGFXBoxdisplaystarted = false;}
+  page->compositeCanvas();
+  page->push();
+ }
     // repeat at intervals to connect to station.   
     if (!AttemptingConnect && !IsConnected && (millis() >= SSIDSearchTimer)) {  
       SSIDSearchTimer = millis() + scansearchinterval;   if (millis()<= 30000){SSIDSearchTimer = millis() + 200;}                       // fast scan for first 30 secs
@@ -390,14 +495,14 @@ void loop() {
       }  
     }
        
-    // switch off WIFIGFXBox after timed interval
-    if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
-      WIFIGFXBoxdisplaystarted = false;
-      // - see OTA    WebServerActive = false; ?
-      Display(true, -99);delay(10);
-      Display(true, Display_Page);
-      delay(50);  // change page back, having set display -99  above which alows the graphics to reset up the boxes etc.
-    }
+    // // switch off WIFIGFXBox after timed interval
+    // if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
+    //   WIFIGFXBoxdisplaystarted = false;
+    //   // - see OTA    WebServerActive = false; ?
+    //   Display(true, -99);delay(10);
+    //   Display(true, Display_Page);
+    //   delay(50);  // change page back, having set display -99  above which alows the graphics to reset up the boxes etc.
+    // }
 
   // the instrument log saves everything every LogInterval (set in config)  secs, even if data is not available! (NMEA0183DoubleNA)
   // uses LOCAL Time as this advances if GPS (UTC) is lost (but resets when GPS received again.)
@@ -413,6 +518,7 @@ void loop() {
 
 
   }
+  delay(10);
 }
 
 
@@ -440,7 +546,7 @@ void Init_GFX() {
   gfx->fillScreen(BLUE);
   gfx->setTextBound(0, 0, TOUCH_WIDTH, 480);
   gfx->setTextColor(WHITE);
-  setFont(4);
+  gfx->setFont(&FreeMonoBold12pt7b);
   gfx->setCursor(0, 20);
   gfx->println(F("*********************"));
   gfx->println(F("***Display Started***"));
@@ -450,8 +556,8 @@ void Init_GFX() {
 
 void InitNMEA2000() {  // make it display device Info on start up..
 
- DEBUG_PORT.print("NMEA2000 using RX pin ");DEBUG_PORT.println(ESP32_CAN_RX_PIN);
- DEBUG_PORT.print("NMEA2000 using TX pin ");DEBUG_PORT.println(ESP32_CAN_TX_PIN);
+ DEBUG_PORT.print("***Set up NMEA2000 using RX:");DEBUG_PORT.print(ESP32_CAN_RX_PIN);
+ DEBUG_PORT.print("and TX:");DEBUG_PORT.println(ESP32_CAN_TX_PIN);
  gfx->println(F("Setting up NMEA2000 interface"));
  delay(10);
   NMEA2000.SetN2kCANMsgBufSize(8);
@@ -522,9 +628,9 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
     char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
     if (known) {
-      UpdateLinef(BLACK, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(NEAR_BLACK, 7, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     } else {
-      UpdateLinef(52685, 8, Terminal, "N2K:(%i)[%.2X%.5X] %s", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(52685, 7, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
     }
     //52685 is light gray in RBG565 light gray for pgns we do not decode. (based on handler setup)
   }
@@ -562,8 +668,8 @@ void Fatfs_Setup() {
       gfx->print(F("---  NO FATFS ---"));
   }
   if (FMsetup){
-    DEBUG_PORT.println(F("+ Filemanager*"));
-    gfx->println(F("+ Filemanager*"));
+    //DEBUG_PORT.println(F("+ Filemanager*"));
+    gfx->println(F("& Filemanager Setup"));
   } else {
     gfx->println(F(""));
   }
@@ -571,20 +677,20 @@ void Fatfs_Setup() {
 void SPIFFS_Setup() {
   bool FMsetup=false;
   hasSPIFFS = false;
-  DEBUG_PORT.print("FFAT  START");
+  DEBUG_PORT.print("SPIFFS  START");
   if (SPIFFS.begin(true)) {
     hasSPIFFS = true;
   size_t totalBytes = SPIFFS.totalBytes();
   size_t usedBytes = SPIFFS.usedBytes();
   size_t freeBytes = totalBytes - usedBytes;
 
-   
     gfx->printf("SPIFFS initiated: %i free",freeBytes);
+    DEBUG_PORT.printf(".. initiated: %i free",freeBytes);
     delay(500);
     if (!filemgr.AddFS(SPIFFS, "Flash/SPIFFS", false)) {
       DEBUG_PORT.println(F("Adding SPIFFS to Filemanager failed."));
     } else { FMsetup=true;
-      DEBUG_PORT.println(F("  Added SPIFFS to Filemanager"));
+      DEBUG_PORT.println(F(" and added to Filemanager"));
     }
   } else {
     DEBUG_PORT.println(F("FFat File System not initiated."));
@@ -594,8 +700,8 @@ void SPIFFS_Setup() {
       gfx->print(F("---  NO SPIFFS ---"));
   }
   if (FMsetup){
-    DEBUG_PORT.println(F("+ Filemanager*"));
-    gfx->println(F("+ Filemanager*"));
+    DEBUG_PORT.println(F("+ Filemanager started"));
+    gfx->println(F("+ Filemanager started"));
   } else {
     gfx->println(F(""));
   }
@@ -756,7 +862,7 @@ void SaveDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   doc["_comments_"] = "Colours as integers";
   doc["WHITE"] = WHITE;
   doc["BLUE"] = BLUE;
-  doc["BLACK"] = BLACK;
+  doc["NEAR_BLACK"] = NEAR_BLACK;
   doc["GREEN"] = GREEN;
   doc["RED"] = RED;
 
@@ -810,7 +916,7 @@ bool LoadDisplayConfiguration(fs::FS& fs, const char* filename, _MyColors& set) 
   }
   // gett here means we can set defaults, regardless!
 
-  set.TextColor = doc["TextColor"] | BLACK;
+  set.TextColor = doc["TextColor"] | NEAR_BLACK;
   set.BackColor = doc["BackColor"] | WHITE;
   set.BorderColor = doc["BorderColor"] | BLUE;
   // set.BoxW = doc["BoxW"] | 46;
@@ -997,18 +1103,13 @@ void PrintJsonFile(fs::FS& fs,const char* comment, const char* filename) {
 }
 
 void ShowToplinesettings(_sWiFi_settings_Config A, String Text) {
-  // int local;
-  // local = MasterFont;
-  // SETS MasterFont, so cannot use MasterFont directly in last line and have to save it!
   long rssiValue = WiFi.RSSI();
-  gfx->setTextSize(1);
-  gfx->setTextColor(CurrentSettingsBox.TextColor);
-  CurrentSettingsBox.PrintLine = 0;
+  CurrentSettingsBox.lastY = CurrentSettingsBox.v;
   // 7 is smallest Bold Font
-  UpdateLinef(7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>", Text, A.ssid, A.password, A.UDP_PORT);
-  UpdateLinef(7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
-  UpdateLinef(7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>Log<%s>NMEA<%s>", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
-  // UpdateLinef(7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "%s:SSID<%s>PWD<%s>UDPPORT<%s>\n", Text, A.ssid, A.password, A.UDP_PORT);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "IP:%i.%i.%i.%i  RSSI %i\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3], rssiValue);
+  page->UpdateLinef(WHITE,7, CurrentSettingsBox, "Ser<%s>UDP<%s>ESP<%s>N2K<%s>Log<%s>NMEA<%s>\n", A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.N2K_ON On_Off, A.Log_ON On_Off, A.Data_Log_ON On_Off);
+  // page->UpdateLinef(WHITE,7,CurrentSettingsBox, "Logger settings Log<%s>NMEA<%s>",A.Serial_on On_Off, A.UDP_ON On_Off, A.ESP_NOW_ON On_Off,A.Data_Log_ON On_Off);
 }
 void ShowToplinesettings(String Text) {
   ShowToplinesettings(Current_Settings, Text);
@@ -1063,65 +1164,65 @@ char* LongtoString(double data) {
 
 
 // Draw the compass pointer at an angle in degrees
-void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
-  // DEBUG_PORT.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
-  bool recent = (Wind.updated >= millis() - 3000);
-  if (!Wind.graphed) {  //EventTiming("START");
-    WindArrowSub(button, Speed, Wind);
-    // EventTiming("STOP");EventTiming("WIND arrow");
-  }
-  if (Wind.greyed) { return; }
+// void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
+//   // DEBUG_PORT.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
+//   bool recent = (Wind.updated >= millis() - 3000);
+//   if (!Wind.graphed) {  //EventTiming("START");
+//     WindArrowSub(button, Speed, Wind);
+//     // EventTiming("STOP");EventTiming("WIND arrow");
+//   }
+//   if (Wind.greyed) { return; }
 
-  if (!recent && !Wind.greyed) { WindArrowSub(button, Speed, Wind); }
-}
+//   if (!recent && !Wind.greyed) { WindArrowSub(button, Speed, Wind); }
+// }
 
-void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
-  //DEBUG_PORT.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
-  bool recent = (wind.updated >= millis() - 3000);
-  Phv center;
-  int rad, outer, inner;
-  static int lastfont;
-  static double lastwind;
-  center.h = button.h + button.width / 2;
-  center.v = button.v + button.height / 2;
-  rad = (button.height - (2 * button.bordersize)) / 2;  // height used as more likely to be squashed in height
-  outer = (rad * 82) / 100;                             //% of full radius (at full height) (COMPASS has .83 as inner circle)
-  inner = (rad * 28) / 100;                             //25% USe same settings as pointer
-  DrawMeterPointer(center, lastwind, inner, outer, 2, button.BackColor, button.BackColor);
-  if (wind.data != NMEA0183DoubleNA) {
-    if (wind.updated >= millis() - 3000) {
-      DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, BLACK);
-    } else {
-      wind.greyed = true;
-      DrawMeterPointer(center, wind.data, inner, outer, 2, LIGHTGREY, LIGHTGREY);
-    }
-  }
-  lastwind = wind.data;
-  wind.graphed = true;
-  lastfont = MasterFont;
-  if (Speed.data != NMEA0183DoubleNA) {
-    if (rad <= 130) {
-      UpdateDataTwoSize(1,true, true, 8, 7, button, Speed, "%2.0fkt");
-    } else {
-      UpdateDataTwoSize(1,true, true, 10, 9, button, Speed, "%2.0fkt");
-    }
-  }
+// void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
+//   //DEBUG_PORT.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
+//   bool recent = (wind.updated >= millis() - 3000);
+//   Phv center;
+//   int rad, outer, inner;
+//   static int lastfont;
+//   static double lastwind;
+//   center.h = button.h + button.width / 2;
+//   center.v = button.v + button.height / 2;
+//   rad = (button.height - (2 * button.bordersize)) / 2;  // height used as more likely to be squashed in height
+//   outer = (rad * 82) / 100;                             //% of full radius (at full height) (COMPASS has .83 as inner circle)
+//   inner = (rad * 28) / 100;                             //25% USe same settings as pointer
+//   DrawMeterPointer(center, lastwind, inner, outer, 2, button.BackColor, button.BackColor);
+//   if (wind.data != NMEA0183DoubleNA) {
+//     if (wind.updated >= millis() - 3000) {
+//       DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, NEAR_BLACK);
+//     } else {
+//       wind.greyed = true;
+//       DrawMeterPointer(center, wind.data, inner, outer, 2, LIGHTGREY, LIGHTGREY);
+//     }
+//   }
+//   lastwind = wind.data;
+//   wind.graphed = true;
+//   lastfont = MasterFont;
+//   if (Speed.data != NMEA0183DoubleNA) {
+//     if (rad <= 130) {
+//       UpdateDataTwoSize(1,true, true, 8, 7, button, Speed, "%2.0fkt");
+//     } else {
+//       UpdateDataTwoSize(1,true, true, 10, 9, button, Speed, "%2.0fkt");
+//     }
+//   }
 
-  setFont(lastfont);
-}
+//   setFont(lastfont);
+// }
 
-void DrawMeterPointer(Phv center, double wind, int inner, int outer, int linewidth, uint16_t FILLCOLOUR, uint16_t LINECOLOUR) {  // WIP
-  Phv P1, P2, P3, P4, P5, P6;
-  P1 = translate(center, wind - linewidth, outer);
-  P2 = translate(center, wind + linewidth, outer);
-  P3 = translate(center, wind - (4 * linewidth), inner);
-  P4 = translate(center, wind + (4 * linewidth), inner);
-  P5 = translate(center, wind, inner);
-  P6 = translate(center, wind, outer);
-  PTriangleFill(P1, P2, P3, FILLCOLOUR);
-  PTriangleFill(P2, P3, P4, FILLCOLOUR);
-  Pdrawline(P5, P6, LINECOLOUR);
-}
+// void DrawMeterPointer(Phv center, double wind, int inner, int outer, int linewidth, uint16_t FILLCOLOUR, uint16_t LINECOLOUR) {  // WIP
+//   Phv P1, P2, P3, P4, P5, P6;
+//   P1 = translate(center, wind - linewidth, outer);
+//   P2 = translate(center, wind + linewidth, outer);
+//   P3 = translate(center, wind - (4 * linewidth), inner);
+//   P4 = translate(center, wind + (4 * linewidth), inner);
+//   P5 = translate(center, wind, inner);
+//   P6 = translate(center, wind, outer);
+//   PTriangleFill(P1, P2, P3, FILLCOLOUR);
+//   PTriangleFill(P2, P3, P4, FILLCOLOUR);
+//   Pdrawline(P5, P6, LINECOLOUR);
+// }
 
 Phv translate(Phv center, double angle, int rad) {  // 'full version with full accuracy cos and sin
   Phv moved;
@@ -1154,8 +1255,8 @@ void DrawCompass(_sButton button) {
   gfx->fillArc(x, y, Rad3, Rad1, 270 - 45, 270, RED);
   gfx->fillArc(x, y, Rad3, Rad1, 270, 270 + 45, GREEN);
   //Mark 12 linesarks at 30 degrees
-  for (int i = 0; i < (360 / 30); i++) { gfx->fillArc(x, y, rad, Rad1, i * 30, (i * 30) + 1, BLACK); }  //239 to 200
-  for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, BLACK); }  // dots at 10 degrees
+  for (int i = 0; i < (360 / 30); i++) { gfx->fillArc(x, y, rad, Rad1, i * 30, (i * 30) + 1, NEAR_BLACK); }  //239 to 200
+  for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, NEAR_BLACK); }  // dots at 10 degrees
 }
 
 
@@ -1199,7 +1300,7 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
         DEBUG_PORT.println(disconnectreason(info.wifi_sta_disconnected.reason));
         WiFi.disconnect(false);     // changed to false.. Revise?? so that it does this only if no one is connected to the AP ??
         AttemptingConnect = false;  // so that ScanandConnect can do a full scan next time..
-        WifiGFXinterrupt(8, WifiStatus, "Disconnected \n REASON:%s\n Retrying:<%s>", disconnectreason(info.wifi_sta_disconnected.reason).c_str(), Current_Settings.ssid);
+        WifiGFXinterrupt(8, WifiStatus, "Disconnected :%s ..Retrying:<%s>", disconnectreason(info.wifi_sta_disconnected.reason).c_str(), Current_Settings.ssid);
         IsConnected = false;
       }
       break;
@@ -1208,7 +1309,7 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
       DEBUG_PORT.print("The ESP32 has received IP address :");
       DEBUG_PORT.println(WiFi.localIP());
       udp_st = Get_UDP_IP(WiFi.localIP(), subnet);
-      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO\n<%s>\nIP:%i.%i.%i.%i\n", WiFi.SSID(),
+      WifiGFXinterrupt(9, WifiStatus, "CONNECTED TO <%s>   IP:%i.%i.%i.%i\n", WiFi.SSID(),
                        WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
       break;
 
@@ -1220,25 +1321,68 @@ void wifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
 
     case ARDUINO_EVENT_WIFI_AP_STACONNECTED:  //12 a station connected to ESP32 soft-AP
       StationsConnectedtomyAP = StationsConnectedtomyAP + 1;
-      WifiGFXinterrupt(8, WifiStatus, "Station Connected\nTo AP\n Total now %i", StationsConnectedtomyAP);
+      WifiGFXinterrupt(8, WifiStatus, "Station Connected To AP Total now %i", StationsConnectedtomyAP);
       break;
     case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:  //13 a station disconnected from ESP32 soft-AP
       StationsConnectedtomyAP = StationsConnectedtomyAP - 1;
       if (StationsConnectedtomyAP == 0) {}
-      WifiGFXinterrupt(8, WifiStatus, "Station Disconnected\nfrom AP\n Total now %i", StationsConnectedtomyAP);
+      WifiGFXinterrupt(8, WifiStatus, "Station Disconnected from AP Total now %i", StationsConnectedtomyAP);
 
       break;
     case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:  //14 ESP32 soft-AP assign an IP to a connected station
-      WifiGFXinterrupt(8, WifiStatus, "Station Connected\nTo AP\nNow has Assigned IP");
+      WifiGFXinterrupt(8, WifiStatus, "Station Connected To AP Now has Assigned IP");
       DEBUG_PORT.print("   AP IP address: ");
       DEBUG_PORT.println(WiFi.softAPIP());
       break;
   }
 }
 
-void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //quick interrupt of gfx to show WIFI events..
-  if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
+void WifiInterruptMessage (  const char* fmt, ...) {
+   if (Display_Page <= -1) { return; }                                      // do not interrupt the settings pages!
   if (Display_Config.Start_Page == -87) { return; }                        // do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
+   WiFiMsg[0] = '\0';
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(WiFiMsg, 128, fmt, args);
+  va_end(args);
+  int len = strlen(WiFiMsg);
+  WIFIGFXBoxdisplaystarted = true;
+  WIFIGFXBoxstartedTime = millis();
+
+}
+
+void WiFiInterrupttoCanvas(_sButton& button,char* buf){
+ page->GFXBorderBoxPrintf(button, buf); //Just print? 
+ static char* token;
+  const char delimiter[2] = "\n";  //  NB when i used  "static const char delimiter = '\n';"  I got big problems ..
+  char* pch;
+  pch = strtok(buf, delimiter);    // split (tokenise)  msg at the delimiter
+  // print each separated line centered... starting from line 1
+  button.PrintLine = 1;
+  while (pch != NULL) {
+   // page->CommonSub_UpdateLine(button.TextColor, 8, WifiStatus, pch);
+    pch = strtok(NULL, delimiter);
+  }
+  delay(100);
+}
+void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {   // same parameters as old version 
+   if (Display_Page <= -1) { return; }                                      // do not interrupt debug  pages?
+  if (Display_Config.Start_Page == -87) { return; }                        // ?? redundant ?do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
+   WiFiMsg[0] = '\0';
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(WiFiMsg, 128, fmt, args);
+  va_end(args);
+  int len = strlen(WiFiMsg);
+  WIFIGFXBoxdisplaystarted = true;
+  WIFIGFXBoxstartedTime = millis();
+
+}
+
+
+void WifiGFXinterrupt(int variable, int font, _sButton& button, const char* fmt, ...) {  //quick interrupt use of this original by adding another variable 
+  if (Display_Page <= -1) { return; }                                      // do not interrupt the debug pages?
+  if (Display_Config.Start_Page == -87) { return; }                        // ?? redundant ? do not do the screen shows on BLE page                                                                // version of add centered text, multi line from /void MultiLineInButton(int font, _sButton &button,const char *fmt, ...)
   static char msg[300] = { '\0' };
   va_list args;
   va_start(args, fmt);
@@ -1248,12 +1392,12 @@ void WifiGFXinterrupt(int font, _sButton& button, const char* fmt, ...) {  //qui
   static char* token;
   const char delimiter[2] = "\n";  //  NB when i used  "static const char delimiter = '\n';"  I got big problems ..
   char* pch;
-  GFXBorderBoxPrintf(button, "");  // clear the button
+  page->GFXBorderBoxPrintf(button, msg);  // clear the button
   pch = strtok(msg, delimiter);    // split (tokenise)  msg at the delimiter
   // print each separated line centered... starting from line 1
   button.PrintLine = 1;
   while (pch != NULL) {
-    CommonSub_UpdateLine(button.TextColor, font, button, pch);
+    page->CommonSub_UpdateLine(button.TextColor, font, button, pch);
     pch = strtok(NULL, delimiter);
   }
   WIFIGFXBoxdisplaystarted = true;
@@ -1492,6 +1636,7 @@ void SD_Setup(int SPISCK, int SPIMISO, int SPIMOSI, int SPISDCS) {
 }
 
 void SD_CS(bool state) {
+  if (!hasSD) {return;}
 #ifdef WAVSHARE
   static bool laststate;
     if (laststate != state) {
@@ -1682,15 +1827,15 @@ void UseNMEA(char* buf, int type) {
       }
     }
     // 8 is snasBold8pt small font and seems to wrap to give a space before the second line
-    if ((Display_Page == -86)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-      if (type == 4) {UpdateLinef(BLACK, 8, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
+    if ((Display_Page == -86)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
+      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 7, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
     }
 
-    if ((Display_Page == -21)) {  //Terminal.debugpause built into in UpdateLinef as part of button characteristics
-      if (type == 4) {UpdateLinef(BLACK, 8, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
-      if (type == 2) {UpdateLinef(BLUE, 8, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
-      if (type == 3) {UpdateLinef(RED, 8, Terminal, "ESP:%s", buf);}
-      if (type == 1) { UpdateLinef(GREEN, 8, Terminal, "Ser:%s", buf);}
+    if ((Display_Page == -21)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
+      if (type == 4) {page->UpdateLinef(NEAR_BLACK, 7, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
+      if (type == 2) {page->UpdateLinef(BLUE, 7, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
+      if (type == 3) {page->UpdateLinef(RED, 7, Terminal, "ESP:%s\n", buf);} // add lf as esp does not have it 
+      if (type == 1) { page->UpdateLinef(GREEN, 7, Terminal, "Ser:%s", buf);}
     }
     // now decode it for the displays to use
     if (ColorSettings.SerialOUT) {DEBUG_PORT.println(buf);}

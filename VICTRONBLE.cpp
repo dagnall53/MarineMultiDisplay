@@ -23,6 +23,12 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 #include "debug_port.h"
+#include "src/MarinePageGFX.h"  // Double-buffered graphics
+#include "CanvasBridge.h"
+extern MarinePageGFX *page;
+#include "FontType.h"
+#include "Structures.h"
+
 // The Espressif people decided to use String instead of std::string in newer versions
 // (3.0 and later?) of their ESP32 libraries. Check your BLEAdvertisedDevice.h file to see
 // if this is the case for getManufacturerData(); if so, then uncomment this line so we'll
@@ -56,8 +62,9 @@ BLEScan *pBLEScan;
 // int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
 // generic button for displays to modify h,v width and height from Vconfig file. Will start with settings relative to Vic_Inst_Master :
 _sButton DisplayOuterbox;
-_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, ColorSettings.BackColor, ColorSettings.TextColor, ColorSettings.BorderColor };  //WHITE, BLACK, BLUE };
-  //
+_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, GREEN, NEAR_BLACK, WHITE, 0 };  //WHITE, NEAR_BLACK, BLUE };
+  //_sButton Vic_Inst_Master = { 0, 0, CommonDisplayWidth, 100, 5, ColorSettings.BackColor, ColorSettings.TextColor, ColorSettings.BorderColor,0 };  //WHITE, BLACK, BLUE };
+
 #define socbar 20
 #define greyoutTime 12000
 #define AES_KEY_BITS 128
@@ -509,15 +516,16 @@ bool CompareString_Mac(const char *receivedMacStr, char *charMacAddr) {  //compa
   }
   return result;
 }
-void DrawBar(_sButton box, char *title, uint16_t color, float data) {
-  int top;
-  top = box.h + box.width - socbar - (box.bordersize);  // aligned with Right hand side minus width
-  int printheight;
-  printheight = box.height - (box.bordersize * 2);
+void DrawBar(_sButton box,  uint16_t color, float data) {
+  int x,width;
+  width = socbar;
+  width = box.width-(2*box.bordersize); // full width bar!
+  x = box.h + box.width - width- box.bordersize ;  // aligned with Right hand side minus width and bordersize
+  int printheight= box.height - (box.bordersize * 2);
   float bar = data * printheight / 100;
-  gfx->fillRect(top, (box.v + box.bordersize) + printheight - int(bar), socbar,
-                int(bar), color);
-  // AddTitleBorderBox(0, box, title);
+ // gfx->fillRect(box.h,(box.v + box.bordersize),width,100,RED);
+  page->fillRect(x, (box.v + box.bordersize) + printheight - int(bar), width,int(bar), color);
+
 }
 
 
@@ -540,7 +548,18 @@ void Setup_N_Display(int i) {  // setsup the display box , but changes position 
   } else {
     strncpy(borderdisplay, victronDevices.DeviceVictronName[i], 30);
   }
-  GFXBorderBoxPrintf(DisplayOuterbox, "");  //Used to blank the previous stuff!
+  page->GFXBorderBoxPrintf(DisplayOuterbox, "");  //in gfx , Used to blank the previous stuff! Reset PrintLine lats x etc
+                                                  // other common stuff
+  if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
+  //
+  page->Addtitletobutton(DisplayOuterbox, 5, 0, "%s", borderdisplay);
+  if (victronDevices.Simulate) {
+    page->Addtitletobutton(DisplayOuterbox, 1, 0, "%s", victronDevices.FileCommentName[i]);
+    page->Addtitletobutton(DisplayOuterbox, 3, 0, "%s", victronDevices.DeviceVictronName[i]);
+    page->Addtitletobutton(DisplayOuterbox, 4, 0, "-sim-");
+    page->Addtitletobutton(DisplayOuterbox, 2, 0, " %i ", i);
+  }
+  DisplayOuterbox.lastY = victronDevices.displayV[i] + (2 * DisplayOuterbox.bordersize);  // add offset down! else it takes the offset from the add titles?
 }
 
 void DebugRawVdata(unsigned char *outputData, int datasize) {
@@ -563,8 +582,6 @@ advertisedDevice.getManufacturerData().length());
 uint8_t* MFRdata;
 MFRdata = (uint8_t*)advertisedDevice.getManufacturerData().data(); // .data() returns a pointer to the std::string array 
 int len = advertisedDevice.getManufacturerData().length();
-
-
 if (manCharBuf2 != NULL) {free(manCharBuf2);}
 */
 
@@ -592,7 +609,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 
     if (victronDevices.BLEDebug) {  //shows ANY BLE with MFr data.
       DEBUG_PORT.printf("BLE: mac<%s> type<%02X> <%s> ", advertisedDevice.getAddress().toString().c_str(),
-                    manCharBuf[1], Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
+                        manCharBuf[1], Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
       if (advertisedDevice.haveName()) {
         DEBUG_PORT.printf("name<%s> len<%i> rssi %i\n", advertisedDevice.getName().c_str(), advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
       } else {
@@ -606,9 +623,9 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
       snprintf(debugMsg, 120, "Beacon:mac<%s> <%s>", advertisedDevice.getAddress().toString().c_str(), Co_BLEIdentifier_Into_Char(manCharBuf[0], manCharBuf[1]));
       strcat(VictronBuffer, debugMsg);
       if (advertisedDevice.haveName()) {
-        snprintf(debugMsg, 120, " name<%s> len<%i> rssi %i", advertisedDevice.getName().c_str(), advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
+        snprintf(debugMsg, 120, " name<%s> len<%i> rssi %i \n", advertisedDevice.getName().c_str(), advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
       } else {
-        snprintf(debugMsg, 120, " len<%i> rssi %i", advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
+        snprintf(debugMsg, 120, " len<%i> rssi %i \n", advertisedDevice.getManufacturerData().length(), advertisedDevice.getRSSI());
       }
       strcat(VictronBuffer, debugMsg);
     }                                                                                     // end of MFR DATA and IS BEACON debug snprintf's
@@ -621,7 +638,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
           victronDevices.updated[i] = millis();
           if (advertisedDevice.haveName()) { strcpy(victronDevices.DeviceVictronName[i], advertisedDevice.getName().c_str()); }
           if (victronDevices.BLEDebug) {  //  DEBUG_PORT.printf("Recognised as my device '%x'  building data \n", i);
-            snprintf(debugMsg, 120, " is my device (%i)", i);
+            snprintf(debugMsg, 120, " IS my device (%i)\n", i);
             strcat(VictronBuffer, debugMsg);
           }
           victronDevices.ManuDataLength[i] = advertisedDevice.getManufacturerData().length();
@@ -651,7 +668,6 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a victronDevices structure with index i
   // we know the victronDevices data should be for one of our device MAC, and only victron data is accepted
   char debugMsg[200];
-
   if (victronDevices.greyed[i]) {  // DEBUG_PORT.printf("%i is Greyed\n",i);// added greying (outdated data) test
     return;
   }
@@ -668,7 +684,6 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   if (victronDevices.BLEDebug) {  // setup VictronBuffer messages for debug
     snprintf(debugMsg, 120, "Victron<%i>,", i);
     strcat(VictronBuffer, debugMsg);
-
     if (victronDevices.greyed[i]) {
       snprintf(debugMsg, 120, "-Greying-");  // not essential, but makes DATALOG and data display tidier
       strcat(VictronBuffer, debugMsg);
@@ -750,8 +765,9 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     }
     esp_aes_free(&ctx);
   }
+  page->setShadowX(2); page->setShadowY(2);
   if (ColorSettings.ShowRawDecryptedDataFor == i) { DebugRawVdata(outputData, encrDataSize); }
-  if (KnownDataType == 1) {
+  if (KnownDataType == 1) {  //VICTRON_BLE_RECORD_SOLAR_CHARGER
     VICTRON_BLE_RECORD_SOLAR_CHARGER *victronData = (VICTRON_BLE_RECORD_SOLAR_CHARGER *)outputData;
     uint8_t device_state = victronData->device_state;  // this is really more like "Charger State"
     uint8_t charger_error = victronData->charger_error;
@@ -775,27 +791,32 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     strcat(VictronBuffer, debugMsg);
     if (Display_Page == -87) {
       Setup_N_Display(i);
-      if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
-      if (victronDevices.Simulate) {
-        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.FileCommentName[i]);
-        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.DeviceVictronName[i]);
-        AddTitleInsideBox(7, 4, DisplayOuterbox, "-simulated-");
-        AddTitleInsideBox(7, 3, DisplayOuterbox, " %i ", i);
-      }  
-      DisplayOuterbox.PrintLine = 5;
-      if (strstr(victronDevices.DisplayShow[i], "P")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%3dw", pv_power); }
-      if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV", battery_voltage); }
-      if (strstr(victronDevices.DisplayShow[i], "I")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA", battery_current); }
-      if (strstr(victronDevices.DisplayShow[i], "l")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA load", load_current); }
-      if (strstr(victronDevices.DisplayShow[i], "L")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA", load_current); }
-      if (strstr(victronDevices.DisplayShow[i], "E")) {
-        UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", DeviceStateToChar(device_state));
-        UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", ErrorCodeToChar(charger_error));
-      }
+      if (strstr(victronDevices.DisplayShow[i], "P")) { page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%3dw\n", pv_power); }
+      if (strstr(victronDevices.DisplayShow[i], "V")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV\n", battery_voltage); }
+      if (strstr(victronDevices.DisplayShow[i], "I")) { 
+        if (abs(battery_current) >= 9.9) {
+          page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA\n", battery_current);
+        } else {
+          page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%1.2FA\n", battery_current);
+        }
+      } 
+      if ((strstr(victronDevices.DisplayShow[i], "L"))|| (strstr(victronDevices.DisplayShow[i], "L"))) { 
+        if (abs(load_current) >= 9.9) {
+          page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA\n", load_current);
+        } else {
+          page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%1.2FA\n", load_current);
+        }
+      } 
+      page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "\n");
+    }  //add lvf at size 7
+    if (strstr(victronDevices.DisplayShow[i], "E")) {
+      page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s\n", DeviceStateToChar(device_state));
+      page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s\n", ErrorCodeToChar(charger_error));
     }
   }
 
-  if (KnownDataType == 2) {
+
+  if (KnownDataType == 2) {  ///VICTRON_BLE_RECORD_BATTERY_MONITOR
     VICTRON_BLE_RECORD_BATTERY_MONITOR *victronData = (VICTRON_BLE_RECORD_BATTERY_MONITOR *)outputData;
     float battery_voltage = float(victronData->battery_voltage) * 0.01;
     float battery_current = float(victronData->battery_current) * 0.001;  //4194
@@ -805,7 +826,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     if (victronDevices.Simulate) {
       battery_voltage = random(10.9, 13.5);
       battery_current = random(-2.2, 20.6);
-      state_of_charge = 50;
+      state_of_charge = 50 +random(-20.3, 20.6);
       auxtype = 2;
       aux_input = 300;
     }
@@ -813,37 +834,33 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     strcat(VictronBuffer, debugMsg);
     if (Display_Page == -87) {
       Setup_N_Display(i);
-      if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
-      DisplayOuterbox.PrintLine = 5;
-      if (victronDevices.Simulate) {
-               AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.FileCommentName[i]);
-        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.DeviceVictronName[i]);
-        AddTitleInsideBox(7, 4, DisplayOuterbox, "-simulated-");
-        AddTitleInsideBox(7, 3, DisplayOuterbox, " %i ", i);
-      } 
-      if (strstr(victronDevices.DisplayShow[i], "S")) { DrawBar(DisplayOuterbox, victronDevices.FileCommentName[i], GREEN, state_of_charge); }
-      if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FV", battery_voltage); }
-      if (strstr(victronDevices.DisplayShow[i], "I")) {
+      if (strstr(victronDevices.DisplayShow[i], "S")) { DrawBar(DisplayOuterbox, GREEN, state_of_charge); }
+      if (strstr(victronDevices.DisplayShow[i], "V")) { page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FV\n", battery_voltage);page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "\n");}   //add lvf at size 7 
+      if (strstr(victronDevices.DisplayShow[i], "I")) { 
         if (abs(battery_current) >= 9.9) {
-          UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA", battery_current);
+          page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%2.1FA\n", battery_current);
         } else {
-          UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%1.2FA", battery_current);
+          page->UpdateTwoSize_MultiLine(1, true, false, 11, 10, DisplayOuterbox, "%1.2FA\n", battery_current);
         }
-      }
+      }  
       if (strstr(victronDevices.DisplayShow[i], "A")) {
         if (auxtype == 2) {
-          UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "");                               //temperature 3rd line // use DisplayShow ?? config.DisplayShow[index]
-          UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "%2.0f deg", aux_input - 273.15);  //this for deg C original data  is in kelvin. Fabian says only 1degree, but I think it is 0.1 resolution and only 1 degree resolution !
+          page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%2.0f deg\n", aux_input - 273.15);  //this for deg C original data  is in kelvin. Fabian says only 1degree, but I think it is 0.1 resolution and only 1 degree resolution !
         }
         if (auxtype == 0) {
-          UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "");
-          UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "AUX %2.1fV", aux_input);
+          page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "AUX %2.1fV\n", aux_input);
         }
       }
+      if (strstr(victronDevices.DisplayShow[i], "S")) { //DrawBar(DisplayOuterbox, GREEN, state_of_charge); 
+         page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "\n");
+         page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "SOC %2.0f %%\n",state_of_charge);
+         }
+    
     }
   }
 
-  if (KnownDataType == 8) {
+
+  if (KnownDataType == 8) {  ///VICTRON_BLE_RECORD_AC_CHARGER
     VICTRON_BLE_RECORD_AC_CHARGER *victronData = (VICTRON_BLE_RECORD_AC_CHARGER *)outputData;
     uint8_t device_state = victronData->device_state;
     int charger_error = victronData->charger_error;
@@ -865,26 +882,21 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     strcat(VictronBuffer, debugMsg);
     if (Display_Page == -87) {
       Setup_N_Display(i);
-      if (victronDevices.greyed[i]) { DisplayOuterbox.TextColor = DARKGREY; }
-      DisplayOuterbox.PrintLine = 5;
-      if (victronDevices.Simulate) {
-               AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.FileCommentName[i]);
-        AddTitleInsideBox(7, 1, DisplayOuterbox,"%s", victronDevices.DeviceVictronName[i]);
-        AddTitleInsideBox(7, 4, DisplayOuterbox, "-sim-");
-        AddTitleInsideBox(7, 3, DisplayOuterbox, " %i ", i);
+      if (strstr(victronDevices.DisplayShow[i], "V")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV1\n", battery_voltage_1); }
+      if (strstr(victronDevices.DisplayShow[i], "I")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA1\n", battery_current_1); }
+      if (strstr(victronDevices.DisplayShow[i], "v")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV2\n", battery_voltage_2); }
+      if (strstr(victronDevices.DisplayShow[i], "i")) { page->UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA2\n", battery_current_2); }
+      page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "\n");
+      if (strstr(victronDevices.DisplayShow[i], "E")) { 
+          page->UpdateTwoSize_MultiLine(1, false, false, 8, 8, DisplayOuterbox, "%s\n", DeviceStateToChar(device_state)); 
+          page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s\n", ErrorCodeToChar(charger_error)); 
       }
+      if (strstr(victronDevices.DisplayShow[i], "A")) { page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%2.0f deg\n", temperature - 273.15); }
       
-      if (strstr(victronDevices.DisplayShow[i], "V")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV1", battery_voltage_1); }
-      if (strstr(victronDevices.DisplayShow[i], "I")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA1", battery_current_1); }
-      if (strstr(victronDevices.DisplayShow[i], "v")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FV2", battery_voltage_2); }
-      if (strstr(victronDevices.DisplayShow[i], "i")) { UpdateTwoSize_MultiLine(1, true, false, 10, 9, DisplayOuterbox, "%2.1FA2", battery_current_2); }
-      UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, " ");
-      if (strstr(victronDevices.DisplayShow[i], "E")) { UpdateTwoSize_MultiLine(1, false, false, 8, 8, DisplayOuterbox, "%s", DeviceStateToChar(device_state)); }
-      if (strstr(victronDevices.DisplayShow[i], "A")) { UpdateTwoSize_MultiLine(1, true, false, 9, 8, DisplayOuterbox, "%2.0f deg", temperature - 273.15); }
-      if (strstr(victronDevices.DisplayShow[i], "E")) { UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%s", ErrorCodeToChar(charger_error)); }
     }
   }
   victronDevices.displayed[i] = true;
+  page->setShadowX(0); page->setShadowY(0);
 }
 
 /**

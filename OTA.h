@@ -73,7 +73,6 @@ extern _MyColors ColorSettings;
 extern void showPicture(const char *name);
 // extern Arduino_ST7701_RGBPanel *gfx ;  // declare the gfx structure so I can use GFX commands in Keyboard.cpp and here...
 extern Arduino_RGB_Display *gfx;  //  change if alternate (not 'Arduino_RGB_Display' ) display !
-extern void setFont(int);
 extern const char soft_version[];
 extern const char _device[];
 //const char *host = "NMEADisplay";
@@ -81,7 +80,7 @@ extern _sBoatData BoatData;
 extern void WifiGFXinterrupt(int font, _sButton &button, const char *fmt, ...);
 extern _sButton WifiStatus;
 extern int Display_Page;
-extern void Display(bool reset, int page);
+extern void Display(bool reset, int pageIndex);
 
 bool WebServerActive;
 WebServer server(80);
@@ -176,7 +175,7 @@ void readFile(fs::FS &fs, const char * path){
 }
 
 // //***************************************************
-// Slightly more flexible way of defining page.. allows if statements ..required for changed displayname..
+// Slightly more flexible way of defining pageIndex.. allows if statements ..required for changed displayname..
 String html_Question() {
   String st = "<!DOCTYPE html>\r\n";
   st += "<html><head>";
@@ -208,7 +207,7 @@ String html_Question() {
   return st;
 }
 // So I can modify the Display Panel Name! but also so that OTA works even without SD card present
-//prettified version/*the main html web page, with modified names etc    */
+//prettified version/*the main html web pageIndex, with modified names etc    */
 String html_startws() {
   String logs, filename;
   String st =
@@ -239,6 +238,10 @@ String html_startws() {
         "<div class='version'>";
   st += String(_device);
   st += String(soft_version);
+   st += "<center><small>" + String(ap_ip[0]) + "." + String(ap_ip[1]) + "." + String(ap_ip[2]) + "." + String(ap_ip[3]);
+  if (IsConnected ) {
+    st += " and " +  String(WiFi.localIP()[0]) + "." + String(WiFi.localIP()[1]) + "." + String(WiFi.localIP()[2]) + "." + String(WiFi.localIP()[3]);
+  }
   st += "</div>"
         "<h1><a class='button-link' href='http://";
   st += String(Display_Config.PanelName);
@@ -394,7 +397,7 @@ void SetupWebstuff() {
     // Victron is never set up by the touchscreen only via SD editor so NOT needed? but makes sure construct is our usual one
     SaveVictronConfiguration();  // save config with bytes ??
     delay(100);
-    WifiGFXinterrupt(9, WifiStatus, "RESTARTING");
+    WifiGFXinterrupt(8, WifiStatus, "RESTARTING");
     handleRoot();  // hopefully this will prevent the webbrowser keeping the/reset active and auto reloading last web command (and thus resetting!) ?
     server.sendHeader("Connection", "close");
     delay(150);
@@ -446,7 +449,7 @@ void SetupWebstuff() {
       HTTPUpload &upload = server.upload();
       if (upload.status == UPLOAD_FILE_START) {
         HaltOtherOperations = true;
-        setFont(9);
+        gfx->setFont(&FreeSansBold12pt7b);
         gfx->setTextColor(BLACK);
         gfx->fillScreen(BLUE);
         delay(10);
@@ -475,7 +478,7 @@ void SetupWebstuff() {
         }
       } else if (upload.status == UPLOAD_FILE_END) {
         if (Update.end(true)) {  //true to set the size to the current progress
-          WifiGFXinterrupt(9, WifiStatus, "SW UPDATED");
+          WifiGFXinterrupt(8, WifiStatus, "SW UPDATED");
           //DEBUG_PORT.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
           delay(500);
         } else {

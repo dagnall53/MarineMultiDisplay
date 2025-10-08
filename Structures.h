@@ -24,7 +24,7 @@ struct _sDisplay_Config {  // will be Display_Config for the JSON set Defaults a
 //  .ssid[25].password[25].UDP_PORT[5].UDP_ON .Serial_on .ESP_NOW_ON. N2K_ON .Log_ON. log_interval_setting. Data_Log_ON. BLE_enable
 struct _sWiFi_settings_Config {  // MAINLY WIFI AND DATA LOGGING key,ssid,PW,udpport, UDP,serial,Espnow
   int EpromKEY;      // Key is changed to allow check for clean EEprom and no data stored change in the default will result in eeprom being reset
-                     //  int DisplayPage;   // start page after defaults
+                     //  int DisplayPage;   // start pageIndex after defaults
   char ssid[25];
   char password[25];
   char UDP_PORT[5];  // hold udp port as char to make using keyboard easier for now. use atoi when needed!!
@@ -58,13 +58,11 @@ struct _sInstData {  // struct to hold instrument data AND the time it was updat
   unsigned long updated;
   bool displayed;  // displayed is used by Digital displays
   bool greyed;     // when the data is OLD! 
-  bool graphed;    // is used by Graphs, so you can display digital and graph on same page!
+  bool graphed;    // is used by Graphs, so you can display digital and graph on same pageIndex!
   int source;      // Ready to try an experiment with two GPS to see how they track .
   int lastx,lasty,lasth,lastw;
  
 };
-
-
 
 struct _sBoatData {
   unsigned long DaysSince1970;  // Days since 1970-01-01
@@ -79,15 +77,50 @@ struct _sBoatData {
   bool MOBActivated;
 
 };
+struct GraphBuffer {
+  double values[200];
+  uint16_t count = 0;
+  uint16_t head = 0;
 
-//BUTTON(h,v,width,height,bordersize, back,text,bordersize BackColor, TextColor, BorderColor; 
-struct _sButton { 
+  void push(double val) {
+    values[head] = val;
+    head = (head + 1) % 200;
+    if (count < 200) count++;
+  }
+  void reset() {
+  count = 0;
+  head = 0;
+  for (uint16_t i = 0; i < 200; i++) {
+    values[i] = 0.0;
+  }
+ } 
+  double get(uint16_t i) const {
+    return values[(head + i) % 200];
+  }
+void fill(double val) {
+  for (uint16_t i = 0; i < 200; i++) {
+    values[i] = val;
+  }
+  count = 200;
+  head = 0;
+}
+
+
+
+};
+
+
+
+
+//_sButton(h,v,width,height,bordersize, backcol,textcol,bordercol,fontinteger ....); 
+struct _sButton { //_sButton(h,v,width,height,bordersize, backC,textC,borderC,Font ; 
   int h, v, width, height, bordersize;
   uint16_t BackColor, TextColor, BorderColor;
   int Font;                  //-1 == not forced (not used?)
   bool Keypressed;           //used by keypressed
   unsigned long LastDetect;  //used by keypressed
   int PrintLine;             // used for UpdateLinef()
+    int lastY;                 // used for where last topleft print was  
   bool screenfull,debugpause;
 };
 

@@ -21,46 +21,38 @@ to get Serial.print working
 const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
   #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
   #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
-
+// taken from examples 
 Arduino_DataBus *bus = new Arduino_SWSPI(
-  GFX_NOT_DEFINED /* DC */,
-  42 /* CS /12*/,                // Chip Select pin
-  2 /* SCK /SCL /11*/,               // Clock pin
-  1 /* SDA /10? */,             // Master Out Slave In pin
-  GFX_NOT_DEFINED /* MISO */  // Master In Slave Out pin (not used)
-);
+    GFX_NOT_DEFINED /* DC */, 42 /* CS */,
+    2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
 
-Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(  // MY BOARD modified pin numbers
-  40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
-  46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,
-  14 /* G0/P22 */, 13 /* G1/P23 */, 12 /* G2/P24 */, 11 /* G3/P25 */, 10 /* G4/P26 */, 9 /* G5 */,
-  5 /* B0 */, 45 /* B1 */, 48 /* B2 */, 47 /* B3 */, 21 /* B4 */ ,
-  1 /* hsync_polarity */,      // Horizontal sync polarity
-  10 /* hsync_front_porch */,  // Horizontal front porch duration
-  8 /* hsync_pulse_width */,   // Horizontal pulse width
-  50 /* hsync_back_porch */,   // Horizontal back porch duration '80 works as well.. set at 50 
-  1 /* vsync_polarity */,      // Vertical sync polarity
-  10 /* vsync_front_porch */,  // Vertical front porch duration
-  8 /* vsync_pulse_width */,   // Vertical pulse width
-  20 /* vsync_back_porch */    // Vertical back porch duration
-                               // ,1, 30000000 // Uncomment for additional parameters if needed
-);
+Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
+    40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
+    46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,
+    14 /* G0 */, 13 /* G1 */, 12 /* G2 */, 11 /* G3 */, 10 /* G4 */, 9 /* G5 */,
+    5 /* B0 */, 45 /* B1 */, 48 /* B2 */, 47 /* B3 */, 21 /* B4 */,
+    1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
+    1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
 
-// Initialize ST7701 display // see comments at end of  https://github.com/Makerfabs/ESP32-S3-Parallel-TFT-with-Touch-4inch
 Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
-  480 /* width */,  480 /* height */,  rgbpanel,
-  2 /* rotation */,  true /* auto_flush */,  bus, // as defined in Arduino_DataBus *bus 
-  GFX_NOT_DEFINED /* RST */,  st7701_type1_init_operations,  sizeof(st7701_type1_init_operations));  ///DAGNALL NOTE  type 1 selected in GFX clock demo - I think it should be type 9 ?
+    480 /* width */, 480 /* height */, rgbpanel, 2 /* rotation */, true /* auto_flush */,
+    bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
 
 
+  
 /* Exploring Wavshare type X inits for correct colours .. 
-MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Display.h Line 511     WRITE_COMMAND_8, 0x21,   // 0x20 normal, 0x21 IPS
-1 wrong, inverted but readable
-2 wrong
+MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RGB_Display.h Line 511     
+          WRITE_COMMAND_8, 0x21,   // 0x20 normal, 0x21 IPS WRITE_C8_D8, 0x3A, 0x60// 0x70 RGB888, 0x60 RGB666, 0x50 RGB565
+    WRITE_COMMAND_8      WRITE_C8_D8 
+1       0x21,                0x3A, 0x60          wrong colour details, basic colour ok 
+1 MODIFIED 0x21              0x3A  0x50             Should only be changed to 565 but colours still not as good as original 1 
+2       0x21,                0x3A, 0x77          (24bit colour) wrong colours overall, 
 3,4,5,6,7,8 unusabl
-8 wrong, different Top part unused? (like 2?)
-9 wrong but usable
- ------------NOTES ------------------------------------
+8       0x20                 0x3A, 0x50                      wrong, Top part unused? (like 2?)
+9        /commented out        0x3A, 0x60 very wrong but usable
+9 modified: 0x21            0x3A, 0x60          like 2 (NOT 1 interestingly, some other factors must be different )
+                            0x3A, 0x50                  (same as above.. )
+ ------------NOTES :  THESE SEEM THE MOST CRITICAl ETTINGS ------------------------------------
  WRITE_C8_D8, 0xCD, 0x00 //  08/ 00(Line 1358)
  //WRITE_COMMAND_8, 0x20, // 0x20 normal, 0x21 IPS (Line 1450)
  WRITE_C8_D8, 0x3A, 0x60, // 0x70 RGB888, 0x60 RGB666, 0x50 RGB565 (Line 1451)
@@ -80,10 +72,6 @@ to get Serial.print working
  
 //** OTHER PINS
 
-//#define TFT_BL GFX_BL  // or EX105 ?  not used??
-//#define I2C_SDA_PIN 15
-//#define I2C_SCL_PIN 7
-
 //SD card interface 
 
 #define SD_SCK  2
@@ -91,11 +79,9 @@ to get Serial.print working
 #define SD_MOSI 1
 #define SDCS  -1 // NOTE not SD_CS, which is a function! is port ex104  ?? Not called up?? 
 
-//** 12/08/2025 ... not working!! touch interface **************************
 
-
-#define TOUCH_INT 16          // 16
-#define TOUCH_RST  254 // -1 not acepted by TAMC GT911 as it is a UINT_8t variable. I modified to detect 254 as "not present"          //-1-1          // EX101 will reset it at the start ?
+#define TOUCH_INT 16          
+#define TOUCH_RST  254 // -1 not acepted by TAMC GT911 as it is a UINT_8t variable. I modified TAMC and include it in src now to detect 254 as "not present"          //-1-1          // EX101 will reset it at the start ?
 #define TOUCH_SDA  15
 #define TOUCH_SCL  7
 
