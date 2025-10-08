@@ -7,9 +7,6 @@
 
 extern int MasterFont;  //global for font! Idea is to use to reset font after 'temporary' seletion of another
 extern String Fontname;
-extern int text_height ;      //so we can get them if we change heights etc inside functions
-extern int text_offset ;      //offset is not equal to height, as subscripts print lower than 'height'
-extern int text_char_width;
 extern int Display_Page;
 
 
@@ -46,10 +43,7 @@ extern _sButton TopHalfBigSingleTopRight;      //  ''
 extern _sButton BottomHalfBigSingleTopRight;  //  ''
 extern _sButton FullScreen;
 //used for nmea RMC /GPS display // was only three lines to start!
-extern _sButton Threelines0;
-extern _sButton Threelines1 ;
-extern _sButton Threelines2;
-extern _sButton Threelines3 ;
+
 // for the quarter screens on the main pageIndex
 extern _sButton topLeftquarter;  //h  reduced by 15 to give 30 space at the bottom
 extern _sButton bottomLeftquarter ;
@@ -64,6 +58,8 @@ extern _sButton TopLeftbutton;
 extern _sButton TopRightbutton ;
 extern _sButton BottomRightbutton;
 extern _sButton BottomLeftbutton ;
+extern _sButton MidRightButton;
+extern _sButton MidLeftButton ;
 
 // buttons for the wifi/settings pages
 extern _sButton TOPButton;
@@ -71,7 +67,7 @@ extern _sButton SecondRowButton ;
 extern _sButton ThirdRowButton;
 extern _sButton FourthRowButton ;
 extern _sButton FifthRowButton;
-
+extern _sButton TinyButton ;  // for a test in GPS draw and touch crosshairs, trying to get last points to be kept 
 
 //switches at line 180
 extern _sButton Switch0;

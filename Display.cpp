@@ -73,6 +73,24 @@ void DoNewKeyboard() {
     wasTouched = false;  // Reset when touch is released
   }
 }
+void ShowGPSDATA(int font, _sButton &button, _sBoatData BoatData) {
+    button.lastY = 2;
+    page->UpdateLinef(font, button, " \n");
+    if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(font, button, " Satellites in view %.0f \n", BoatData.SatsInView); }
+    page->UpdateLinef(font, button, " Date: %06i \n", int(BoatData.GPSDate));
+    page->UpdateLinef(font, button, " TIME: %02i:%02i:%02i\n",
+                      int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
+    if (BoatData.Latitude.data != NMEA0183DoubleNA) {
+      page->UpdateLinef(font, button, " LAT: %s\n", LattoString(BoatData.Latitude.data));
+      page->UpdateLinef(font, button, " LON: %s\n", LongtoString(BoatData.Longitude.data));
+    }
+    if (BoatData.MagHeading.data != NMEA0183DoubleNA) { 
+      page->UpdateLinef(font, button, "Mag Heading: %.4f\n", BoatData.MagHeading); }
+    if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) { 
+      page->UpdateLinef(font, button, "Variation: %.4f\n", BoatData.Variation); }
+
+ 
+}
 
 void Display(bool reset, int pageIndex) {  // setups for alternate pages to be selected by pageIndex.
                                            // DEBUG_PORT.printf("IN void Display page<%i> reset:%s \n",pageIndex,reset True_False);delay(50);  // Give UART time to flush
@@ -99,25 +117,22 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   static int fontlocal;
   char Tempchar[30];  //for fontnames for display
 
-
-
   if (pageIndex != LastPageselected) {
     WIFIGFXBoxdisplaystarted = false;  // will have reset the screen, so turns off the wifibox if there is a  page index change
                                        // this (above) saves a timed screen refresh that can clear keyboard stuff
                                        // DEBUG_PORT.println("IN Display_Page.. load config (Different page)");
-    LoadConfiguration();               //Reload configuration in case new data stored
     RunSetup = true;
   }
   if (reset) {
     WIFIGFXBoxdisplaystarted = false;
     //   DEBUG_PORT.println("IN Display_Page.. load config (reset)");
-    LoadConfiguration();  //Reload configuration in case new data stored
     page->clearCanvas(BLUE);
     RunSetup = true;
   }
   //generic setup stuff for ALL pages
   //page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
   if (RunSetup) {
+    LoadConfiguration();  //Reload configuration in case new data stored
     DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
     page->clearCanvas(BLUE);
     page->setTextColor(WHITE);
@@ -154,9 +169,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(Full0Center, "Jpg tests -Return to Menu-");
         page->GFXBorderBoxPrintf(Full1Center, "logo.jpg");
         page->GFXBorderBoxPrintf(Full2Center, "logo1.jpg");
-        page->GFXBorderBoxPrintf(Full3Center, "logo2.jpg");
-        page->GFXBorderBoxPrintf(Full4Center, "logo4.jpg");
-        page->GFXBorderBoxPrintf(Full5Center, "logo5.jpg");
+        page->GFXBorderBoxPrintf(Full3Center, "vicback.jpg");
+        page->GFXBorderBoxPrintf(Full4Center, "Bars.jpg");
+        page->GFXBorderBoxPrintf(Full5Center, "Colortest.jpg");
       }
 
       if (CheckButton(Full0Center)) { Display_Page = 0; }
@@ -167,13 +182,13 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->showPicture("/logo1.jpg");
       }
       if (CheckButton(Full3Center)) {
-        page->showPicture("/logo2.jpg");
+        page->showPicture("/vicback.jpg");
       }
       if (CheckButton(Full4Center)) {
-        page->showPicture("/logo4.jpg");
+        page->showPicture("/Bars.jpg");  // drawJPEGToTextCanvas and showPicture were written / corrected at separate points: showPicture was updated to be the same and needs to be asimilated
       }
       if (CheckButton(Full5Center)) {
-        page->showPicture("/logo5.jpg");
+        page->showPicture("/Colortest.jpg");
       }
 
       break;
@@ -229,7 +244,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -87:  // pageIndex for graphic display of Vicron data
       if (RunSetup) {
         page->clearCanvas(BLACK);
-        page->drawJPEGToTextCanvas("/vicback.jpg");  // page->Jpegshow ??
+        page->showPicture("/vicback.jpg");  // page->Jpegshow ??
       }
       // all graphics done in VICTRONBLE
       if (CheckButton(StatusBox)) { Display_Page = 0; }  // go to settings
@@ -445,56 +460,41 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         // Display_Page = 0;
         DataChanged = true;
       };
-
-
-
       break;
 
     case -10:  // a test pageIndex for fonts
       if (RunSetup || DataChanged) {
         page->fillScreen(BLUE);
-        //setFont(3);
-        // page->GFXBorderBoxPrintf(Full0Center, "-Font test -");
-        page->GFXBorderBoxPrintf(BottomLeftbutton, "Smaller");
-        page->GFXBorderBoxPrintf(BottomRightbutton, "Larger");
       }
-      // if (millis() > slowdown + 5000) {
-      //   slowdown = millis();
-      //  page->fillScreen(BLUE);
-      //   // fontlocal = fontlocal + 1;
-      //   // if (fontlocal > 15) { fontlocal = 0; } // just use the buttons to change!
-      //   temp = 12.3;
-      //   setFont(fontlocal);
-      // }
       if (millis() > timer2 + 500) {
         timer2 = millis();
         temp = random(-9000, 9000);
         temp = temp / 1000;
-        //setFont(fontlocal);
         Fontname.toCharArray(Tempchar, 30, 0);
-        int FontHt;
-        //setFont(fontlocal);
-        FontHt = text_height;
-        //setFont(3);
-        page->GFXBorderBoxPrintf(CurrentSettingsBox, "FONT:%i name%s height<%i>", fontlocal, Tempchar, FontHt);
-        //setFont(fontlocal);
+        // Measure parts
+        int16_t x1, y1;
+        uint16_t w1, h1;
+        gfx->getTextBounds("9", 0, 0, &x1, &y1, &w1, &h1);
+        page->GFXBorderBoxPrintf(CurrentSettingsBox, "FONT:%i name%s height<%i>", fontlocal, Tempchar, h1);
+        FontBox.Font = fontlocal;
         page->GFXBorderBoxPrintf(FontBox, "Test %4.2f", temp);
         DataChanged = false;
+        page->GFXBorderBoxPrintf(MidLeftButton, "font -");
+        page->GFXBorderBoxPrintf(MidRightButton, "font +");
       }
       if (CheckButton(Full0Center)) { Display_Page = 0; }
 
-      if (CheckButton(BottomLeftbutton)) {
+      if (CheckButton(MidLeftButton)) {
         fontlocal = fontlocal - 1;
         DataChanged = true;
       }
-      if (CheckButton(BottomRightbutton)) {
+      if (CheckButton(MidRightButton)) {
         fontlocal = fontlocal + 1;
         DataChanged = true;
       }
       break;
     case -9:  ///Touchscreen pointer tests
       if (RunSetup || DataChanged) {
-        //setFont(4);
         DataChanged = false;
       }
       if (millis() > slowdown + 1000) {
@@ -568,34 +568,39 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         slowdown = millis();
         //other stuff?
       }
-      
+
       if (Touch_available) {
         if ((ts.isTouched) && (ts.points[0].y >= 105)) {  // nb check on location on screen or scan will get reset when you press one of the top boxes
           //TouchCrosshair(1);
           wifissidpointer = ((ts.points[0].y - 75) / WIFISHOW.height) - 1;
-         int  str_len = WiFi.SSID(wifissidpointer).length() + 1;
+          int str_len = WiFi.SSID(wifissidpointer).length() + 1;
           char result[str_len];
           // Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
           // Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
           if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
             WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
-            if (str_len == 1) {TooLong=true;
+            if (str_len == 1) {
+              TooLong = true;
               page->GFXBorderBoxPrintf(SecondRowButton, "Set via Keyboard?");
             } else {
-              page->GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);TooLong = false;
+              page->GFXBorderBoxPrintf(SecondRowButton, "Select<%s>?", result);
+              TooLong = false;
             }
-          } else {TooLong=true;
+          } else {
+            TooLong = true;
             page->GFXBorderBoxPrintf(SecondRowButton, "ssid too long ! ");
           }
         }
       }
       if (CheckButton(SecondRowButton)) {
-        if (!TooLong){
-        WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
-        SaveConfiguration();
-        Display_Page = -1;}
-        else{Display_Page = -2;}
-        //  
+        if (!TooLong) {
+          WiFi.SSID(wifissidpointer).toCharArray(Current_Settings.ssid, sizeof(Current_Settings.ssid) - 1);
+          SaveConfiguration();
+          Display_Page = -1;
+        } else {
+          Display_Page = -2;
+        }
+        //
       }
 
 
@@ -673,29 +678,29 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (RunSetup || DataChanged) {
         ShowToplinesettings(Saved_Settings, " Flash/JSON ");
       }
-        page->GFXBorderBoxPrintf(Full0Center, "SSID <%s>", Current_Settings.ssid);
-        if (IsConnected) {
-          page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <CONNECTED>");
-        } else {
-          page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <NOT CONNECTED>");
-        }
-        page->GFXBorderBoxPrintf(Full1Center, "Password <%s>", Current_Settings.password);
-        page->Addtitletobutton(Full1Center, 1, 0, "Current Setting");
-        page->GFXBorderBoxPrintf(Full2Center, "UDP Port <%s>", Current_Settings.UDP_PORT);
-        page->Addtitletobutton(Full2Center, 1, 0, "Current Setting");
+      page->GFXBorderBoxPrintf(Full0Center, "SSID <%s>", Current_Settings.ssid);
+      if (IsConnected) {
+        page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <CONNECTED>");
+      } else {
+        page->Addtitletobutton(Full0Center, 1, 0, "Current Setting <NOT CONNECTED>");
+      }
+      page->GFXBorderBoxPrintf(Full1Center, "Password <%s>", Current_Settings.password);
+      page->Addtitletobutton(Full1Center, 1, 0, "Current Setting");
+      page->GFXBorderBoxPrintf(Full2Center, "UDP Port <%s>", Current_Settings.UDP_PORT);
+      page->Addtitletobutton(Full2Center, 1, 0, "Current Setting");
 
-        page->GFXBorderBoxPrintf(Switch0, Current_Settings.Serial_on On_Off);  //A.Serial_on On_Off,  A.UDP_ON On_Off, A.ESP_NOW_ON On_Off
-        page->Addtitletobutton(Switch0, 1, 0, "Serial");
-        page->GFXBorderBoxPrintf(Switch1, Current_Settings.UDP_ON On_Off);
-        page->Addtitletobutton(Switch1, 1, 0, "UDP");
-        page->GFXBorderBoxPrintf(Switch2, Current_Settings.ESP_NOW_ON On_Off);
-        page->Addtitletobutton(Switch2, 1, 0, "ESP-Now");
-        // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->GFXBorderBoxPrintf(Switch5, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
-        page->Addtitletobutton(Switch5, 1, 0, "EEPROM");
-        page->GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
+      page->GFXBorderBoxPrintf(Switch0, Current_Settings.Serial_on On_Off);  //A.Serial_on On_Off,  A.UDP_ON On_Off, A.ESP_NOW_ON On_Off
+      page->Addtitletobutton(Switch0, 1, 0, "Serial");
+      page->GFXBorderBoxPrintf(Switch1, Current_Settings.UDP_ON On_Off);
+      page->Addtitletobutton(Switch1, 1, 0, "UDP");
+      page->GFXBorderBoxPrintf(Switch2, Current_Settings.ESP_NOW_ON On_Off);
+      page->Addtitletobutton(Switch2, 1, 0, "ESP-Now");
+      // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+      page->GFXBorderBoxPrintf(Switch5, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+      page->Addtitletobutton(Switch5, 1, 0, "EEPROM");
+      page->GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
 
-      
+
       if (millis() > slowdown + 1000) {
         slowdown = millis();
       }
@@ -729,7 +734,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
 
     case 0:  // main settings
-      if (RunSetup) {page->clearCanvas(BLUE);
+      if (RunSetup) {
+        page->clearCanvas(BLUE);
         ShowToplinesettings("Settings Now: ");
         page->GFXBorderBoxPrintf(Full0Center, "-Experimental-");
         page->GFXBorderBoxPrintf(Full1Center, "WIFI Settings");
@@ -805,84 +811,47 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       break;
     case 9:  // GPS pageIndex
       if (RunSetup) {
-        //setFont(8);
-        page->GFXBorderBoxPrintf(BigSingleDisplay, "");
-        page->GFXBorderBoxPrintf(TopHalfBigSingleTopRight, "");
-        page->GFXBorderBoxPrintf(BottomHalfBigSingleTopRight, "");
-        page->GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
-        //setFont(10);
       }
-      page->BorderPrintCanvasTwoSize(TopHalfBigSingleTopRight, 154, "%.1f", BoatData.SOG.data);
-      page->AddTitleInsideBox(TopHalfBigSingleTopRight, 6, 8, " SOG ");
-      page->BorderPrintCanvasTwoSize(BottomHalfBigSingleTopRight, 154, "%.1f", BoatData.COG.data);
-      page->AddTitleInsideBox(BottomHalfBigSingleTopRight, 6, 8, " COG ");
+      page->GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
+      page->AutoPrint2Size(TopHalfBigSingleTopRight, "19.9", "%.1f\n", BoatData.SOG.data);
+      page->AddTitleInsideBox(TopHalfBigSingleTopRight, 1, 8, " SOG ");
+      page->AutoPrint2Size(BottomHalfBigSingleTopRight, "19.9", "%.1f\n", BoatData.COG.data);
+      page->AddTitleInsideBox(BottomHalfBigSingleTopRight, 1, 8, " COG ");
 
       if (millis() > slowdown + 1000) {
         slowdown = millis();
         page->GFXBorderBoxPrintf(BigSingleDisplay, "");
-        // do this one once a second.. I have not yet got simplified functions testing if previously displayed and greyed yet
-        page->setTextColor(BigSingleDisplay.TextColor);
-        BigSingleDisplay.PrintLine = 0;
-        if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(8, BigSingleDisplay, "Satellites in view %.0f ", BoatData.SatsInView); }
-        if (BoatData.GPSTime != NMEA0183DoubleNA) {
-          page->UpdateLinef(9, BigSingleDisplay, "\n");
-          page->UpdateLinef(9, BigSingleDisplay, "Date: %06i \n", int(BoatData.GPSDate));
-          page->UpdateLinef(9, BigSingleDisplay, "\n");
-          page->UpdateLinef(9, BigSingleDisplay, "TIME: %02i:%02i:%02i\n",
-                            int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
-        }
-        if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-          page->UpdateLinef(9, BigSingleDisplay, "/n");
-          page->UpdateLinef(9, BigSingleDisplay, "LAT %s/n", LattoString(BoatData.Latitude.data));
-          page->UpdateLinef(9, BigSingleDisplay, "LON %s/n", LongtoString(BoatData.Longitude.data));
-          page->UpdateLinef(9, BigSingleDisplay, "/n");
-        }
-
-        if (BoatData.MagHeading.data != NMEA0183DoubleNA) { page->UpdateLinef(9, BigSingleDisplay, "Mag Heading: %.4f\n", BoatData.MagHeading); }
-        if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) { page->UpdateLinef(9, BigSingleDisplay, "Variation: %.4f\n", BoatData.Variation); }
-      }
+       if (BoatData.GPSTime != NMEA0183DoubleNA) {  ShowGPSDATA(9, BigSingleDisplay,BoatData);}
+       }
       if (CheckButton(BigSingleTopLeft)) { Display_Page = 10; }
       //if (CheckButton(bottomLeftquarter)) { Display_Page = 4; }  //Loop to the main settings pageIndex
       break;
 
     case 10:  // GPS pageIndex 2 sort of anchor watch
       static double magnification;
+      float pixel;
+      pixel = magnification / 111111;
+      if (RunSetup) { magnification = 1111111; }
       if (RunSetup || DataChanged) {
-        //setFont(8);
-        page->GFXBorderBoxPrintf(BigSingleDisplay, "");
-        page->GFXBorderBoxPrintf(BigSingleTopLeft, "");
-        if (BoatData.GPSTime != NMEA0183DoubleNA) {
-          page->UpdateLinef(8, BigSingleTopLeft, "Date: %06i ", int(BoatData.GPSDate));
-          page->UpdateLinef(8, BigSingleTopLeft, "TIME: %02i:%02i:%02i",
-                            int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
-        }
-        if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-          page->UpdateLinef(8, BigSingleTopLeft, "LAT: %f", BoatData.Latitude.data);
-          page->UpdateLinef(8, BigSingleTopLeft, "LON: %f", BoatData.Longitude.data);
-        }
-
-        page->GFXBorderBoxPrintf(BigSingleTopRight, "Show Quad Display");
-        page->GFXBorderBoxPrintf(BottomRightbutton, "Zoom in");
-        page->GFXBorderBoxPrintf(BottomLeftbutton, "Zoom out");
-        magnification = 1111111;  //reset magnification 11111111 = 10 pixels / m == 18m circle.
+        page->fillScreen(BLUE);
+        page->clearCanvas(BLUE);  // fill screen not work, clear canvas does?        
+        
+        DrawGPSPlot(true, TinyButton, BoatData, 1);  //draws TinyButton inside BigSingleDisplay
+        page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
         DataChanged = false;
       }
       if (millis() > slowdown + 1000) {
         slowdown = millis();
-        // do this one once a second.. I have not yet got simplified functions testing if previously displayed and greyed yet
-        ///page->setTextColor(BigSingleDisplay.TextColor);
-        BigSingleTopLeft.PrintLine = 0;
-        page->UpdateLinef(3, BigSingleTopLeft, "%.0f Satellites in view", BoatData.SatsInView);
-        if (BoatData.GPSTime != NMEA0183DoubleNA) {
-          page->UpdateLinef(8, BigSingleTopLeft, "Date: %06i ", int(BoatData.GPSDate));
-          page->UpdateLinef(8, BigSingleTopLeft, "TIME: %02i:%02i:%02i",
-                            int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
-        }
-        if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-          page->UpdateLinef(8, BigSingleTopLeft, "LAT: %s", LattoString(BoatData.Latitude.data));
-          page->UpdateLinef(8, BigSingleTopLeft, "LON: %s", LongtoString(BoatData.Longitude.data));
-          // DrawGPSPlot(false, BigSingleDisplay, BoatData, magnification);
-        }
+          // page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
+     page->fillCircle(240,240,100,NEAR_BLACK);
+        page->GFXBorderBoxPrintf(BigSingleTopLeft, "");
+        if (BoatData.GPSTime != NMEA0183DoubleNA) {  ShowGPSDATA(8, BigSingleTopLeft,BoatData);}  
+        page->AddTitleInsideBox(BigSingleDisplay, 2, 9, "Magnification= %4.1f pixels/m", pixel);
+        page->AddTitleInsideBox(BigSingleDisplay, 1, 9, "Circle= %4.1f m", float((BigSingleDisplay.height) / (2 * pixel)));
+        page->GFXBorderBoxPrintf(BigSingleTopRight, "Show Quad Display");
+        page->GFXBorderBoxPrintf(BottomRightbutton, "Zoom in");
+        page->GFXBorderBoxPrintf(BottomLeftbutton, "Zoom out");
+        DrawGPSPlot(false, TinyButton, BoatData, magnification);
       }
       if (CheckButton(topLeftquarter)) { Display_Page = 9; }
       if (CheckButton(BigSingleTopRight)) { Display_Page = 4; }
@@ -890,18 +859,18 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (CheckButton(BottomRightbutton)) {
         magnification = magnification * 1.5;
         Serial.printf(" magification  %f \n", magnification);
+        DataChanged = true;
       }
       if (CheckButton(BottomLeftbutton)) {
         magnification = magnification / 1.5;
         Serial.printf(" magification  %f \n", magnification);
+        DataChanged = true;
       }
       if (CheckButton(BigSingleDisplay)) {  // press plot to recenter plot
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-          DrawGPSPlot(true, BigSingleDisplay, BoatData, magnification);
-          Serial.printf(" reset center anchorwatch %f   %f \n", startposlat, startposlon);
-          page->GFXBorderBoxPrintf(BigSingleDisplay, "");
-          page->GFXBorderBoxPrintf(BottomRightbutton, "zoom in");
-          page->GFXBorderBoxPrintf(BottomLeftbutton, "zoom out");
+          // Serial.printf("Ture valu n GrawGPS updtes static variables  reset center anchorwatch %f   %f \n", BoatData.Latitude.data, BoatData.Longitude.data);
+          DrawGPSPlot(true, TinyButton, BoatData, magnification);
+          DataChanged = true;
         }
         DataChanged = true;
       }
@@ -932,6 +901,10 @@ void TouchCrosshair(int size) {
 void TouchCrosshair(int point, int size, uint16_t colour) {
   page->setCursor(ts.points[point].x, ts.points[point].y);
   page->printf("%i %i  ", ts.points[point].x, ts.points[point].y);
+  page->fillCircle(ts.points[point].x, ts.points[point].y, 10, WHITE);
+  TinyButton.h = ts.points[point].x;
+  TinyButton.v = ts.points[point].y;
+  page->DrawBox(TinyButton);
   page->drawFastVLine(ts.points[point].x, ts.points[point].y - size, 2 * size, colour);
   page->drawFastHLine(ts.points[point].x - size, ts.points[point].y, 2 * size, colour);
 }
@@ -960,173 +933,7 @@ bool CheckButton(_sButton& button) {  // trigger on release. needs index (s) to 
 }
 
 
-// being replaced with page->setfont set in FontType.h /*
-// Lookup table for font line heights
-/*
-static const int fontHeightTable[FONT_COUNT] = {
-  11, // FONT_MONO_8              0
-  17, // FONT_MONO_12             1
-  25, // FONT_MONO_18             2
-  11, // FONT_MONO_BOLD_8         3
-  17, // FONT_MONO_BOLD_12        4
-  25, // FONT_MONO_BOLD_18        5
-  36, // FONT_MONO_BOLD_27        6
-   9, // FONT_FreeSansBold6       7
-  11, // FONT_FreeSansBold8       8
-  18, // FONT_FreeSansBold12      9
-  27, // FONT_FreeSansBold18      10
-  39, // FONT_FreeSansBold27      11
-  59, // FONT_FreeSansBold40      12
-  88  // FONT_FreeSansBold60      13
-};
-*/
-// void setFont(int fontinput) {  //fonts 3..12 are FreeMonoBold in sizes incrementing by 1.5
-//                                //Notes: May remove some later to save program mem space?
-//                                // used : 0,1,2,4 for keyboard
-//                                //      : 0,3,4,8,10,11 in main
-//   MasterFont = fontinput;
-//   // page->setFontByIndex(fontinput);
-//   switch (fontinput) {  //select font and automatically set height/offset based on character '['
-//       // set the heights and offset to print [ in boxes. Heights in pixels are NOT the point heights!
 
-//     case 0:                        // SMALL 8pt
-//       Fontname = "FreeMono8pt7b";  //9 to 14 high?
-//       gfx->setFont(&FreeMono8pt7b);
-//       text_height = (FreeMono8pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMono8pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 1:  // standard 12pt
-//       Fontname = "FreeMono12pt7b";
-//       gfx->setFont(&FreeMono12pt7b);
-//       text_height = (FreeMono12pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMono12pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-
-//       break;
-//     case 2:  //standard 18pt
-//       Fontname = "FreeMono18pt7b";
-//       gfx->setFont(&FreeMono18pt7b);
-//       text_height = (FreeMono18pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMono18pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-
-//       break;
-//     case 3:  //BOLD 8pt
-//       Fontname = "FreeMonoBOLD8pt7b";
-//       gfx->setFont(&FreeMonoBold8pt7b);
-//       text_height = (FreeMonoBold8pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMonoBold8pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-
-//       break;
-//     case 4:  //BOLD 12pt
-//       Fontname = "FreeMonoBOLD12pt7b";
-//       gfx->setFont(&FreeMonoBold12pt7b);
-//       text_height = (FreeMonoBold12pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMonoBold12pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-
-//       break;
-//     case 5:  //BOLD 18 pt
-//       Fontname = "FreeMonoBold18pt7b";
-//       gfx->setFont(&FreeMonoBold18pt7b);
-//       text_height = (FreeMonoBold18pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMonoBold18pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 6:  //BOLD 27 pt
-//       Fontname = "FreeMonoBold27pt7b";
-//       gfx->setFont(&FreeMonoBold27pt7b);
-//       text_height = (FreeMonoBold27pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMonoBold27pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 7:  //SANS BOLD 6 pt
-//       Fontname = "FreeSansBold6pt7b";
-//       gfx->setFont(&FreeSansBold6pt7b);
-//       text_height = (FreeSansBold6pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold6pt7bGlyphs[0x38].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 8:  //SANS BOLD 8 pt
-//       Fontname = "FreeSansBold8pt7b";
-//       gfx->setFont(&FreeSansBold8pt7b);
-//       text_height = (FreeSansBold8pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold8pt7bGlyphs[0x38].yOffset);  // yAdvance is the last variable.. and the one that affects the extra lf on wrap.
-//       text_char_width = 12;
-//       break;
-//     case 9:  //SANS BOLD 12 pt
-//       Fontname = "FreeSansBold12pt7b";
-//       gfx->setFont(&FreeSansBold12pt7b);
-//       text_height = (FreeSansBold12pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold12pt7bGlyphs[0x38].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 10:  //SANS BOLD 18 pt
-//       Fontname = "FreeSansBold18pt7b";
-//       gfx->setFont(&FreeSansBold18pt7b);
-//       text_height = (FreeSansBold18pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold18pt7bGlyphs[0x38].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 11:  //sans BOLD 27 pt
-//       Fontname = "FreeSansBold27pt7b";
-//       gfx->setFont(&FreeSansBold27pt7b);
-//       text_height = (FreeSansBold27pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold27pt7bGlyphs[0x38].yOffset);
-//       text_char_width = 12;
-//       break;
-//     case 12:  //sans BOLD 40 pt
-//       Fontname = "FreeSansBold40pt7b";
-//       gfx->setFont(&FreeSansBold40pt7b);
-//       text_height = (FreeSansBold40pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold40pt7bGlyphs[0x38].yOffset);
-//       text_char_width = 12;
-//       break;
-
-//     case 13:  //sans BOLD 60 pt
-//       Fontname = "FreeSansBold60pt7b";
-//       gfx->setFont(&FreeSansBold60pt7b);
-//       text_height = (FreeSansBold60pt7bGlyphs[0x38].height) + 1;
-//       text_offset = -(FreeSansBold60pt7bGlyphs[0x38].yOffset);
-//       text_char_width = 12;
-//       break;
-
-//       //   case 21:  //Mono oblique BOLD 27 pt
-//       //   Fontname = "FreeMonoBoldOblique27pt7b";
-//       //   gfx->setFont(&FreeMonoBoldOblique27pt7b);
-//       //   text_height = (FreeMonoBoldOblique27pt7bGlyphs[0x38].height) + 1;
-//       //   text_offset = -(FreeMonoBoldOblique27pt7bGlyphs[0x38].yOffset);
-//       //   text_char_width = 12;
-//       //   break;
-//       // case 22:  //Mono oblique BOLD 40 pt
-//       //   Fontname = "FreeMonoBoldOblique40pt7b";
-//       //   gfx->setFont(&FreeMonoBoldOblique40pt7b);
-//       //   text_height = (FreeMonoBoldOblique40pt7bGlyphs[0x38].height) + 1;
-//       //   text_offset = -(FreeMonoBoldOblique40pt7bGlyphs[0x38].yOffset);
-//       //   text_char_width = 12;
-//       //   break;
-//       //       case 23:  //Mono oblique BOLD 60 pt
-//       //   Fontname = "FreeMonoBoldOblique60pt7b";
-//       //   gfx->setFont(&FreeMonoBoldOblique60pt7b);
-//       //   text_height = (FreeMonoBoldOblique60pt7bGlyphs[0x38].height) + 1;
-//       //   text_offset = -(FreeMonoBoldOblique60pt7bGlyphs[0x38].yOffset);
-//       //   text_char_width = 12;
-//       //   break;
-
-
-//     default:
-//       Fontname = "FreeMono8pt7b";
-//       // page->setFont(&FreeMono8pt7b);
-//       text_height = (FreeMono8pt7bGlyphs[0x3D].height) + 1;
-//       text_offset = -(FreeMono8pt7bGlyphs[0x3D].yOffset);
-//       text_char_width = 12;
-//       MasterFont = 0;
-
-//       break;
-//   }
-// }
 void ShowGPSinBox(int font, _sButton button) {
   static double lastTime;
   //Serial.printf("In ShowGPSinBox  %i\n",int(BoatData.GPSTime));
@@ -1231,4 +1038,4 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
       //setFont(10);
     }
   }
-}
+} 

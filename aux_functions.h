@@ -24,6 +24,6 @@ double ValidData(_sInstData variable);  // To avoid showing NMEA0183DoubleNA val
   
 // other stuff placed here now 
 //TBD
-void DrawGPSPlot(bool reset, _sButton button,_sBoatData BoatData, double magnification );
+void DrawGPSPlot(bool reset, _sButton &BLOB, _sBoatData BoatData, double magnification );
 
 #endif

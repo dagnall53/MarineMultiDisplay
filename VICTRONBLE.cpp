@@ -54,7 +54,6 @@ extern _sWiFi_settings_Config Current_Settings;
 extern _sMyVictronDevices victronDevices;
 extern _MyColors ColorSettings;
 extern int Display_Page;
-//extern int text_height;
 //extern void showPictureFrame(_sButton &button, const char *name);
 //char ErrorInChars[50];
 

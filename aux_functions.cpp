@@ -18,10 +18,10 @@ but highly modified!
 extern MarinePageGFX* page;
 extern GraphBuffer DepthBuffer;
 
-extern int text_offset;
+
 extern int MasterFont;
 //extern void setFont(int);
-extern int text_height;
+
 extern int Display_Page;
 extern _MyColors ColorSettings;
 extern _sDisplay_Config Display_Config;
@@ -270,7 +270,7 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {
   return false;
 }
 
-void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnification) { //do later 
+void DrawGPSPlot(bool reset, _sButton &BLOB, _sBoatData BoatData, double magnification) { //do later 
   static double startposlat, startposlon;
   double LatD, LongD;  //deltas
   int h, v;
@@ -279,21 +279,24 @@ void DrawGPSPlot(bool reset, _sButton button, _sBoatData BoatData, double magnif
       startposlat = BoatData.Latitude.data;
       startposlon = BoatData.Longitude.data;
     }
-
-    h = button.h + ((button.width) / 2);
-    v = button.v + ((button.height) / 2);
-  //   // magnification 1 degree is roughly 111111 m
-  //   AddTitleInsideBox(1, 1, button, "circle:%4.1fm", float((button.height) / (2 * (magnification / 111111))));
-  //   page->fillCircleToCanvas(h, v, (button.height) / 2, button.BorderColor);
-  //   page->AddTitleBorderBox(0, button, "Magnification:%4.1f pixel/m", float(magnification) / 111111);
-  //   if (startposlon == 0) {
-  //     startposlat = BoatData.Latitude.data;
-  //     startposlon = BoatData.Longitude.data;
-  //   }
-  //   LongD = h + ((BoatData.Longitude.data - startposlon) * magnification);
-  //   LatD = v - ((BoatData.Latitude.data - startposlat) * magnification);  // negative because display is top left to bottom right!
-  //                                                                         //set limits!! ?
-  //   page->fillCircle(LongD, LatD, 4, button.TextColor);
+     h = 0 + ((Screen_Width) / 2);  // screen width / height 
+     v = 0  + ((480) / 2);
+                 BLOB.h=0;
+            BLOB.v=0;
+            BLOB.BackColor=WHITE;
+            page->DrawBox(BLOB); 
+    // magnification 1 degree is roughly 111111 m
+    if (startposlon == 0) {
+      startposlat = BoatData.Latitude.data;
+      startposlon = BoatData.Longitude.data;
+    }
+    LongD = h + ((BoatData.Longitude.data - startposlon) * magnification);
+    LatD = v - ((BoatData.Latitude.data - startposlat) * magnification);  // negative because display is top left to bottom right!
+            BLOB.h=LongD;
+            BLOB.v=LatD;
+            BLOB.BackColor=BLUE;
+            BLOB.BorderColor=WHITE;
+            page->DrawBox(BLOB);                                                                     //set limits!! ?
    }
 }
 

@@ -121,11 +121,9 @@ void jpegDraw(
     _jpeg.decode(x, y, _scale);
     _jpeg.close();
 }
-void MarinePageGFX::drawJPEGToTextCanvas(const char* filename) {
-    setJPEGTargetCanvas(_textCanvas);
-    jpegDraw(filename, jpegDrawCallback, true, 0, 0, _textCanvas->width(), _textCanvas->height());
-}
+
 void MarinePageGFX::showPicture(const char* name) {
+  setJPEGTargetCanvas(_textCanvas);
   jpegDraw(name, jpegDrawCallback, true /* useBigEndian */,
            0 /* x */, 0 /* y */, _textCanvas->width() /* widthLimit */, _textCanvas->height() /* heightLimit */);
 }
@@ -496,7 +494,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
   sscanf(valueBuffer, "%lf", &testValue);
 // DEBUG_PORT.println(testValue);
 // 
-  if (testValue == -1e9  ) {return;}
+  if (testValue == -1e9  ) {return;} // this is the NA value for NMEA 2000 data 
   int printableWidth = button.width - 2 * button.bordersize;
   int printableHeight = button.height - 2 * button.bordersize;
   DrawBox(button);
@@ -507,44 +505,34 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
   _textCanvas->setTextSize(1);
   int chosenFont;
   _textCanvas->setTextBound(0, 0, 1024, 1024);  // artificially large bounds
-  int lastw =0;
+  int lastw =0;int lasth =0;
   for (int fontIndex = 7; fontIndex <=13; fontIndex++) {
     setFontByIndex(fontIndex);
     _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
-    if ((w1 >= printableWidth)||(lastw>=w1)) { break;}   // make sure that if we have an error in the fint table and loop, we still catch the lagest font
-    lastw=w1;
+     if ((w1 >= printableWidth)||(h1>= printableHeight)) { break;}   // make sure that if we have an error in the font table and loop, we still catch the lagest font
+    lastw=w1;lasth=h1;
     chosenFont = fontIndex;
   }
- //  DEBUG_PORT.printf("** Font selected is font %i, magnification %i \n",chosenFont, magnify );
+  // Serial.printf("**page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
   // allow possibilty that if biggest font is less than half the printableWidth and then magnify by 2 
-  if (lastw <= 2*printableWidth/3 ) {
-    magnify=2; 
+  if ((lastw <= printableWidth/2 )&&(lasth <= printableHeight/2 )) {
+    magnify=4; 
    _textCanvas->setTextSize(magnify);
-    lastw =0;
+    lastw =0;lasth=0;
+    // get the largest font size again 
     for (int fontIndex = 7; fontIndex <=13; fontIndex++) {
      setFontByIndex(fontIndex);
      _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
-      if ((w1 >= printableWidth)||(lastw>=w1)) { break;}   // make sure that if we have an error in the fint table and loop, we still catch the lagest font
-      lastw=w1;
+      if ((w1 >= printableWidth)||(h1>= printableHeight)) { break;}   // make sure that if we have an error in the fint table and loop, we still catch the lagest font
+      lastw=w1;lasth=h1;
      chosenFont = fontIndex;
     }
+  //    Serial.printf("*****page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
+
   } 
-  // SET chosen magnify and font for printing 
+  // SET chosen magnify and font for printing in UpdateTwoSize_MultiLine(
   button.lastY = button.v+button.bordersize;
   UpdateTwoSize_MultiLine(magnify, true, true, chosenFont, chosenFont-1, button,"%s", valueBuffer);
- /* _textCanvas->setTextSize(magnify);
-  setFontByIndex(chosenFont);  
-  _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1); // repeat in case we do a magnify before this .. 
-  _textCanvas->getTextBounds(valueBuffer, 0, 0, &x1, &y1, &w2, &h2);
-   // Compute top  so reference would be vertically centered - fixes vertical alignment so different character heights do not shift position of decimal point
-  int16_t refV = button.v + (button.height + h1) / 2; // V centered ?
-   // Center actual value horizontally
-  int16_t valH = button.h + button.bordersize + (button.width-w2) / 2;
-  // set correct text bounds
-  _textCanvas->setTextBound(button.h + button.bordersize, button.v+button.bordersize,button.width - 2 * button.bordersize, button.height - 2 * button.bordersize); 
- // DEBUG_PORT.printf("print  %s  at v%i h%i in font %i, magnification %i \n",valueBuffer,refV,valH,chosenFont,magnify );
-  PrintSubshadow(button,valueBuffer,valH,refV,chosenFont);
-*/
   _textCanvas->setTextSize(1); // reset magnify for other functions
   button.PrintLine = 0;button.lastY = button.v+button.bordersize;
  }
@@ -855,7 +843,15 @@ void MarinePageGFX::PrintSubshadow(_sButton& button, const char* valueBuffer, in
   _textCanvas->setTextColor(button.TextColor);
   _textCanvas->print(valueBuffer);
 }
-
+void MarinePageGFX::drawTextAt(int16_t x, int16_t y, const char* text, uint8_t size,int font, uint16_t color) {
+  if (!_textCanvas || !isReady()) return;
+  _textCanvas->setTextBound(0, 0, 1024, 1024);  // set artificially large bounds
+  setFontByIndex(font);
+  _textCanvas->setTextSize(size);
+  _textCanvas->setTextColor(color);
+  _textCanvas->setCursor(x, y);
+  _textCanvas->print(text);
+}
 void MarinePageGFX::SplitInterDecimal(const char* buffer, char* Integer, char* Fraction, char* DotPart) {
   if (!buffer || !Integer || !Fraction ) return;
   const char* dot = strchr(buffer, '.');
@@ -1147,25 +1143,7 @@ void MarinePageGFX::clearCanvas(uint16_t color) {
   }
 }
 
-void MarinePageGFX::drawTextAt(int16_t x, int16_t y, const char* text, uint8_t size,int font, uint16_t color) {
-  if (!_textCanvas || !isReady()) return;
-  setFontByIndex(font);
-  _textCanvas->setTextSize(size);
-  _textCanvas->setTextColor(color);
-  _textCanvas->setCursor(x, y);
-  _textCanvas->print(text);
-  // Copy canvas pixels into active buffer
-  uint16_t* canvasBuf = (uint16_t*)_textCanvas->getFramebuffer();
-  //Replace  with pixel-wise blending  memcpy(_buffer[_active], canvasBuf, _width * _height * sizeof(uint16_t));
-  for (int16_t y = 0; y < _height; y++) {
-    for (int16_t x = 0; x < _width; x++) {
-      uint16_t pixel = canvasBuf[y * _width + x];
-      if (pixel != 0) {  // Only draw non-black pixels (assuming black = transparent)
-        _buffer[_active][y * _width + x] = pixel;
-      }
-    }
-  }
-}
+
 
 
 void MarinePageGFX::compositeCanvas() {

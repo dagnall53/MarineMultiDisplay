@@ -29,7 +29,7 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.30";
+const char soft_version[] = " V0.31";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
@@ -197,9 +197,7 @@ _sWiFi_settings_Config Default_Settings_JSON = { 17, "GUESTBOAT", "12345678", "2
 
 int MasterFont;                             //global for font! Idea is to use to reset font after 'temporary' seletion of another
 String Fontname;
-int text_height = 12;  //so we can get them if we change heights etc inside functions
-int text_offset = 12;  //offset is not equal to height, as subscripts print lower than 'height'
-int text_char_width = 12;
+
 int Display_Page;
 
 
@@ -208,7 +206,7 @@ int Display_Page;
 
 
 
-_sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE };
+_sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE ,8};
 
 //_sButton WindDisplay = { 0, 0, 480, 480, 0, BLUE, WHITE, NEAR_BLACK };  // full screen no border
 
@@ -216,16 +214,11 @@ _sButton FontBox = { 0, 80, TOUCH_WIDTH, 330, 5, BLUE, WHITE, BLUE };
 // modified all to lift by 30 pixels to allow a common bottom row display (to show logs and get to settings)
 
 
-_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, NEAR_BLACK };              // used for wind and graph displays
-_sButton BigSingleTopRight = { 240, 0, 240, 90, 5, BLUE, WHITE, NEAR_BLACK };             //  ''
-_sButton BigSingleTopLeft = { 0, 0, 240, 90, 5, BLUE, WHITE, NEAR_BLACK };                //  ''
-_sButton TopHalfBigSingleTopRight = { 240, 0, 240, 45, 5, BLUE, WHITE, NEAR_BLACK };      //  ''
-_sButton BottomHalfBigSingleTopRight = { 240, 45, 240, 45, 5, BLUE, WHITE, NEAR_BLACK };  //  ''
-//used for nmea RMC /GPS display // was only three lines to start!
-_sButton Threelines0 = { 20, 30, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Threelines1 = { 20, 130, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Threelines2 = { 20, 230, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton Threelines3 = { 20, 330, 440, 80, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton BigSingleDisplay = { 0, 90, TOUCH_WIDTH, 360, 5, BLUE, WHITE, NEAR_BLACK,8 };              // used for wind and graph displays
+_sButton BigSingleTopRight = { TOUCH_WIDTH/2, 0, TOUCH_WIDTH/2, 90, 5, BLUE, WHITE, NEAR_BLACK,8 };             //  ''
+_sButton BigSingleTopLeft = { 0, 0, TOUCH_WIDTH/2, 90, 5, BLUE, WHITE, NEAR_BLACK,8 };                //  ''
+_sButton TopHalfBigSingleTopRight = { TOUCH_WIDTH/2, 0, TOUCH_WIDTH/2, 45, 5, BLUE, WHITE, NEAR_BLACK ,8};      //  ''
+_sButton BottomHalfBigSingleTopRight = { TOUCH_WIDTH/2, 45, TOUCH_WIDTH/2, 45, 5, BLUE, WHITE, NEAR_BLACK ,8};  //  ''
 _sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE ,7};// 7 is the smallest font 
 // for the quarter screens on the main page
 _sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };  //h  reduced by 15 to give 30 space at the bottom
@@ -236,23 +229,25 @@ _sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLU
 _sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,8 };
 _sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,8 }; 
 
-
+_sButton TinyButton { 0, 0, 10, 10, 1, BLUE, WHITE, NEAR_BLACK,7 }; 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
-_sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton TopLeftbutton = { 0, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK,1 };
+_sButton TopRightbutton = { TOUCH_WIDTH-75, 0, 75, 45, 5, BLUE, WHITE, NEAR_BLACK,1 };
 
-_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
-_sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK };
+_sButton BottomRightbutton = { TOUCH_WIDTH-75, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK,1 };
+_sButton BottomLeftbutton = { 0, 405, 75, 45, 5, BLUE, WHITE, NEAR_BLACK,1 };
 
+_sButton MidRightButton = { TOUCH_WIDTH-80, 240, 80, 45, 5, BLUE, WHITE, NEAR_BLACK,1};
+_sButton MidLeftButton = { 0, 240, 80, 45, 5, BLUE, WHITE, NEAR_BLACK,1 };
 
 #define sw_width 65
 //switches at line 250 for WIFI settings
-_sButton Switch0 = { 20+(1*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch1 = { 20+(3*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch2 = { 20+(5*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE };
-_sButton Switch3 = { 20+(7*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE }; 
-_sButton Switch4 = { 20+(9*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE }; //new not used ? 
-_sButton Switch5 = { 20+(11*sw_width/2), 250, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE }; //was 4 // big one for eeprom update
+_sButton Switch0 = { 20+(1*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE ,7};
+_sButton Switch1 = { 20+(3*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE ,7};
+_sButton Switch2 = { 20+(5*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE ,7};
+_sButton Switch3 = { 20+(7*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE ,7}; 
+_sButton Switch4 = { 20+(9*sw_width/2), 250, sw_width, 40, 5, WHITE, NEAR_BLACK, BLUE ,7}; //new not used ? 
+_sButton Switch5 = { 20+(11*sw_width/2), 250, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE ,7}; //was 4 // big one for eeprom update
 
 // at line140 in wif scan update
 _sButton Switch5a = { 345, 90, 3*sw_width/2, 40, 5, WHITE, NEAR_BLACK, BLUE };  // big one for eeprom update
@@ -452,6 +447,7 @@ void loop() {
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchTimer;
   static int WiFiChannel;
+  static bool ClearScreenNow;
   delay(1);
  // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
@@ -478,10 +474,11 @@ void loop() {
   page->swap();
   page->fillScreen(NEAR_BLACK);
   Display(false,Display_Page);
-  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%ifps>",Display_Config.PanelName,Display_Page, 1000/(millis()-DebugInterval));  // common to all pages  
+  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%.1ffps>",Display_Config.PanelName,Display_Page, 1000.0/(millis()-DebugInterval));  // common to all pages  
   DebugInterval=millis();
-  if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);}
-  else{WIFIGFXBoxdisplaystarted = false;}
+  if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);ClearScreenNow=true;}
+  else{WIFIGFXBoxdisplaystarted = false; ClearScreenNow=false;}
+  
   page->compositeCanvas();
   page->push();
  }

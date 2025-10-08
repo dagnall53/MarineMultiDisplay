@@ -31,7 +31,7 @@ public:
   bool getShadow_ON();
   void setShadow_ON(bool value);
 
-  void drawJPEGToTextCanvas(const char* filename);
+  
   void showPicture(const char* name);
   
   
