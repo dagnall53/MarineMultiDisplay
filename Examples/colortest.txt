@@ -1,0 +1,16 @@
+{
+  "_comments_": "These sizes below are for some font tests in victron display!",
+  "WHITE": 65535,
+  "BLUE": 31,
+  "BLACK": 0,
+  "GREEN": 2016,
+  "RED": 63488,
+  "TextColor": 65535,
+  "BackColor": 31,
+  "BorderColor": 1,
+  "FontH": 8,
+  "FontS": 7,
+  "SERIAL_OUT": "false",
+  "ShowRawDecryptedDataFor": 1,
+  "Frame": "false"
+}
