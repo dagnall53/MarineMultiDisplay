@@ -473,11 +473,14 @@ void loop() {
   PageInterval=millis()+10;
   page->swap();
   page->fillScreen(NEAR_BLACK);
-  Display(false,Display_Page);
+  Display(ClearScreenNow,Display_Page);
   page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%.1ffps>",Display_Config.PanelName,Display_Page, 1000.0/(millis()-DebugInterval));  // common to all pages  
   DebugInterval=millis();
-  if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);ClearScreenNow=true;}
-  else{WIFIGFXBoxdisplaystarted = false; ClearScreenNow=false;}
+  if(ClearScreenNow){ClearScreenNow= false;}
+  if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {
+    WiFiInterrupttoCanvas(WifiStatus,WiFiMsg);}
+  else{ if (WIFIGFXBoxdisplaystarted){ClearScreenNow= true;}// sets up for one reset of Display( )
+    WIFIGFXBoxdisplaystarted = false; }  
   
   page->compositeCanvas();
   page->push();
@@ -1160,67 +1163,6 @@ char* LongtoString(double data) {
 }
 
 
-// Draw the compass pointer at an angle in degrees
-// void WindArrow2(_sButton button, _sInstData Speed, _sInstData& Wind) {
-//   // DEBUG_PORT.printf(" ** DEBUG  speed %f    wind %f ",Speed.data,Wind.data);
-//   bool recent = (Wind.updated >= millis() - 3000);
-//   if (!Wind.graphed) {  //EventTiming("START");
-//     WindArrowSub(button, Speed, Wind);
-//     // EventTiming("STOP");EventTiming("WIND arrow");
-//   }
-//   if (Wind.greyed) { return; }
-
-//   if (!recent && !Wind.greyed) { WindArrowSub(button, Speed, Wind); }
-// }
-
-// void WindArrowSub(_sButton button, _sInstData Speed, _sInstData& wind) {
-//   //DEBUG_PORT.printf(" ** DEBUG WindArrowSub speed %f    wind %f \n",Speed.data,wind.data);
-//   bool recent = (wind.updated >= millis() - 3000);
-//   Phv center;
-//   int rad, outer, inner;
-//   static int lastfont;
-//   static double lastwind;
-//   center.h = button.h + button.width / 2;
-//   center.v = button.v + button.height / 2;
-//   rad = (button.height - (2 * button.bordersize)) / 2;  // height used as more likely to be squashed in height
-//   outer = (rad * 82) / 100;                             //% of full radius (at full height) (COMPASS has .83 as inner circle)
-//   inner = (rad * 28) / 100;                             //25% USe same settings as pointer
-//   DrawMeterPointer(center, lastwind, inner, outer, 2, button.BackColor, button.BackColor);
-//   if (wind.data != NMEA0183DoubleNA) {
-//     if (wind.updated >= millis() - 3000) {
-//       DrawMeterPointer(center, wind.data, inner, outer, 2, button.TextColor, NEAR_BLACK);
-//     } else {
-//       wind.greyed = true;
-//       DrawMeterPointer(center, wind.data, inner, outer, 2, LIGHTGREY, LIGHTGREY);
-//     }
-//   }
-//   lastwind = wind.data;
-//   wind.graphed = true;
-//   lastfont = MasterFont;
-//   if (Speed.data != NMEA0183DoubleNA) {
-//     if (rad <= 130) {
-//       UpdateDataTwoSize(1,true, true, 8, 7, button, Speed, "%2.0fkt");
-//     } else {
-//       UpdateDataTwoSize(1,true, true, 10, 9, button, Speed, "%2.0fkt");
-//     }
-//   }
-
-//   setFont(lastfont);
-// }
-
-// void DrawMeterPointer(Phv center, double wind, int inner, int outer, int linewidth, uint16_t FILLCOLOUR, uint16_t LINECOLOUR) {  // WIP
-//   Phv P1, P2, P3, P4, P5, P6;
-//   P1 = translate(center, wind - linewidth, outer);
-//   P2 = translate(center, wind + linewidth, outer);
-//   P3 = translate(center, wind - (4 * linewidth), inner);
-//   P4 = translate(center, wind + (4 * linewidth), inner);
-//   P5 = translate(center, wind, inner);
-//   P6 = translate(center, wind, outer);
-//   PTriangleFill(P1, P2, P3, FILLCOLOUR);
-//   PTriangleFill(P2, P3, P4, FILLCOLOUR);
-//   Pdrawline(P5, P6, LINECOLOUR);
-// }
-
 Phv translate(Phv center, double angle, int rad) {  // 'full version with full accuracy cos and sin
   Phv moved;
   moved.h = center.h + (rad * sin(angle * 0.0174533));
@@ -1228,33 +1170,33 @@ Phv translate(Phv center, double angle, int rad) {  // 'full version with full a
   return moved;
 }
 
-void DrawCompass(_sButton button) {
-  //x y are center in drawcompass
-  int x, y, rad;
-  x = button.h + button.width / 2;
-  y = button.v + button.height / 2;
-  rad = (button.height - (2 * button.bordersize)) / 2;
-  int Rad1, Rad2, Rad3, Rad4, inner;
-  Rad1 = rad * 0.83;  //200
-  Rad2 = rad * 0.86;  //208
-  Rad3 = rad * 0.91;  //220
-  Rad4 = rad * 0.94;
-  inner = (rad * 28) / 100;                                                            //28% USe same settings as pointer // keep border same as other boxes..
-  gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
-  gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize, button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
-  //gfx->fillRect(x - rad, y - rad, rad * 2, rad * 2, button.BackColor);
-  gfx->fillCircle(x, y, rad, button.TextColor);   //white
-  gfx->fillCircle(x, y, Rad1, button.BackColor);  //bluse
-  gfx->fillCircle(x, y, inner - 1, button.TextColor);
-  gfx->fillCircle(x, y, inner - 5, button.BackColor);
-  //rad =240 example Rad2 is 200 to 208   bar is 200 to 239 wind colours 200 to 220
-  // colour segments
-  gfx->fillArc(x, y, Rad3, Rad1, 270 - 45, 270, RED);
-  gfx->fillArc(x, y, Rad3, Rad1, 270, 270 + 45, GREEN);
-  //Mark 12 linesarks at 30 degrees
-  for (int i = 0; i < (360 / 30); i++) { gfx->fillArc(x, y, rad, Rad1, i * 30, (i * 30) + 1, NEAR_BLACK); }  //239 to 200
-  for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, NEAR_BLACK); }  // dots at 10 degrees
-}
+// void DrawCompass(_sButton button) {
+//   //x y are center in drawcompass
+//   int x, y, rad;
+//   x = button.h + button.width / 2;
+//   y = button.v + button.height / 2;
+//   rad = (button.height - (2 * button.bordersize)) / 2;
+//   int Rad1, Rad2, Rad3, Rad4, inner;
+//   Rad1 = rad * 0.83;  //200
+//   Rad2 = rad * 0.86;  //208
+//   Rad3 = rad * 0.91;  //220
+//   Rad4 = rad * 0.94;
+//   inner = (rad * 28) / 100;                                                            //28% USe same settings as pointer // keep border same as other boxes..
+//   gfx->fillRect(button.h, button.v, button.width, button.height, button.BorderColor);  // width and height are for the OVERALL box.
+//   gfx->fillRect(button.h + button.bordersize, button.v + button.bordersize, button.width - (2 * button.bordersize), button.height - (2 * button.bordersize), button.BackColor);
+//   //gfx->fillRect(x - rad, y - rad, rad * 2, rad * 2, button.BackColor);
+//   gfx->fillCircle(x, y, rad, button.TextColor);   //white
+//   gfx->fillCircle(x, y, Rad1, button.BackColor);  //bluse
+//   gfx->fillCircle(x, y, inner - 1, button.TextColor);
+//   gfx->fillCircle(x, y, inner - 5, button.BackColor);
+//   //rad =240 example Rad2 is 200 to 208   bar is 200 to 239 wind colours 200 to 220
+//   // colour segments
+//   gfx->fillArc(x, y, Rad3, Rad1, 270 - 45, 270, RED);
+//   gfx->fillArc(x, y, Rad3, Rad1, 270, 270 + 45, GREEN);
+//   //Mark 12 linesarks at 30 degrees
+//   for (int i = 0; i < (360 / 30); i++) { gfx->fillArc(x, y, rad, Rad1, i * 30, (i * 30) + 1, NEAR_BLACK); }  //239 to 200
+//   for (int i = 0; i < (360 / 10); i++) { gfx->fillArc(x, y, rad, Rad4, i * 10, (i * 10) + 1, NEAR_BLACK); }  // dots at 10 degrees
+// }
 
 
 

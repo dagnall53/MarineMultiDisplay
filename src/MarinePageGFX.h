@@ -57,16 +57,18 @@ public:
 
   void fillScreen(uint16_t color);
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
-  void fillCircle(int16_t x, int16_t y, int16_t r, uint16_t color);
-  void fillCircleToCanvas(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+  void fillCircle(int16_t x, int16_t y, int16_t r, uint16_t color); //? defective??
+  void fillArc(int16_t x, int16_t y, int16_t r1, int16_t r2, float start, float end, uint16_t color);
+  void drawArc(int16_t x, int16_t y, int16_t r1, int16_t r2, float start, float end, uint16_t color);
   void fillArc(int16_t x, int16_t y, int16_t r, int16_t start_angle, int16_t end_angle, uint16_t color);
+  void drawCircle(int16_t x, int16_t y, int16_t r, uint16_t color);
   void drawPixel(int16_t x, int16_t y, uint16_t color);
   
   void drawLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
   void drawWideLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color,int width);
   
   void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
-  void drawTriangleToCanvas(int16_t x0, int16_t y0,
+  void drawTriangle(int16_t x0, int16_t y0,
                           int16_t x1, int16_t y1,
                           int16_t x2, int16_t y2,
                           uint16_t color);

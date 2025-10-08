@@ -270,7 +270,7 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {
   return false;
 }
 
-void DrawGPSPlot(bool reset, _sButton &BLOB, _sBoatData BoatData, double magnification) { //do later 
+void DrawGPSPlot(bool reset, _sBoatData BoatData, double magnification) { //do later 
   static double startposlat, startposlon;
   double LatD, LongD;  //deltas
   int h, v;
@@ -281,10 +281,7 @@ void DrawGPSPlot(bool reset, _sButton &BLOB, _sBoatData BoatData, double magnifi
     }
      h = 0 + ((Screen_Width) / 2);  // screen width / height 
      v = 0  + ((480) / 2);
-                 BLOB.h=0;
-            BLOB.v=0;
-            BLOB.BackColor=WHITE;
-            page->DrawBox(BLOB); 
+    page->fillCircle(h,v,5,WHITE);
     // magnification 1 degree is roughly 111111 m
     if (startposlon == 0) {
       startposlat = BoatData.Latitude.data;
@@ -292,11 +289,8 @@ void DrawGPSPlot(bool reset, _sButton &BLOB, _sBoatData BoatData, double magnifi
     }
     LongD = h + ((BoatData.Longitude.data - startposlon) * magnification);
     LatD = v - ((BoatData.Latitude.data - startposlat) * magnification);  // negative because display is top left to bottom right!
-            BLOB.h=LongD;
-            BLOB.v=LatD;
-            BLOB.BackColor=BLUE;
-            BLOB.BorderColor=WHITE;
-            page->DrawBox(BLOB);                                                                     //set limits!! ?
+    page->fillCircle(LongD,LatD,5,WHITE);
+    page->fillCircle(LongD,LatD,4,NEAR_BLACK);
    }
 }
 

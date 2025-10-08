@@ -836,14 +836,15 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->fillScreen(BLUE);
         page->clearCanvas(BLUE);  // fill screen not work, clear canvas does?        
         
-        DrawGPSPlot(true, TinyButton, BoatData, 1);  //draws TinyButton inside BigSingleDisplay
-        page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
+        DrawGPSPlot(true,  BoatData, 1);  //draws circle
+      //  page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
         DataChanged = false;
       }
       if (millis() > slowdown + 1000) {
         slowdown = millis();
-          // page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
-     page->fillCircle(240,240,100,NEAR_BLACK);
+
+      //  page->drawRoundRect(200, 200, 170, 130, 10, GREEN);
+        page->drawCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, WHITE);
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "");
         if (BoatData.GPSTime != NMEA0183DoubleNA) {  ShowGPSDATA(8, BigSingleTopLeft,BoatData);}  
         page->AddTitleInsideBox(BigSingleDisplay, 2, 9, "Magnification= %4.1f pixels/m", pixel);
@@ -851,7 +852,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->GFXBorderBoxPrintf(BigSingleTopRight, "Show Quad Display");
         page->GFXBorderBoxPrintf(BottomRightbutton, "Zoom in");
         page->GFXBorderBoxPrintf(BottomLeftbutton, "Zoom out");
-        DrawGPSPlot(false, TinyButton, BoatData, magnification);
+        DrawGPSPlot(false,  BoatData, magnification);
       }
       if (CheckButton(topLeftquarter)) { Display_Page = 9; }
       if (CheckButton(BigSingleTopRight)) { Display_Page = 4; }
@@ -869,7 +870,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (CheckButton(BigSingleDisplay)) {  // press plot to recenter plot
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
           // Serial.printf("Ture valu n GrawGPS updtes static variables  reset center anchorwatch %f   %f \n", BoatData.Latitude.data, BoatData.Longitude.data);
-          DrawGPSPlot(true, TinyButton, BoatData, magnification);
+          DrawGPSPlot(true, BoatData, magnification);
           DataChanged = true;
         }
         DataChanged = true;
