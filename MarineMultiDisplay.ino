@@ -412,6 +412,8 @@ void setup() {
   //  delay(100);listDir(SPIFFS,"/",1);  delay(500);
   Setup_Wire_Expander(TOUCH_SDA, TOUCH_SCL, EX106);
   Touch_available = Touchsetup(); // if before ffats? stops ffats reading!
+  if (Touch_available){gfx->println(F("*** TOUCH ON ***"));
+   }else {gfx->println(F("*** touch failed to start ***"));}
   //delay(100);listDir(SPIFFS,"/",1);  delay(500);
   if (LoadConfigs(true,true)) {
      gfx->println(F("*** All CONFIGS LOADED ***"));

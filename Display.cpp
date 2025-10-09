@@ -843,7 +843,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (millis() > slowdown + 1000) {
         slowdown = millis();
 
-      //  page->drawRoundRect(200, 200, 170, 130, 10, GREEN);
+      //  page->drawRoundRect(200, 200, 170, 130, 10, GREEN); easy place to put graphics tests! 
+      //page->drawBoatOutline(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2),150);
+      //page->fillCircle(100, 200, 5, RED);
         page->drawCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, WHITE);
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "");
         if (BoatData.GPSTime != NMEA0183DoubleNA) {  ShowGPSDATA(8, BigSingleTopLeft,BoatData);}  

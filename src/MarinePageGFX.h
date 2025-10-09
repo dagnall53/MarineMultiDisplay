@@ -34,7 +34,7 @@ public:
   
   void showPicture(const char* name);
   
-  
+  void drawBoatOutline(int x, int y, int size);
   void DrawCompass(_sButton& button);
   
   void DrawScrollingGraph(_sButton& button, const GraphBuffer& buffer, double minVal, double maxVal);

@@ -304,8 +304,9 @@ void MarinePageGFX::DrawCompass(_sButton& button) {
   // Compass rings
   _textCanvas->fillCircle(x, y, rad, button.TextColor);        // outer ring
   _textCanvas->fillCircle(x, y, Rad1, button.BackColor);       // inner fill
-  _textCanvas->fillCircle(x, y, inner - 1, button.TextColor);  // center ring
-  _textCanvas->fillCircle(x, y, inner - 5, button.BackColor);  // inner core
+  drawBoatOutline(x,y,inner*2);
+  //_textCanvas->fillCircle(x, y, inner - 1, button.TextColor);  // center ring
+  //_textCanvas->fillCircle(x, y, inner - 5, button.BackColor);  // inner core
 
   // Wind sectors
   _textCanvas->fillArc(x, y, Rad3, Rad1, 225, 270, RED);    // left sector
@@ -321,6 +322,37 @@ void MarinePageGFX::DrawCompass(_sButton& button) {
     _textCanvas->fillArc(x, y, rad, Rad4, i, i + 1, BLACK);
   }
 }
+
+void MarinePageGFX::drawBoatOutline(int x, int y, int size) { // add uint16_t color next 
+  if (size < 12) return;
+  int halfWidth = size / 2;
+  int offset= size; //
+  int sternY = y + offset;
+  // Arc radius is half the boat length
+  int arcRadius = 95*size/60;
+  int arcThickness = 5;
+
+  // Left hull arc: center at left edge, arc from stern to bow (270° to 90°)
+  _textCanvas->drawArc(x - size, y + offset/3, arcRadius, arcRadius-arcThickness, 309, 14, WHITE);
+
+  // Right hull arc: center at right edge, arc from stern to bow (90° to 270°)
+  _textCanvas->drawArc(x +size, y + offset/3, arcRadius, arcRadius-arcThickness, 166, 231, WHITE);
+
+  // Flat stern
+  sternY=sternY-offset/3;
+  _textCanvas->drawLine(x - halfWidth, sternY, x + halfWidth, sternY, WHITE);
+  _textCanvas->drawLine(x - halfWidth, sternY+arcThickness, x + halfWidth, sternY+arcThickness, WHITE);
+  // centroid marker (optional for development )
+  //_textCanvas->fillCircle(x, y, 5, RED);
+  // Centerline (optional)
+ //_textCanvas->drawLine(x, y, x, sternY, WHITE);
+}
+
+
+
+
+
+
 
 void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, float angleDeg, uint16_t color, bool shadow) {
   if (!isReady() || !_textCanvas) return;
@@ -374,7 +406,7 @@ void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int1
   // Main pointer
   _textCanvas->fillTriangle(tailX, tailY, baseX1, baseY1, tipX, tipY, SILVER_GRAY);
   _textCanvas->fillTriangle(tailX, tailY, baseX2, baseY2, tipX, tipY, color);
-  drawLineToCanvas(tipX, tipY, tailX, tailY, NEAR_BLACK);
+  _textCanvas->drawLine(tipX, tipY, tailX, tailY, NEAR_BLACK);
 }
 
 void MarinePageGFX::clearOutsideRadius(_sButton& button, uint16_t color) {
