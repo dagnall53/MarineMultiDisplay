@@ -475,7 +475,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         int16_t x1, y1;
         uint16_t w1, h1;
         gfx->getTextBounds("9", 0, 0, &x1, &y1, &w1, &h1);
-        page->GFXBorderBoxPrintf(CurrentSettingsBox, "FONT:%i name%s height<%i>", fontlocal, Tempchar, h1);
+        page->GFXBorderBoxPrintf(CurrentSettingsBox, "FONT:%i name%s height<%i>", fontlocal, fontNameTable[fontlocal], h1);
         FontBox.Font = fontlocal;
         page->GFXBorderBoxPrintf(FontBox, "Test %4.2f", temp);
         DataChanged = false;

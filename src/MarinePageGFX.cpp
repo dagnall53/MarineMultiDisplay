@@ -19,7 +19,7 @@ const GFXfont* _currentFont = nullptr;
 static int _ShadowX = 0;
 static int _ShadowY = 0;
 static bool _ShadowON = 0;
-
+extern String Fontname;  // trying to sort auto sizing and need the fontname
 
 
 static Arduino_GFX* _jpegTargetCanvas = nullptr;  //This will hold the canvas you want to draw to—whe
@@ -302,9 +302,9 @@ void MarinePageGFX::DrawCompass(_sButton& button) {
                         button.BackColor);
 
   // Compass rings
-  _textCanvas->fillCircle(x, y, rad, button.TextColor);        // outer ring
-  _textCanvas->fillCircle(x, y, Rad1, button.BackColor);       // inner fill
-  drawBoatOutline(x,y,inner*2);
+  _textCanvas->fillCircle(x, y, rad, button.TextColor);   // outer ring
+  _textCanvas->fillCircle(x, y, Rad1, button.BackColor);  // inner fill
+  drawBoatOutline(x, y, inner * 2);
   //_textCanvas->fillCircle(x, y, inner - 1, button.TextColor);  // center ring
   //_textCanvas->fillCircle(x, y, inner - 5, button.BackColor);  // inner core
 
@@ -323,29 +323,29 @@ void MarinePageGFX::DrawCompass(_sButton& button) {
   }
 }
 
-void MarinePageGFX::drawBoatOutline(int x, int y, int size) { // add uint16_t color next 
+void MarinePageGFX::drawBoatOutline(int x, int y, int size) {  // add uint16_t color next
   if (size < 12) return;
   int halfWidth = size / 2;
-  int offset= size; //
+  int offset = size;  //
   int sternY = y + offset;
   // Arc radius is half the boat length
-  int arcRadius = 95*size/60;
+  int arcRadius = 95 * size / 60;
   int arcThickness = 5;
 
   // Left hull arc: center at left edge, arc from stern to bow (270° to 90°)
-  _textCanvas->drawArc(x - size, y + offset/3, arcRadius, arcRadius-arcThickness, 309, 14, WHITE);
+  _textCanvas->drawArc(x - size, y + offset / 3, arcRadius, arcRadius - arcThickness, 309, 14, WHITE);
 
   // Right hull arc: center at right edge, arc from stern to bow (90° to 270°)
-  _textCanvas->drawArc(x +size, y + offset/3, arcRadius, arcRadius-arcThickness, 166, 231, WHITE);
+  _textCanvas->drawArc(x + size, y + offset / 3, arcRadius, arcRadius - arcThickness, 166, 231, WHITE);
 
   // Flat stern
-  sternY=sternY-offset/3;
+  sternY = sternY - offset / 3;
   _textCanvas->drawLine(x - halfWidth, sternY, x + halfWidth, sternY, WHITE);
-  _textCanvas->drawLine(x - halfWidth, sternY+arcThickness, x + halfWidth, sternY+arcThickness, WHITE);
+  _textCanvas->drawLine(x - halfWidth, sternY + arcThickness, x + halfWidth, sternY + arcThickness, WHITE);
   // centroid marker (optional for development )
   //_textCanvas->fillCircle(x, y, 5, RED);
   // Centerline (optional)
- //_textCanvas->drawLine(x, y, x, sternY, WHITE);
+  //_textCanvas->drawLine(x, y, x, sternY, WHITE);
 }
 
 
@@ -532,39 +532,65 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
   uint16_t w1, w2, h1, h2;
   // Font probing using FontID and fontTable
   _textCanvas->setTextSize(1);
-  int chosenFont;
-  _textCanvas->setTextBound(0, 0, 1024, 1024);  // artificially large bounds
-  int lastw = 0;
-  int lasth = 0;
-  for (int fontIndex = 7; fontIndex <= 13; fontIndex++) {
-    setFontByIndex(fontIndex);
-    _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
-    if ((w1 >= printableWidth) || (h1 >= printableHeight)) { break; }  // make sure that if we have an error in the font table and loop, we still catch the lagest font
-    lastw = w1;
-    lasth = h1;
-    chosenFont = fontIndex;
-  }
-  // Serial.printf("**page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
-  // allow possibilty that if biggest font is less than half the printableWidth and then magnify by 2
-  if ((lastw <= printableWidth / 2) && (lasth <= printableHeight / 2)) {
-    magnify = 4;
-    _textCanvas->setTextSize(magnify);
-    lastw = 0;
-    lasth = 0;
-    // get the largest font size again
-    for (int fontIndex = 7; fontIndex <= 13; fontIndex++) {
+
+  _textCanvas->setTextBound(0, 0, 2048, 2048);  // artificially large bounds
+  // new, comprehensive,  while test
+  bool printable, lastprintable;
+  int limit;
+  limit = 0;
+  int chosenFont = 8;
+  int chosenMag = 1;
+  bool foundFit = false;
+  for (int textmag = 1; textmag <= 5 && !foundFit; textmag++) {
+    for (int fontIndex = 8; fontIndex <= 13 && !foundFit; fontIndex++) {  // my fonts 7 to 13 are carefully each about 2/3 bigger use 8 as lower limit so we do not get silly font-1 prints
       setFontByIndex(fontIndex);
+      _textCanvas->setTextSize(textmag);
       _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
-      if ((w1 >= printableWidth) || (h1 >= printableHeight)) { break; }  // make sure that if we have an error in the fint table and loop, we still catch the lagest font
-      lastw = w1;
-      lasth = h1;
-      chosenFont = fontIndex;
+      printable = ((w1 <= printableWidth) && (h1 <= printableHeight));
+//      Serial.printf("**  printable?(%i)page (%ix%i) Font %i %s,mag %i Gives(%i x %i) \n", printable, , printableWidth, printableHeight, fontIndex, fontNameTable[fontIndex], textmag, w1, h1);
+      if (printable) {  //save largest font at each magnification
+        chosenFont = fontIndex;
+        chosenMag = textmag;
+      } else {
+        if (lastprintable) { foundFit = true; }  //detect the first time the font/mag combination is too big and stop looking
+      }
+      lastprintable = printable;  // chosenFont/mag should hold the last printable font/magnification
     }
-    //    Serial.printf("*****page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
   }
+
+ // Serial.printf("**page (%ix%i) CHOSENFont %i, mag %i (%s)\n", printableWidth, printableHeight, chosenFont, chosenMag, fontNameTable[chosenFont]);
+  // OLD
+  // int lastw = 0;
+  // int lasth = 0;
+  // for (int fontIndex = 7; fontIndex <= 13; fontIndex++) {
+  //   setFontByIndex(fontIndex);
+  //   _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
+  //   if ((w1 >= printableWidth) || (h1 >= printableHeight)) { break; }  // make sure that if we have an error in the font table and loop, we still catch the lagest font
+  //   lastw = w1;
+  //   lasth = h1;
+  //   chosenFont = fontIndex;
+  // }
+  // // Serial.printf("**page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
+  // // allow possibilty that if biggest font is less than half the printableWidth and then magnify by 2
+  // if ((lastw <= printableWidth / 2) && (lasth <= printableHeight / 2)) {
+  //   magnify = 4;
+  //   _textCanvas->setTextSize(magnify);
+  //   lastw = 0;
+  //   lasth = 0;
+  //   // get the largest font size again
+  //   for (int fontIndex = 7; fontIndex <= 13; fontIndex++) {
+  //     setFontByIndex(fontIndex);
+  //     _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
+  //     if ((w1 >= printableWidth) || (h1 >= printableHeight)) { break; }  // make sure that if we have an error in the fint table and loop, we still catch the lagest font
+  //     lastw = w1;
+  //     lasth = h1;
+  //     chosenFont = fontIndex;
+  //   }
+  //   //    Serial.printf("*****page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
+  // }
   // SET chosen magnify and font for printing in UpdateTwoSize_MultiLine(
   button.lastY = button.v + button.bordersize;
-  UpdateTwoSize_MultiLine(magnify, true, true, chosenFont, chosenFont - 1, button, "%s", valueBuffer);
+  UpdateTwoSize_MultiLine(chosenMag, true, true, chosenFont, chosenFont - 1, button, "%s", valueBuffer);
   _textCanvas->setTextSize(1);  // reset magnify for other functions
   button.PrintLine = 0;
   button.lastY = button.v + button.bordersize;
@@ -951,18 +977,17 @@ void MarinePageGFX::fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color
   if (!_textCanvas || r <= 0) return;
   _textCanvas->fillCircle(x0, y0, r, color);
 }
-void MarinePageGFX::fillArc(int16_t x, int16_t y, int16_t r1, int16_t r2, float start, float end, uint16_t color){
-   if (!_textCanvas || r1 <= 0 || r2 <= 0 ) return;
-  _textCanvas->fillArc(x, y, r1,  r2,  start,  end,  color); // adopt from LovyanGFX via GFX for Arduino 
+void MarinePageGFX::fillArc(int16_t x, int16_t y, int16_t r1, int16_t r2, float start, float end, uint16_t color) {
+  if (!_textCanvas || r1 <= 0 || r2 <= 0) return;
+  _textCanvas->fillArc(x, y, r1, r2, start, end, color);  // adopt from LovyanGFX via GFX for Arduino
 }
 
-void MarinePageGFX::drawArc(int16_t x, int16_t y, int16_t r1, int16_t r2, float start, float end, uint16_t color){
-   if (!_textCanvas || r1 <= 0 || r2 <= 0 ) return;
-  _textCanvas->drawArc(x, y, r1,  r2,  start,  end,  color); // adopt from LovyanGFX via GFX for Arduino 
-
+void MarinePageGFX::drawArc(int16_t x, int16_t y, int16_t r1, int16_t r2, float start, float end, uint16_t color) {
+  if (!_textCanvas || r1 <= 0 || r2 <= 0) return;
+  _textCanvas->drawArc(x, y, r1, r2, start, end, color);  // adopt from LovyanGFX via GFX for Arduino
 }
 void MarinePageGFX::fillArc(int16_t x0, int16_t y0, int16_t r, int16_t start_angle, int16_t end_angle, uint16_t color) {
-   float start_rad = start_angle * DEG_TO_RAD;
+  float start_rad = start_angle * DEG_TO_RAD;
   float end_rad = end_angle * DEG_TO_RAD;
 
   for (int16_t y = -r; y <= r; y++) {
@@ -1029,9 +1054,9 @@ void MarinePageGFX::drawWideLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int
 
 
 void MarinePageGFX::drawTriangle(int16_t x0, int16_t y0,
-                                         int16_t x1, int16_t y1,
-                                         int16_t x2, int16_t y2,
-                                         uint16_t color) {
+                                 int16_t x1, int16_t y1,
+                                 int16_t x2, int16_t y2,
+                                 uint16_t color) {
   if (!_textCanvas || !isReady()) return;
   _textCanvas->drawTriangle(x0, y0, x1, y1, x2, y2, color);
 }

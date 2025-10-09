@@ -51,7 +51,9 @@ static const GFXfont* const fontTable[FONT_COUNT] = {
   &FreeSansBold18pt7b,
   &FreeSansBold27pt7b,
   &FreeSansBold40pt7b,
-  &FreeSansBold60pt7b
+  &FreeSansBold60pt7b,
+  
+  
 };
 // Lookup table for font line heights
 static const int fontHeightTable[FONT_COUNT] = {
@@ -70,7 +72,22 @@ static const int fontHeightTable[FONT_COUNT] = {
   59, // FONT_FreeSansBold40      12
   88  // FONT_FreeSansBold60      13
 };
-
+static const char* const fontNameTable[FONT_COUNT] = {
+  "FreeMono8pt7b",         // 0
+  "FreeMono12pt7b",        // 1
+  "FreeMono18pt7b",        // 2
+  "FreeMonoBold8pt7b",     // 3
+  "FreeMonoBold12pt7b",    // 4
+  "FreeMonoBold18pt7b",    // 5
+  "FreeMonoBold27pt7b",    // 6
+  "FreeSansBold6pt7b",     // 7
+  "FreeSansBold8pt7b",     // 8
+  "FreeSansBold12pt7b",    // 9
+  "FreeSansBold18pt7b",    // 10
+  "FreeSansBold27pt7b",    // 11
+  "FreeSansBold40pt7b",    // 12
+  "FreeSansBold60pt7b"     // 13
+};
 
 
 #endif  // FONT_TYPES_H

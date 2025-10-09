@@ -1,32 +1,36 @@
 
 # Marine Multi Display
 
+This project is a development of the NMEADISPLAY Wireless Instrument Repeater Display for Boats. This revised project supports direct NMEA2000 connection and has a completely revised file editor and uses flash memory for configuration files making the use of the SD card optional.
+It has three versions, one for the GUITRON 480x480 module, one for the 480x480 4 inch WaveShare Module and one for the 800x480 '4.3inch box' wide Waveshare module.  
+The Wavshare modules were selected because they have in built CANBUS and 6-36V power supplies, making them slightly better suited for N2000 bus integration.
+With the Guitron module, it is necessary to provide an external 5v power supply (from the boat or N2000 bus) and optionally add a cheap CAN drives such as TJA1050, and wire it (with a 3.3V power supply) to the 8 pin connector. 
+
+Despite sounding more practical for boat use, the Wavshare modules have a very iritating 'feature' in that they do not switch on with power on, and require pressing their reset buttons before the screens turn on. 
+
 <i><small>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
 The user is responsible for cross-checking data with other sources, exercising judgment, and maintaining situational awareness. 
 No liability for any loss, damage, or injury resulting from the use of this instrument will be accepted. </i></small>
 
-This project is a development of the NMEADISPLAY Wireless Instrument Repeater Display for Boats. This revised project supports direct NMEA2000 connection and has a completely revised file editor and uses flash memory for configuration files making the use of the SD card optional.
-
-It has three versions, one for the GUITRON 480x480 module, one for the 480 480 4 inch WaveShare Module and one for the 800x480 '4.3inch box' wide waveshare module.  
-
 ## HOW TO INSTALL FIRST TIME
-First, plug your module into a com port on your PC. Switch the module on (press the PWRKEY) and record which port it is using. If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
+First, plug your module into a com port on your PC. Switch the module on (press the PWRKEY and/or reset! ) and record which port it is using. If confused, check Device Manager and look for the USB-SERIAL CH340 port. 
 Remember the port number!
 
 Click the link below to download the file "WebProgram.bat" from the github.
 <a href="https://dagnall53.github.io/MarineMultiDisplay/build/MMDWebProgram.bat" download>Download MMD WebProgram.bat</a>
 
 Save this somewhere convenient such as downloads.
-NOTE: this program will erase any data in the module flash memory. (*)
+NOTE: this program (may) erase any data in the module flash memory. (*)
 Run the program ..   Make sure you select the correct version for your module and set the correct USB port. 
 It will download the latest binaries to the directory where you saved it and program the hardware. 
 It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat file. 
 
 It is possible some PC/ modules/ cables may not program at full speed. If you have trouble programming, try reducing the baud rate from 921600 to 115200. 
-If your module becomes corrupted and you cannot connect to USB port, you can usually recver by Pressing Reset, and then hold down BOOT  then release reset with boot still pressed, and release boot. This should allow the USB port to start and make the module receptive to reprogramming.
+If your module becomes corrupted and you cannot connect to USB port, you can usually recver by Pressing Reset, and then hold down BOOT then release reset with boot still pressed, and release boot. This should allow the USB port to start and make the module receptive to reprogramming.
+(on the Guitron module, these buttons are hidden under the black cover, which will need to be removed for access.)
 
-##Changed FILE STRUCTURE and editor 
+## CONFIG FILEs STRUCTURE and Editor 
 
 When connected via a PC, upload of new files (or images) is easy. However when connect by phone, you are effectively limited to just editing existing text files.
 ALL configuration files (".txt") for this version of the code ars now contained in three files that are stored in the (SPIFFS) flash and are automatically generated on first start. 
@@ -57,18 +61,20 @@ The root of the FLASH (SPIFFS) should have (at least) these files:
 config.txt, ( a json file with user settings) and 
 vconfig.txt ( a json with settings for the ble victron mode )
 colortest.txt ( a json with settings that will eventually allow global day/night colours and also has some simulation/debug settings for the BLE part of the display)
-  These txt files may (should!) self initiate if not present, but its better to have defaults present! 
+
+These txt files may (should!) self initiate if not present, but its better to have defaults present! 
+Examples are available in the EXAMPLES folder on github. In particular, the example Victron configurations (colortest.txt and vconfig.txt and vicback.jpg set up a simulation to show the Victron display capability.
 
 Other files may be added :
 (note- I do not recommed using graphics on the Wavshare boards as the colour quality is poor - this may be an issue in the driver ? and the display does not really need Jpegs! )
 logo4.jpg (the new generic start screen image), 
 v3small.jpg (used in the webbrowser start screen).
 and loading.jpg, (a picture that appears during OTA updates). 
-(these can be found on the NMEADISPLAY github, or you can add your own 400*400 JPG files)
 
 ## Connecting to NMEA 2000
 Is done automatically and does not require the module to be wirelessly connected to a multiplexer.
-Wireless communication is necessary to change settings. I would recommend normally connecting the display to a multiplexer just to allow it to stop searching for the network.
+
+BUT - Wireless communication is necessary to change settings. I would recommend normally connecting the display to a WiFi multiplexer just to allow it to stop searching for the network.
 
 For the Guiton device, add a CAN Driver module such as the TJA1050 and a 3.3V voltage regulator.
 Connect the bottom left connection of the 8 way socket to TJA "TX" and the connection above to TJA "RX".
@@ -77,11 +83,9 @@ Connect the NMEA2000 (or boat 12V) to a 5V regulator input and connect the 5V ou
 Connect Ground (top pins of the 8 way socket) to the TJA ground and Regulator grounds. 
 Lastly, connect the CANH and CANl from the TJA to the NMEA2000 canbus. 
 
-The wavshare module has inbuilt 12V regulator and CAn driver, so connecting this device is simpler.  
-
 ## CAUTIONS
 
-I have got the wavshare wide display and the guitron working, but the 4" with touch is not working yet 
+The wavshare displays are sensitive to voltage and do not initialise the touch sensors if the power input is insufficient, as it may be if powered only by USB.
 
 ## Connecting to your Wifi SSID 
 You can connect to the module's access point by connecting and then using a browser to connect to 192.168.4.1 
@@ -92,12 +96,12 @@ With touchscreen, Go to Settings WiFi,  Click on "set SSID", and you will be pre
 You can select a network by touching it and it will update in the second box and show (eg) Select<GUESTBOAT>?
 if you touch this, it will select that SSID and return you to the main WiFi Settings page. 
 Press EEPROM "UPDATE" and then "Save/Reset " to save this new SSID in the eeprom.
-Settings made via the screen will be copied into the config.txt file on the SD card and may also be modified wirelessly. (see next).
-Settings on the config.txt (from SD card) take priority when starting.
+Settings made via the screen will be copied into the config.txt file on flash and may also be modified wirelessly. (see next).
+Settings on the config.txt (from flash) take priority when starting.
 
-The Display does a scan on startup and will attempt to automatically connect IF it finds the correct SSID on startup. 
+The Display does a scan on startin he wifi SSID page and this may take a while (2-4seconds).
 it will retry the scan once every 30 seconds if it does not find the SSID. 
-This will interrupt the display, but since you are not connected .. there is nothing to display! 
+This may interrupt the display. 
 
 ### Webbrowser:
 
@@ -132,13 +136,12 @@ The module will start with the "Quad" instrument display. Touching each quadrant
 This is a simplified view of the original mapping.
 ![Screen Navigation](https://github.com/user-attachments/assets/f05d7e21-4c72-45cd-ae81-91a27ed20897)
 
-Which instrurment data will be displayed in each of the 'quadrants' of the 'Quad' display can be selected from variables in the config.txt file. 
+Which instrument data will be displayed in each of the 'quadrants' of the 'Quad' display can be selected from variables in the config.txt file. 
 
-### NMEA DATA and UDP
+### NMEA DATA and UDP and N2K
 
-Whilst the main way to send instrument data to the Display was originally via NMEA(0183) over UDP, the project also accepts 'ESP-NOW' from suitable multiplexers such as VELA-Naviga types: 
+Whilst the main way to send instrument data to the Display was originally via NMEA(0183) over UDP, the project also accepts 'ESP-NOW' from suitable multiplexers such as VELA-Naviga types and N2K if the CAN driver is fitted.: 
 https://www.vela-navega.com/index.php/multiplexers
-The module also natively supports NME2000. 
 
 
 ### Victron BLE device display
