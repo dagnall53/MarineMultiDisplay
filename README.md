@@ -19,12 +19,15 @@ Remember the port number!
 
 Click the link below to download the file "WebProgram.bat" from the github.
 <a href="https://dagnall53.github.io/MarineMultiDisplay/build/MMDWebProgram.bat" download>Download MMD WebProgram.bat</a>
+or this newer version that tries to find the Com port of your module for you: 
+<a href="https://dagnall53.github.io/MarineMultiDisplay/build/USBProgramV2.bat" download>Download MMD USBProgramV2.bat</a>
+
 
 Save this somewhere convenient such as downloads.
 NOTE: this program (may) erase any data in the module flash memory. (*)
 Run the program ..   Make sure you select the correct version for your module and set the correct USB port. 
 It will download the latest binaries to the directory where you saved it and program the hardware. 
-It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat file. 
+It will then delete the binaries and the tool used to upload after it has completed,leaving just the WebProgram.bat (or USBProgramV2) file. 
 
 It is possible some PC/ modules/ cables may not program at full speed. If you have trouble programming, try reducing the baud rate from 921600 to 115200. 
 If your module becomes corrupted and you cannot connect to USB port, you can usually recver by Pressing Reset, and then hold down BOOT then release reset with boot still pressed, and release boot. This should allow the USB port to start and make the module receptive to reprogramming.
