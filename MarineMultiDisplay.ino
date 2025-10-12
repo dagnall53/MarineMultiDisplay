@@ -29,7 +29,7 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.33";
+const char soft_version[] = " V0.34";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
@@ -52,7 +52,7 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include "FS.h"
 #include <FFat.h>  // plan to use FATFS for local files
 #include <SPIFFS.h>
-#include <SD_MMC.h>
+#include <SD_MMC.h> // not used now ??
 #include <LittleFS.h>
 #include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
 

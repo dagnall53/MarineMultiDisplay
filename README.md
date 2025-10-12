@@ -163,6 +163,9 @@ There is a Simulate option, selectable in colortest, this initiates a crude simu
 This works most logically with my default Vconfig.txt file. 
 I have seen some issues with Simulate crashing the display very badly:(needed reinstall of code). But I think(hope) this has been fixed.
 
+For reference see also  https://github.com/Fabian-Schmidt/esphome-victron_ble
+
+
 GUIT version 1978885 bytes 29/09
 
 =======

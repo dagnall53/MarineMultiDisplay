@@ -701,7 +701,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   }  //save it to our debug file to save us having to write it manually ???     }
 
   if (victronDevices.BLEDebug) {
-    snprintf(debugMsg, 120, " Type<%s>,ProductID(%i),", RecordTypeToChar(vicData->VICTRON_BLE_RECORD_TYPE), vicData->product_id);
+    snprintf(debugMsg, 120, " Type(%i)=<%s>,ProductID(%i), record length(%i)",vicData->VICTRON_BLE_RECORD_TYPE, RecordTypeToChar(vicData->VICTRON_BLE_RECORD_TYPE), vicData->product_id);
     strcat(VictronBuffer, debugMsg);
   }
   //DEBUG_PORT.println(debugMsg);
@@ -716,7 +716,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
   if (!victronDevices.Simulate) {
     if ((vicData->encryption_key_0 != localbyteKey[0])) {
       if (victronDevices.BLEDebug) {
-        snprintf(debugMsg, 120, "Key is MIS-MATCHED %x Localbyte(0)%x\n", localbyteKey[0]);  //DEBUG_PORT.println(debugMsg); without the debug, sends this for greying after simulation OFF ?
+        snprintf(debugMsg, 120, "Key is MIS-MATCHED %x Localbyte(0)%x\n",vicData->encryption_key_0, localbyteKey[0]);  //DEBUG_PORT.println(debugMsg); without the debug, sends this for greying after simulation OFF ?
         strcat(VictronBuffer, debugMsg);
       }
       victronDevices.displayed[i] = true;  // stop trying again until we get better data!
@@ -764,7 +764,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
     }
     esp_aes_free(&ctx);
   }
-  page->setShadowX(2); page->setShadowY(2);
+  page->setShadowX(0); page->setShadowY(0);
   if (ColorSettings.ShowRawDecryptedDataFor == i) { DebugRawVdata(outputData, encrDataSize); }
   if (KnownDataType == 1) {  //VICTRON_BLE_RECORD_SOLAR_CHARGER
     VICTRON_BLE_RECORD_SOLAR_CHARGER *victronData = (VICTRON_BLE_RECORD_SOLAR_CHARGER *)outputData;
@@ -829,7 +829,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
       auxtype = 2;
       aux_input = 300;
     }
-    snprintf(debugMsg, 120, "Volts<%3.2f>,AMPS<%3.2f>, SOC<%3.0f%>, AUX<%3.2f> \n", battery_voltage, battery_current, state_of_charge, aux_input);
+    snprintf(debugMsg, 120, "Volts<%3.2f>,AMPS<%3.2f>, SOC<%3.0f%>, AUXtype(%i)<%3.2f> \n", battery_voltage, battery_current, state_of_charge, auxtype,aux_input);
     strcat(VictronBuffer, debugMsg);
     if (Display_Page == -87) {
       Setup_N_Display(i);
@@ -843,6 +843,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
         }
       }  
       if (strstr(victronDevices.DisplayShow[i], "A")) {
+        page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "\n");
         if (auxtype == 2) {
           page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "%2.0f deg\n", aux_input - 273.15);  //this for deg C original data  is in kelvin. Fabian says only 1degree, but I think it is 0.1 resolution and only 1 degree resolution !
         }
@@ -850,7 +851,7 @@ void Deal_With_BLE_Data(int i) {  // BLE message will have been saved into a vic
           page->UpdateTwoSize_MultiLine(1, true, false, 8, 8, DisplayOuterbox, "AUX %2.1fV\n", aux_input);
         }
       }
-      if (strstr(victronDevices.DisplayShow[i], "S")) { //DrawBar(DisplayOuterbox, GREEN, state_of_charge); 
+      if (strstr(victronDevices.DisplayShow[i], "S")) { //DrawBar(DisplayOuterbox, GREEN, state_of_charge); // done first to underlay other data!
          page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "\n");
          page->UpdateTwoSize_MultiLine(1, true, false, 7, 7, DisplayOuterbox, "SOC %2.0f %%\n",state_of_charge);
          }
