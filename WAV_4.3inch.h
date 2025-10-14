@@ -30,7 +30,8 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(  // MY BOARD modifi
   5 /* DE */, 3 /* VSYNC */, 46 /* HSYNC */, 7 /* PCLK */,
   1,2,42,41,40, //R pins R3,4,5,6,R7  1,2,42,41,40
   39,0,45,48,47,21, //G pins
-  14,38,18,17,10,    //B pins
+  10,14,38,18,17,    //B pins  pin definition FAULT in wavshare data - or fix to match GFX for arduino ? unknwown, but works 
+ // 14,38,18,17,10,    //B pins
   0 /* hsync_polarity */, 8 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
   0 /* vsync_polarity */, 8 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
   1 /* pclk_active_neg */, 13000000 /* prefer_speed */, false /* useBigEndian */,

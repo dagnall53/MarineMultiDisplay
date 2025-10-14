@@ -54,14 +54,7 @@ Both use RGB666 which seems essential... but im not sure why as it is physicaly 
 
 Note: Use Type1 & the colours will be inverted!  
 in Type 9 is no setting of 'IPS' (it is commented out), it sets 'MDT' to 0 (Line 1358): and RGB 666 (0x60): this works.
-checking combinations to see if I can change flicker effect: using 2.0.17 :
-using 0x21 and 0 0x60 :Inverted colours
-using 0x21 and CD=0x08 0x60;  still inverted
-using 0x20 and CD =0x08 0x60; v. strange partially correct pallette
-using  0x20 08  0x50         TRY 565 : 0X50 ...BETTER but not correct coverage of full spectrum
-using  0x20,00,50 ;              565 again.. still strange MDT does not seem to affect this ? 
-using 0x20, 00 60 Good results 
-using //(deleted), 00 60 Good results == type9 default  
+
  ------------------------------------------------
  WRITE_C8_D8, 0xCD, 0x00 //  08/ 00(Line 1358)
  //WRITE_COMMAND_8, 0x20, // 0x20 normal, 0x21 IPS (Line 1450)

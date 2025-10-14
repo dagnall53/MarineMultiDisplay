@@ -33,8 +33,8 @@ const char soft_version[] = " V0.34";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
-//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-//#define WIDEBOX    // 4.3inch 800 by 480 display Setup
+#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
@@ -221,13 +221,13 @@ _sButton TopHalfBigSingleTopRight = { TOUCH_WIDTH/2, 0, TOUCH_WIDTH/2, 45, 5, BL
 _sButton BottomHalfBigSingleTopRight = { TOUCH_WIDTH/2, 45, TOUCH_WIDTH/2, 45, 5, BLUE, WHITE, NEAR_BLACK ,8};  //  ''
 _sButton StatusBox = { 0, TOUCH_HEIGHT-30, TOUCH_WIDTH, 30, 5, NEAR_NEAR_BLACK, WHITE, BLUE ,7};// 7 is the smallest font 
 // for the quarter screens on the main page
-_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };  //h  reduced by 15 to give 30 space at the bottom
-_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
-_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
-_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,8 };
+_sButton topLeftquarter = { 0, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,9 };  //h  NB some displays use the default font so set it
+_sButton bottomLeftquarter = { 0, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,9 };
+_sButton topRightquarter = { TOUCH_WIDTH-240, 0, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,9 };
+_sButton bottomRightquarter = { TOUCH_WIDTH-240, 240 - 15, 240, 240 - 15, 5, BLUE, WHITE, NEAR_BLACK,9 };
 // for wide display //        int h, v, width, height, bordersize;  uint16_t BackColor, TextColor, BorderColor;
-_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,8 };
-_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,8 }; 
+_sButton WideScreenCentral =          { TOUCH_WIDTH-560 ,0, 320, 480 - 30, 5, BLUE, WHITE, NEAR_BLACK,9 };
+_sButton FullScreen = { 0, 0, TOUCH_WIDTH, 460, 5, BLUE, WHITE, NEAR_BLACK,9 }; 
 
 _sButton TinyButton { 0, 0, 10, 10, 1, BLUE, WHITE, NEAR_BLACK,7 }; 
 // these were used for initial tests and for volume control - not needed for most people!! .. only used now for Range change in GPS graphic (?)
@@ -545,6 +545,8 @@ void Init_GFX() {
   gfx->begin();
   //if GFX> 1.3.1 try and do this as the invert colours write 21h or 20h to 0Dh has been lost from the structure!
   gfx->invertDisplay(false);
+  // does not work for ST7272/ gfx for arduino  gfx->setColorDepth(16);  // Forces RGB565
+
   gfx->fillScreen(BLUE);
   gfx->setTextBound(0, 0, TOUCH_WIDTH, 480);
   gfx->setTextColor(WHITE);

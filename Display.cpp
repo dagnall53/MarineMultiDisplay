@@ -54,6 +54,48 @@ const char* label = labelBuffer;  // Now label points to the formatted string
 extern TAMC_GT911 ts;
 extern bool Touch_available;
 
+inline uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
+{
+  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+void drawRGBGradientAndBitfieldBars(){
+  const int w = 480;
+  const int h = 10;
+  const int barWidth = w / 6;  // 6 bars for 6 bits per channel
+  // ─── RGB Gradient Bars ───
+  for (int x = 0; x < w; ++x)
+  {
+    uint8_t intensity = (x * 255) / (w - 1);
+
+    page->fillRect(x, 0, 1, h, color565(0, 0, intensity));       // Blue
+    page->fillRect(x, h, 1, h, color565(0, intensity, 0));       // Green
+    page->fillRect(x, 2 * h, 1, h, color565(intensity, 0, 0));   // Red
+  }
+
+  // ─── RGB Bitfield Bars ───
+  for (int i = 0; i < 6; ++i)  // 6 bits per channel
+  {
+    uint8_t red   = 1 << i;  // R0–R5 (scaled to 6-bit)
+    uint8_t green = 1 << i;  // G0–G5
+    uint8_t blue  = 1 << i;  // B0–B5
+
+    // Scale to 8-bit space for color565
+    uint8_t red8   = red << 2;
+    uint8_t green8 = green << 2;
+    uint8_t blue8  = blue << 2;
+
+    int x = i * barWidth;
+
+    page->fillRect(x, 3 * h, barWidth, h, color565(0, 0, blue8));   // Blue bitfield
+    page->fillRect(x, 4 * h, barWidth, h, color565(0, green8, 0));  // Green bitfield
+    page->fillRect(x, 5 * h, barWidth, h, color565(red8, 0, 0));    // Red bitfield
+
+    Serial.printf("Bitfield Bar %d: R=%d G=%d B=%d\n", i, red8, green8, blue8);
+  }
+}
+
+
 void Display(int pageIndex) {
   DEBUG_PORT.printf("IN overlay void Display page<%i> \n", pageIndex);
   Display(false, pageIndex);
@@ -164,31 +206,36 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
 
     case -200:
-      if (RunSetup) {  //logo examples
+      if (RunSetup || DataChanged) {  //logo examples
+     
         page->showPicture("/logo.jpg");
+        
         page->GFXBorderBoxPrintf(Full0Center, "Jpg tests -Return to Menu-");
         page->GFXBorderBoxPrintf(Full1Center, "logo.jpg");
-        page->GFXBorderBoxPrintf(Full2Center, "logo1.jpg");
+        page->GFXBorderBoxPrintf(Full2Center, "ColourTestBars");
         page->GFXBorderBoxPrintf(Full3Center, "vicback.jpg");
         page->GFXBorderBoxPrintf(Full4Center, "Bars.jpg");
         page->GFXBorderBoxPrintf(Full5Center, "Colortest.jpg");
+        drawRGBGradientAndBitfieldBars();
       }
 
       if (CheckButton(Full0Center)) { Display_Page = 0; }
       if (CheckButton(Full1Center)) {
-        page->showPicture("/logo.jpg");
+        page->showPicture("/logo.jpg");DataChanged=true;
       }
       if (CheckButton(Full2Center)) {
-        page->showPicture("/logo1.jpg");
+        drawRGBGradientAndBitfieldBars();
+        DataChanged=true;
+       // page->showPicture("/logo1.jpg");
       }
       if (CheckButton(Full3Center)) {
-        page->showPicture("/vicback.jpg");
+        page->showPicture("/vicback.jpg");DataChanged=true;
       }
       if (CheckButton(Full4Center)) {
-        page->showPicture("/Bars.jpg");  // drawJPEGToTextCanvas and showPicture were written / corrected at separate points: showPicture was updated to be the same and needs to be asimilated
+        page->showPicture("/Bars.jpg");DataChanged=true;  // drawJPEGToTextCanvas and showPicture were written / corrected at separate points: showPicture was updated to be the same and needs to be asimilated
       }
       if (CheckButton(Full5Center)) {
-        page->showPicture("/Colortest.jpg");
+        page->showPicture("/Colortest.jpg");DataChanged=true;
       }
 
       break;
@@ -1024,20 +1071,18 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
   if (Choice == "TIME") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
       slowdown = millis();
-      //setFont(timefont);
-      page->GFXBorderBoxPrintf(Position, "%02i:%02i",
+      page->AutoPrint2Size(Position, "19.99", "%02i:%02i",
                                int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
-      page->AddTitleInsideBox(Position, 9, 3, "UTC ");
+      page->AddTitleInsideBox(Position, 6, 9, "UTC ");
       //setFont(10);
     }
   }
   if (Choice == "TIMEL") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
       slowdown = millis();
-      //setFont(timefont);
-      page->GFXBorderBoxPrintf(Position, "%02i:%02i",
+      page->AutoPrint2Size(Position, "19.99", "%02i:%02i",
                                int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
-      page->AddTitleInsideBox(Position, 9, 3, "LOCAL ");
+      page->AddTitleInsideBox(Position, 6, 9, "LOCAL ");
       //setFont(10);
     }
   }
