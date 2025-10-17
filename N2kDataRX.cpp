@@ -29,7 +29,7 @@ my work here is based on example in Examples  N2KdataRX.cpp
 #include <N2kTypes.h>
 #include <math.h>
 #include <string.h>
-
+#include "Globals.h"
 #include "debug_port.h"
 const double radToDeg = 180.0 / M_PI;
 #include "aux_functions.h"
@@ -166,7 +166,7 @@ void HandleBoatSpeed(const tN2kMsg &N2kMsg) { //128259
   tN2kSpeedWaterReferenceType SWRT; // water speed reference type 
   // ignore ground referenced! 
   if (ParseN2kBoatSpeed(N2kMsg, SID, WaterReferenced, GroundReferenced, SWRT)) {
-     toNewStruct(WaterReferenced, BoatData.STW);
+     toNewStruct(WaterReferenced, BoatData.STW);STWBuffer.push(BoatData.STW.data);
     
   }
 }
@@ -178,7 +178,7 @@ void HandleDepth(const tN2kMsg &N2kMsg) {
   double Offset;
   double Range;
   if (ParseN2kWaterDepth(N2kMsg, SID, DepthBelowTransducer, Offset, Range)) {
-    toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);
+    toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);DepthBuffer.push(BoatData.WaterDepth.data);
      }
 }
 
@@ -188,7 +188,7 @@ void WaterDepth(const tN2kMsg &N2kMsg) { // original name in datatdisplay exampl
   double Offset;
   double Range;
   if (ParseN2kWaterDepth(N2kMsg, SID, DepthBelowTransducer, Offset, Range)) {
-    toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);
+    toNewStruct(DepthBelowTransducer, BoatData.WaterDepth);DepthBuffer.push(BoatData.WaterDepth.data);
      }
 }
 
@@ -261,7 +261,7 @@ void HandleCOGSOG(const tN2kMsg &N2kMsg) {
       if (!N2kIsNA(BoatData.Variation)) COG -= BoatData.Variation;
     }
     toNewStruct(COG, BoatData.COG);
-    toNewStruct(SOG, BoatData.SOG);
+    toNewStruct(SOG, BoatData.SOG);SOGBuffer.push(BoatData.SOG.data);
     
   }
 }

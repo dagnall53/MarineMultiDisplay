@@ -1062,8 +1062,18 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
 
 
   // if (Choice == "DGRAPH2") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
-  // if (Choice == "STWGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.STW, 0, 10, 8, "STW-Graph ", "kts"); }
-  // if (Choice == "SOGGRAPH") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.SOG, 0, 10, 8, "SOG-Graph ", "kts"); }
+  if (Choice == "STWGRAPH") { 
+     page->DrawScrollingGraph(Position, STWBuffer, 0, 10);  //
+    page->AddTitleInsideBox(Position, 1, 0, "STW ");
+    page->AddTitleInsideBox(Position, 2, 0, "10Kt");
+    page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ", 0);
+     }
+  if (Choice == "SOGGRAPH") {     
+    page->DrawScrollingGraph(Position, SOGBuffer, 0, 10);  //
+    page->AddTitleInsideBox(Position, 1, 0, "SOG");
+    page->AddTitleInsideBox(Position, 2, 0, "10 Kt");
+    page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ", 0);
+     }
   if (Choice == "GPS") { ShowGPSinBox(9, Position); }
   if (Choice == "TIME") {
     if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!

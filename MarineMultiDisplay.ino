@@ -29,11 +29,11 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.35";
+const char soft_version[] = " V0.36";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
-//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
 //#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
@@ -61,7 +61,7 @@ bool _WideDisplay;  // so that I can pass this to sub files
 //********* stuff t add my library for paged displays *****************
 
 #include "src/MarinePageGFX.h"  // Double-buffered graphics
-#include "CanvasBridge.h"       // must be after MARINEPAGEGFX    
+#include "CanvasBridge.h"       // must be after MARINEPAGEGFX    passes referece to canvas/Arduino_Canvas.h without incurring multiple repeated define errors. 
 #include "FontType.h" // has include for all fonts and new FontID enum 
 #include "Structures.h"
 // allocate the (huge? buffers for the two pages)
@@ -72,8 +72,8 @@ MarinePageGFX* page = nullptr;  // or assign to a valid instance
 GraphBuffer headingDeltaBuffer;  // or voltageBuffer, tempBuffer, etc. 200 deep buffer of double valuesfor graphing
 
 
-//MAGIC TREK style File viewer see https://github.com/holgerlembke/
-#include <ESPFMfGK.h>  // the thing.
+
+#include <ESPFMfGK.h>  // //MAGIC TREK style File viewer see https://github.com/holgerlembke/
 const word filemanagerport = 8080;
 // we want a different port than the webserver
 ESPFMfGK filemgr(filemanagerport);
@@ -99,10 +99,11 @@ bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 
 int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
 
-#include "N2kMsg.h"
-#include "NMEA2000.h"
-#include <NMEA2000_esp32xx.h>
-#include <N2kMessages.h>
+#include "N2kMsg.h"            //part of https://github.com/ttlappalainen/NMEA2000[NMEA2000] library. I have it in C:\Users\dagna\OneDrive\DocOneDrive\Arduino\libraries       
+                               //https://github.com/ttlappalainen/NMEA0183
+#include "NMEA2000.h"          //https://github.com/ttlappalainen/NMEA2000[NMEA2000] library. 
+#include <NMEA2000_esp32xx.h>  //https://github.com/jiauka/NMEA2000_esp32xx
+#include <N2kMessages.h>       // also part of https://github.com/ttlappalainen/NMEA2000[NMEA2000] library.    ?????? why does this need <> and the n2kMsg.h need (or use) "" ?????
 tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 
 // some wifi stuff
@@ -180,6 +181,9 @@ bool dataUpdated;     // flag that Nmea Data has been updated
 //for new graphs
 #include "Globals.h"
 GraphBuffer DepthBuffer;
+GraphBuffer STWBuffer;
+GraphBuffer SOGBuffer;
+
 
  // or voltageBuffer, tempBuffer, etc.
 
@@ -438,6 +442,8 @@ void setup() {
 // include #include "MarineRuntimeOverlay.h"; if we wish to debug page sizes etc MarineRuntimeOverlay::runOverlay(page->getBuffer(0), page->getBuffer(1));
   for (int i=0;i<=200;i++){ // fill buffer with zero to start
     DepthBuffer.push(0);
+    STWBuffer.push(0);
+    SOGBuffer.push(0);
   }
    delay(100); 
  }

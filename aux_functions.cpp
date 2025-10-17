@@ -17,7 +17,8 @@ but highly modified!
 #include "Globals.h"
 extern MarinePageGFX* page;
 extern GraphBuffer DepthBuffer;
-
+extern GraphBuffer STWBuffer;
+extern GraphBuffer SOGBuffer;
 
 extern int MasterFont;
 //extern void setFont(int);
@@ -160,7 +161,7 @@ void toNewStruct(double field, _sInstData &data) {  // allow update of struct wi
   data.displayed = false;
   data.graphed = false;
 }
-// reads char array buf and places (updates) data if found in stringND
+// reads 0183 char array buf and places (updates) data if found in stringND
 bool processPacket(const char *buf, _sBoatData &BoatData) {  
   char *p;
   int Index;
@@ -206,13 +207,14 @@ bool processPacket(const char *buf, _sBoatData &BoatData) {
       return true;
       break;
 
-    case 5:  //VHW
-      toNewStruct(Field[5], BoatData.STW);
+    case 5:  //VHW  //STW
+      toNewStruct(Field[5], BoatData.STW);STWBuffer.push(BoatData.STW.data);
+
       // other VHW data (directions!) are usually false!
       return true;
       break;
     case 6:  //RMC
-      toNewStruct(Field[7], BoatData.SOG);
+      toNewStruct(Field[7], BoatData.SOG);SOGBuffer.push(BoatData.SOG.data);
       toNewStruct(Field[8], BoatData.COG);
       // nmea0183nan (-10million.. so may need extra stuff to prevent silly displays!)
 

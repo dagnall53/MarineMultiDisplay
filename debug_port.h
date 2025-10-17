@@ -7,6 +7,6 @@ extern HardwareSerial Serial0;  // UART0
  #ifdef WAVSHARE
    #define DEBUG_PORT Serial
  #else
-  #define DEBUG_PORT Serial //
+  #define DEBUG_PORT Serial //was Serial0 before I started changing the USB CDC on boot command manually ! But if set her, leads to issues with the Arduino CLI if used.
 #endif
 
