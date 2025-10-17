@@ -29,6 +29,7 @@ my work here is based on example in Examples  N2KdataRX.cpp
 #include <N2kTypes.h>
 #include <math.h>
 #include <string.h>
+
 #include "debug_port.h"
 const double radToDeg = 180.0 / M_PI;
 #include "aux_functions.h"

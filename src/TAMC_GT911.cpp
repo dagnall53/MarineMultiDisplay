@@ -33,7 +33,7 @@ void TAMC_GT911::reset() {
     readBlockData(configBuf, GT911_CONFIG_START, GT911_CONFIG_SIZE);
     setResolution(width, height);
   } else {
-    Serial.println("GT911 not responding — skipping config read");
+   // DEBUG_PORT.println("GT911 not responding — skipping config read");
     setResolution(width, height);  // still set resolution manually
   }
 
@@ -72,7 +72,7 @@ void TAMC_GT911::setResolution(uint16_t _width, uint16_t _height) {
 //   onRead = isr;
 // }
 void TAMC_GT911::read(void) {
-  // Serial.println("TAMC_GT911::read");
+  // DEBUG_PORT.println("TAMC_GT911::read");
   uint8_t data[7];
   uint8_t id;
   uint16_t x, y, size;
@@ -83,11 +83,11 @@ void TAMC_GT911::read(void) {
   uint8_t haveKey = pointInfo >> 4 & 1;
   isLargeDetect = pointInfo >> 6 & 1;
   touches = pointInfo & 0xF;
-  // Serial.print("bufferStatus: ");Serial.println(bufferStatus);
-  // Serial.print("largeDetect: ");Serial.println(isLargeDetect);
-  // Serial.print("proximityValid: ");Serial.println(proximityValid);
-  // Serial.print("haveKey: ");Serial.println(haveKey);
-  // Serial.print("touches: ");Serial.println(touches);
+  // DEBUG_PORT.print("bufferStatus: ");DEBUG_PORT.println(bufferStatus);
+  // DEBUG_PORT.print("largeDetect: ");DEBUG_PORT.println(isLargeDetect);
+  // DEBUG_PORT.print("proximityValid: ");DEBUG_PORT.println(proximityValid);
+  // DEBUG_PORT.print("haveKey: ");DEBUG_PORT.println(haveKey);
+  // DEBUG_PORT.print("touches: ");DEBUG_PORT.println(touches);
   isTouched = touches > 0;
   if (bufferStatus == 1 && isTouched) {
     for (uint8_t i=0; i<touches; i++) {
@@ -156,7 +156,7 @@ void TAMC_GT911::writeBlockData(uint16_t reg, uint8_t *val, uint8_t size) {
 }
 void TAMC_GT911::readBlockData(uint8_t *buf, uint16_t reg, uint8_t size) {
   if (!buf || size == 0 || size > GT911_CONFIG_SIZE) {
-    Serial.println("GT911 readBlockData: invalid buffer or size");
+   // DEBUG_PORT.println("GT911 readBlockData: invalid buffer or size");
     return;
   }
 
@@ -164,13 +164,13 @@ void TAMC_GT911::readBlockData(uint8_t *buf, uint16_t reg, uint8_t size) {
   Wire.write(highByte(reg));
   Wire.write(lowByte(reg));
   if (Wire.endTransmission(false) != 0) {
-    Serial.println("GT911 I2C write failed");
+  //  DEBUG_PORT.println("GT911 I2C write failed");
     return;
   }
 
   uint8_t received = Wire.requestFrom(addr, size);
   if (received != size) {
-    Serial.printf("GT911 I2C read mismatch: got %d, expected %d\n", received, size);
+   // DEBUG_PORT.printf("GT911 I2C read mismatch: got %d, expected %d\n", received, size);
     for (uint8_t i = 0; i < received && i < size; i++) {
       buf[i] = Wire.read();
     }

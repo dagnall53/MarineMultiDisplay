@@ -22,6 +22,7 @@
 #include <BLEDevice.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
+
 #include "debug_port.h"
 #include "src/MarinePageGFX.h"  // Double-buffered graphics
 #include "CanvasBridge.h"

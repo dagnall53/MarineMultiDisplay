@@ -2,9 +2,9 @@
 
 /*
 *************** settings **************************
-USB CDC on boot enabled
+USB CDC on boot enabled for Wavsahre: Disabled for Guitron 
 Erase All flash before sketch disable -- but also test Enable to check that the code rebuilds the configuration files
-Partition scheme  Default 16M(6.25Mb APP /3.4MB SPIFFS)
+Partition scheme  Default 16M(6.25Mb APP /3.4MB SPIFFS) (copied as ora_16MB_clean.csv for CLI compile to try to overcome CLI vs IDE issues)
 PSRAM OPI PSRAM
 
 to activate the Default 16M(6.25Mb APP /3.4MB SPIFFS)  partition - which is default_16MB.csv in the 2.0.17/tools/partitions 
@@ -29,16 +29,16 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.34";
+const char soft_version[] = " V0.35";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
-#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
-#define WIDEBOX    // 4.3inch 800 by 480 display Setup
+//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+//#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
 bool _WideDisplay;  // so that I can pass this to sub files
-
+#include <Arduino.h>       
 //Include libraries..
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -70,9 +70,6 @@ MarinePageGFX* page = nullptr;  // or assign to a valid instance
 //extern MarinePageGFX* page;  //overcome ARDUINO QUIRK 
 #define NEAR_NEAR_BLACK 0x0001  // One bit on from NEAR_BLACK - avoids the (useful) issue that NEAR_BLACK can be seen as Transparent.
 GraphBuffer headingDeltaBuffer;  // or voltageBuffer, tempBuffer, etc. 200 deep buffer of double valuesfor graphing
-
-
-
 
 
 //MAGIC TREK style File viewer see https://github.com/holgerlembke/
@@ -376,7 +373,7 @@ bool NewPagesetupstuff(){
     gfx->print("PAGE Buffer init failed!");
     sucess = false;
     }
-   Serial0.println("MarinePageGFX initialized successfully.");
+   DEBUG_PORT.println("MarinePageGFX initialized successfully.");
   return sucess;
 }
 
@@ -385,6 +382,8 @@ bool NewPagesetupstuff(){
 
 void setup() {
   DEBUG_PORT.begin(115200);
+ // Serial.begin(115200);
+ // DEBUG_PORTbegin(115200);
   Screen_Width=TOUCH_WIDTH;  // difficult to pass TOUCH_WIDTH to aux functions 
   _WideDisplay =false;
   #ifdef WIDEBOX 
@@ -394,8 +393,8 @@ void setup() {
   delay(100);
   DEBUG_PORT.print(F("***Starting NMEA Display***"));
   DEBUG_PORT.println(F(" using 'DEBUG_PORT.print' "));
-  // Serial.println(F(" Using Serial.print "));
-  // Serial0.println(F(" Using Serial0.print "));
+  //DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
+  //DEBUG_PORT.println(F(" Using DEBUG_PORT.print "));
   DEBUG_PORT.println(_device);DEBUG_PORT.println(soft_version); 
   DEBUG_PORT.printf("Flash size reported: %u bytes\n", spi_flash_get_chip_size());
   Display_Config = Default_JSON;
@@ -579,15 +578,56 @@ void InitNMEA2000() {  // make it display device Info on start up..
                                 2046,          // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
                                 4              //marine
   );
+#ifdef WAVSHARE
+#ifdef WIDEBOX
   NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
                                  001,                      // Manufacturer's product code
-                                 "Simple NMEA Display",    // Manufacturer's Model ID
-                                 "TEST",                   //N2kSwCode
-                                 "Guitron ESP32s 4 inch",  // N2kModelVersion
+                                 "MarineMultiDisplay",    // Manufacturer's Model ID
+                                 soft_version,                   //N2kSwCode
+                                 "Wavshare 4.3 800x480 Wide Display",  // N2kModelVersion
                                  3                         //,                            // LoadEquivalency (of 50mA loads)
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
+#else
+  NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
+                                 001,                      // Manufacturer's product code
+                                 "MarineMultiDisplay",    // Manufacturer's Model ID
+                                 soft_version,                   //N2kSwCode
+                                 "Wavshare 4 inch 480x480",  // N2kModelVersion
+                                 3                         //,                            // LoadEquivalency (of 50mA loads)
+                                                           //2102,                           // N2kversion default 2102
+                                                           //0                           // CertificationLevel
+  );
+#endif
+#else
+  NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
+                                 001,                      // Manufacturer's product code
+                                 "MarineMultiDisplay",    // Manufacturer's Model ID
+                                 soft_version,                   //N2kSwCode
+                                 "Guitron ESP32s3 4 inch480x480",  // N2kModelVersion
+                                 3                         //,                            // LoadEquivalency (of 50mA loads)
+                                                           //2102,                           // N2kversion default 2102
+                                                           //0                           // CertificationLevel
+  );
+#endif
+
+
+
+
+
+
+
+
+  // NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
+  //                                001,                      // Manufacturer's product code
+  //                                "MarineMultiDisplay",    // Manufacturer's Model ID
+  //                                "TEST",                   //N2kSwCode
+  //                                "Guitron ESP32s 4 inch",  // N2kModelVersion
+  //                                3                         //,                            // LoadEquivalency (of 50mA loads)
+  //                                                          //2102,                           // N2kversion default 2102
+  //                                                          //0                           // CertificationLevel
+  // );
 
   NMEA2000.EnableForward(false);                        // we are not  forwarding / streaming anything
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 15);  // needs this to enable device information send at start up?
@@ -1691,13 +1731,13 @@ bool Touchsetup() {  // look for 0x5d (GT911_ADDR1)and setup
     DEBUG_PORT.println("Device found: begin");
     ts.begin(GT911_ADDR1);  // remove address for wavshare? 
     delay(100);
-    /*#define ROTATION_LEFT      (uint8_t)0
-#define ROTATION_INVERTED  (uint8_t)1
-#define ROTATION_RIGHT     (uint8_t)2
-#define ROTATION_NORMAL    (uint8_t)3*/
+    /*
+    #define ROTATION_LEFT      (uint8_t)0
+    #define ROTATION_INVERTED  (uint8_t)1
+    #define ROTATION_RIGHT     (uint8_t)2
+    #define ROTATION_NORMAL    (uint8_t)3
+    */
     ts.setRotation(TOUCH_ROTATION);
-    //ts.setRotation(ROTATION_INVERTED);
-
   }
  if (result) {DEBUG_PORT.println("TOUCH setup OK");
       } else {DEBUG_PORT.println("* NO TOUCH");
@@ -1943,7 +1983,7 @@ void EventTiming(String input ){
   EventTiming(input,1); // 1 should be ignored as this is start or stop! but will also give immediate print!
 }
 
-void EventTiming(String input, int number){//.. prints when string !=start or Stop! so print can be somewhere else Event timing, Usage START, STOP , 'Descrption text'   Number waits for the Nth call before serial.printing results (Description text + results).  
+void EventTiming(String input, int number){//.. prints when string !=start or Stop! so print can be somewhere else Event timing, Usage START, STOP , 'Descrption text'   Number waits for the Nth call before DEBUG_PORT.printing results (Description text + results).  
   static unsigned long Start_time;
   static unsigned long timedInterval;
   static unsigned long _MaxInterval;

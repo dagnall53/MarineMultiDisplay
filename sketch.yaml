@@ -1,0 +1,10 @@
+directories:
+  user: C:\Users\dagna\OneDrive\DocOneDrive\Arduino
+
+board_manager:
+  additional_urls: []
+
+logging:
+  file: ""
+  format: text
+  level: info

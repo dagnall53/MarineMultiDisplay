@@ -152,7 +152,7 @@ MarinePageGFX::MarinePageGFX(Arduino_GFX* gfx, int16_t width, int16_t height)
     _cursorX(0), _cursorY(0), _textColor(0xFFFF), _textSize(1) {
 
   if (!psramFound()) {
-    Serial0.println("ERROR: PSRAM not found. Cannot allocate page buffers.");
+    DEBUG_PORT.println("ERROR: PSRAM not found. Cannot allocate page buffers.");
     _buffer[0] = nullptr;
     _buffer[1] = nullptr;
     return;
@@ -163,11 +163,11 @@ MarinePageGFX::MarinePageGFX(Arduino_GFX* gfx, int16_t width, int16_t height)
   _buffer[1] = (uint16_t*)heap_caps_malloc(bufSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
   if (!_buffer[0] || !_buffer[1]) {
-    Serial0.println("ERROR: Failed to allocate page buffers in PSRAM.");
+    DEBUG_PORT.println("ERROR: Failed to allocate page buffers in PSRAM.");
     _buffer[0] = nullptr;
     _buffer[1] = nullptr;
   } else {
-    Serial0.printf("Page buffers allocated: %d bytes each\n", bufSize);
+    DEBUG_PORT.printf("Page buffers allocated: %d bytes each\n", bufSize);
   }
 }
 
@@ -184,7 +184,7 @@ void MarinePageGFX::begin() {
   if (isReady()) {
     fillScreen(0x0000);  // Clear to black
   } else {
-    Serial0.println("WARNING: Buffer not initialized. Skipping fillScreen.");
+    DEBUG_PORT.println("WARNING: Buffer not initialized. Skipping fillScreen.");
   }
   _textCanvas = new Arduino_Canvas(_width, _height, nullptr, false);
   _textCanvas->begin();
@@ -199,7 +199,7 @@ void MarinePageGFX::push() {
   if (isReady()) {
     _gfx->draw16bitRGBBitmap(0, 0, _buffer[_active], _width, _height);
   } else {
-    Serial0.println("WARNING: Buffer not initialized. Skipping push.");
+    DEBUG_PORT.println("WARNING: Buffer not initialized. Skipping push.");
   }
 }
 
@@ -246,7 +246,7 @@ void MarinePageGFX::drawLineToCanvas(int16_t x0, int16_t y0, int16_t x1, int16_t
 
 void MarinePageGFX::setFontByIndex(int index) {
   if (!_textCanvas) return;
-  //Serial0.printf("Font set: %d\n", index);
+  //DEBUG_PORT.printf("Font set: %d\n", index);
 
 
   if (index >= 0 && index < FONT_COUNT) {
@@ -547,7 +547,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
       _textCanvas->setTextSize(textmag);
       _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
       printable = ((w1 <= printableWidth) && (h1 <= printableHeight));
-//      Serial.printf("**  printable?(%i)page (%ix%i) Font %i %s,mag %i Gives(%i x %i) \n", printable, , printableWidth, printableHeight, fontIndex, fontNameTable[fontIndex], textmag, w1, h1);
+//      DEBUG_PORT.printf("**  printable?(%i)page (%ix%i) Font %i %s,mag %i Gives(%i x %i) \n", printable, , printableWidth, printableHeight, fontIndex, fontNameTable[fontIndex], textmag, w1, h1);
       if (printable) {  //save largest font at each magnification
         chosenFont = fontIndex;
         chosenMag = textmag;
@@ -558,7 +558,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
     }
   }
 
- // Serial.printf("**page (%ix%i) CHOSENFont %i, mag %i (%s)\n", printableWidth, printableHeight, chosenFont, chosenMag, fontNameTable[chosenFont]);
+ // DEBUG_PORT.printf("**page (%ix%i) CHOSENFont %i, mag %i (%s)\n", printableWidth, printableHeight, chosenFont, chosenMag, fontNameTable[chosenFont]);
   // OLD
   // int lastw = 0;
   // int lasth = 0;
@@ -570,7 +570,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
   //   lasth = h1;
   //   chosenFont = fontIndex;
   // }
-  // // Serial.printf("**page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
+  // // DEBUG_PORT.printf("**page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
   // // allow possibilty that if biggest font is less than half the printableWidth and then magnify by 2
   // if ((lastw <= printableWidth / 2) && (lasth <= printableHeight / 2)) {
   //   magnify = 4;
@@ -586,7 +586,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
   //     lasth = h1;
   //     chosenFont = fontIndex;
   //   }
-  //   //    Serial.printf("*****page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
+  //   //    DEBUG_PORT.printf("*****page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
   // }
   // SET chosen magnify and font for printing in UpdateTwoSize_MultiLine(
   button.lastY = button.v + button.bordersize;
@@ -1309,7 +1309,7 @@ void MarinePageGFX::UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool 
   // DEBUG_PORT.print(" lastY :");DEBUG_PORT.print(button.lastY);
   //  DEBUG_PORT.print(" BoxY: ");DEBUG_PORT.print(button.v+button.bordersize); DEBUG_PORT.print(" to: ");DEBUG_PORT.print(button.v+button.height-button.bordersize);
   // if (typingspaceW >=300){
-  // Serial.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
+  // DEBUG_PORT.printf("** Debug Msg is <%s> typingspacew=%i \n",msg,typingspaceW);
 
   if (strcspn(msg, delimiter) != strlen(msg)) {
     token = strtok(msg, delimiter);
@@ -1334,7 +1334,7 @@ void MarinePageGFX::UpdateTwoSize_MultiLine(int magnify, bool horizCenter, bool 
   setFontByIndex(smallfont);
   _textCanvas->getTextBounds(decimal, 0, 0, &TBx2, &TBy2, &TBw2, &TBh2);                         // get text bounds for decimal
                                                                                                  // if (typingspaceW >=300){
-                                                                                                 //   Serial.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
+                                                                                                 //   DEBUG_PORT.printf("digits<%s>:decimal<%s> Total %i tbx1: %i tbx2: %i   TBW1: %i TBW2: %i  ",digits,decimal,TBw1+TBw2,TBx1,TBx2, TBw1, TBw2);
                                                                                                  //   }
   setFontByIndex(bigfont);                                                                       // Reset to big font for Digits..
   if (horizCenter) { x = button.h + button.bordersize + ((typingspaceW - (TBw1 + TBw2)) / 2); }  //offset to horizontal center

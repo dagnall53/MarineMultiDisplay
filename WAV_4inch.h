@@ -10,7 +10,7 @@ https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 also need ?
 #define ARDUINO_USB_MODE 1
 #define ARDUINO_USB_CDC_ON_BOOT 1
-to get Serial.print working 
+to get DEBUG_PORT.print working 
 (or set in tools-> USB CDC )
 
  ******************************************************************************/
@@ -182,7 +182,7 @@ TESTING MODIFY  Arduino\libraries\GFX_Library_for_Arduino\src\display\Arduino_RG
 also need ?
 #define ARDUINO_USB_MODE 1
 #define ARDUINO_USB_CDC_ON_BOOT 1
-to get Serial.print working 
+to get DEBUG_PORT.print working 
 (or set in tools-> USB CDC )
 
  ******************************************************************************/

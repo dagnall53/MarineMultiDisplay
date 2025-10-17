@@ -4,7 +4,7 @@ _sBoatData from Timo Llapinen by Dr.András Szép under GNU General Public Licen
 */
 #ifndef _Structures_H_
 #define _Structures_H_
-#include <NMEA0183.h>  // for the TL NMEA0183 library functions
+//#include <NMEA0183.h>  // for the TL NMEA0183 library functions
 #include <NMEA0183Msg.h>
 #include <NMEA0183Messages.h> // for the doubleNA
 

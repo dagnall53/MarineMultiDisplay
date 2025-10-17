@@ -15,8 +15,6 @@ extern MarinePageGFX* page;
 
 #include "debug_port.h"
 
-
-
 extern bool WIFIGFXBoxdisplaystarted;
 extern bool _WideDisplay;
 extern _sWiFi_settings_Config Current_Settings;
@@ -91,7 +89,7 @@ void drawRGBGradientAndBitfieldBars(){
     page->fillRect(x, 4 * h, barWidth, h, color565(0, green8, 0));  // Green bitfield
     page->fillRect(x, 5 * h, barWidth, h, color565(red8, 0, 0));    // Red bitfield
 
-    Serial.printf("Bitfield Bar %d: R=%d G=%d B=%d\n", i, red8, green8, blue8);
+    DEBUG_PORT.printf("Bitfield Bar %d: R=%d G=%d B=%d\n", i, red8, green8, blue8);
   }
 }
 
@@ -175,7 +173,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   //page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
   if (RunSetup) {
     LoadConfiguration();  //Reload configuration in case new data stored
-    DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
+   // DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
     page->clearCanvas(BLUE);
     page->setTextColor(WHITE);
   }
@@ -378,7 +376,6 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
     case -22:                                                    //  "EXPERIMENT in N2K data"
       if (RunSetup) { page->GFXBorderBoxPrintf(Terminal, ""); }  // only for setup, not changed data
       if (RunSetup || DataChanged) {
-        //setFont(3);
         page->GFXBorderBoxPrintf(FullTopCenter, "N2K debug ");
         if (!Terminal.debugpause) {
           page->Addtitletobutton(Terminal, 1, 0, "TERMINAL");
@@ -622,8 +619,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
           wifissidpointer = ((ts.points[0].y - 75) / WIFISHOW.height) - 1;
           int str_len = WiFi.SSID(wifissidpointer).length() + 1;
           char result[str_len];
-          // Serial.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
-          // Serial.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
+          // DEBUG_PORT.printf(" touched at %i  equates to %i ? %s ", ts.points[0].y, wifissidpointer, WiFi.SSID(wifissidpointer));
+          // DEBUG_PORT.printf("  result str_len%i   sizeof settings.ssid%i \n", str_len, sizeof(Current_Settings.ssid));
           if (str_len <= sizeof(Current_Settings.ssid)) {                                       // check small enough for our ssid register array!
             WiFi.SSID(wifissidpointer).toCharArray(result, sizeof(Current_Settings.ssid) - 1);  // I like to keep a spare space!
             if (str_len == 1) {
@@ -742,7 +739,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       page->Addtitletobutton(Switch1, 1, 0, "UDP");
       page->GFXBorderBoxPrintf(Switch2, Current_Settings.ESP_NOW_ON On_Off);
       page->Addtitletobutton(Switch2, 1, 0, "ESP-Now");
-      // Serial.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
+      // DEBUG_PORT.printf(" Compare Saved and Current <%s> \n", CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
       page->GFXBorderBoxPrintf(Switch5, CompStruct(Saved_Settings, Current_Settings) ? "-same-" : "UPDATE");
       page->Addtitletobutton(Switch5, 1, 0, "EEPROM");
       page->GFXBorderBoxPrintf(Full5Center, "Logger and Debug");
@@ -908,17 +905,17 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
       if (CheckButton(BottomRightbutton)) {
         magnification = magnification * 1.5;
-        Serial.printf(" magification  %f \n", magnification);
+        DEBUG_PORT.printf(" magification  %f \n", magnification);
         DataChanged = true;
       }
       if (CheckButton(BottomLeftbutton)) {
         magnification = magnification / 1.5;
-        Serial.printf(" magification  %f \n", magnification);
+        DEBUG_PORT.printf(" magification  %f \n", magnification);
         DataChanged = true;
       }
       if (CheckButton(BigSingleDisplay)) {  // press plot to recenter plot
         if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-          // Serial.printf("Ture valu n GrawGPS updtes static variables  reset center anchorwatch %f   %f \n", BoatData.Latitude.data, BoatData.Longitude.data);
+          // DEBUG_PORT.printf("Ture valu n GrawGPS updtes static variables  reset center anchorwatch %f   %f \n", BoatData.Latitude.data, BoatData.Longitude.data);
           DrawGPSPlot(true, BoatData, magnification);
           DataChanged = true;
         }
@@ -965,7 +962,7 @@ bool CheckButton(_sButton& button) {  // trigger on release. needs index (s) to 
     //trigger on release! does not sense !isTouched ..  use Keypressed in each button struct to keep track!
     if (ts.isTouched && !button.Keypressed && (millis() - button.LastDetect >= 250)) {
       if (XYinBox(ts.points[0].x, ts.points[0].y, button.h, button.v, button.width, button.height)) {
-        //Serial.printf(" Checkbutton size%i state %i %i \n",ts.points[0].size,ts.isTouched,XYinBox(ts.points[0].x, ts.points[0].y,button.h,button.v,button.width,button.height));
+        //DEBUG_PORT.printf(" Checkbutton size%i state %i %i \n",ts.points[0].size,ts.isTouched,XYinBox(ts.points[0].x, ts.points[0].y,button.h,button.v,button.width,button.height));
         button.Keypressed = true;
         //button.BorderColor= BLACK;
         button.LastDetect = millis();
@@ -974,7 +971,7 @@ bool CheckButton(_sButton& button) {  // trigger on release. needs index (s) to 
     }
   }
   if (button.Keypressed && (millis() - button.LastDetect >= 250)) {
-    //Serial.printf(" Checkbutton released from  %i %i\n",button.h,button.v);
+    //DEBUG_PORT.printf(" Checkbutton released from  %i %i\n",button.h,button.v);
     button.Keypressed = false;
     //button.BorderColor= WHITE;
     return true;
@@ -986,7 +983,7 @@ bool CheckButton(_sButton& button) {  // trigger on release. needs index (s) to 
 
 void ShowGPSinBox(int font, _sButton button) {
   static double lastTime;
-  //Serial.printf("In ShowGPSinBox  %i\n",int(BoatData.GPSTime));
+  //DEBUG_PORT.printf("In ShowGPSinBox  %i\n",int(BoatData.GPSTime));
   if ((BoatData.GPSTime != NMEA0183DoubleNA) && (BoatData.GPSTime != lastTime)) {
     lastTime = BoatData.GPSTime;
     //  page->GFXBorderBoxPrintf(button, "");

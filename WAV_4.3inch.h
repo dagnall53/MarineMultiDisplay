@@ -6,7 +6,7 @@ https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3B
 also need ?
 #define ARDUINO_USB_MODE 1
 #define ARDUINO_USB_CDC_ON_BOOT 1
-to get Serial.print working 
+to get DEBUG_PORT.print working 
 (or set in tools-> USB CDC )
 
  ******************************************************************************/
@@ -54,7 +54,7 @@ https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3B/ESP32-S3-Touch-LCD-4.3B
 also need ?
 #define ARDUINO_USB_MODE 1
 #define ARDUINO_USB_CDC_ON_BOOT 1
-to get Serial.print working 
+to get DEBUG_PORT.print working 
 (or set in tools-> USB CDC )
 
  ******************************************************************************/

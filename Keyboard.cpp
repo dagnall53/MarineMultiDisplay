@@ -2,6 +2,7 @@
 
 #include <Arduino_GFX_Library.h> 
 // also includes Arduino etc, so variable names are understood
+#include <Arduino.h>       
 #include "Structures.h"
 #include "debug_port.h"
 #include "Keyboard.h"

@@ -1,5 +1,6 @@
 #ifndef Display_Func
 #define Display_Func
+
 #include "Structures.h"
 #include <Arduino_GFX_Library.h> // defines colours BLUE etc
 #include "debug_port.h"
