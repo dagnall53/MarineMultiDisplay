@@ -132,7 +132,7 @@ static const uint8_t st7701_type1b_init_operations[] = {
     WRITE_COMMAND_8, 0x29, // Display On
     END_WRITE};
 
-const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4";
+const char _device[]=  "WAVSHARE ESP32-S3-Touch-LCD-4 480x480";
   #define ESP32_CAN_TX_PIN GPIO_NUM_6  // for the waveshare 4 module boards!
   #define ESP32_CAN_RX_PIN GPIO_NUM_0  // 
 // taken from examples 

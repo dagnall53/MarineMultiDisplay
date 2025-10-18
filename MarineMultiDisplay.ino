@@ -296,10 +296,7 @@ _sButton WIFISHOW = {0,0, TOUCH_WIDTH-50, 40, 2, BLUE, WHITE, NEAR_BLACK,8 };  /
 
 //#include "esp_task_wdt.h"
 #include "esp_partition.h"
-// void SDList(char* msg){
-//   DEBUG_PORT.println(msg);
-//   listDir(SD, "/", 1);
-// }
+
 
 bool LoadConfigs(bool print,bool displ){
   bool FilesOK = true;
@@ -405,7 +402,7 @@ void setup() {
   Current_Settings = Default_Settings_JSON;
   Init_GFX(); // must be before SD setup (at least for Guitron)
   DEBUG_PORT.println(F(" Printing to screen  "));
-  gfx->print(_device);
+  gfx->println(_device);
   gfx->println(soft_version);delay(100);
   if (NewPagesetupstuff()) {gfx->println(F("*** Paging display Setup ***"));
      DEBUG_PORT.println("Paging display Setup");}
@@ -501,15 +498,7 @@ void loop() {
        if (WiFiChannel >= 12) { WiFiChannel = 1; }
       }  
     }
-       
-    // // switch off WIFIGFXBox after timed interval
-    // if (WIFIGFXBoxdisplaystarted && (millis() >= WIFIGFXBoxstartedTime + 10000) && (!AttemptingConnect)) {
-    //   WIFIGFXBoxdisplaystarted = false;
-    //   // - see OTA    WebServerActive = false; ?
-    //   Display(true, -99);delay(10);
-    //   Display(true, Display_Page);
-    //   delay(50);  // change page back, having set display -99  above which alows the graphics to reset up the boxes etc.
-    // }
+
 
   // the instrument log saves everything every LogInterval (set in config)  secs, even if data is not available! (NMEA0183DoubleNA)
   // uses LOCAL Time as this advances if GPS (UTC) is lost (but resets when GPS received again.)
@@ -520,9 +509,6 @@ void loop() {
             ValidData(BoatData.STW), ValidData(BoatData.MagHeading), ValidData(BoatData.SOG), ValidData(BoatData.COG),
             ValidData(BoatData.WaterDepth), ValidData(BoatData.WindSpeedK), ValidData(BoatData.WindAngleApp));
   }
-
-
-
 
   }
   delay(10);
@@ -617,23 +603,6 @@ void InitNMEA2000() {  // make it display device Info on start up..
                                                            //0                           // CertificationLevel
   );
 #endif
-
-
-
-
-
-
-
-
-  // NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
-  //                                001,                      // Manufacturer's product code
-  //                                "MarineMultiDisplay",    // Manufacturer's Model ID
-  //                                "TEST",                   //N2kSwCode
-  //                                "Guitron ESP32s 4 inch",  // N2kModelVersion
-  //                                3                         //,                            // LoadEquivalency (of 50mA loads)
-  //                                                          //2102,                           // N2kversion default 2102
-  //                                                          //0                           // CertificationLevel
-  // );
 
   NMEA2000.EnableForward(false);                        // we are not  forwarding / streaming anything
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 15);  // needs this to enable device information send at start up?
@@ -756,11 +725,6 @@ void SPIFFS_Setup() {
     gfx->println(F(""));
   }
 }
-//*********** FLASH OVERLOAD  functions So can just be called from sub routines*********
-// void EEPROM_WRITE(_sDisplay_Config B, _sWiFi_settings_Config A) {
-//   DEBUG_PORT.printf("SAVING CONFIG\n");
-//   SaveConfiguration(SPIFFS, Setupfilename, B, A);
-// }
 
 //***********  Overload for save and load that keeps file type here for easy change if needed
 // I started with FFat but could not overcome crash 
@@ -2014,4 +1978,4 @@ void EventTiming(String input, int number){//.. prints when string !=start or St
   //  if (OutOfSetup) { SetSerialFor_DefaultBaud(); }
   }
 }
-
+

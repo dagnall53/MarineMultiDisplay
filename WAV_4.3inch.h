@@ -14,7 +14,7 @@ to get DEBUG_PORT.print working
 #ifndef _WAV_DEF_H
 #define _WAV_DEF_H
 
-const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B (wide) box";
+const char _device[]=  "Wavshare ESP32-S3-Touch-LCD-4.3B 800x480 module";
   #define ESP32_CAN_TX_PIN GPIO_NUM_15  // for the waveshare '4.3B' 800x480 module boards! ST7272
   #define ESP32_CAN_RX_PIN GPIO_NUM_16  // 
 
@@ -25,7 +25,54 @@ Arduino_DataBus *bus = new Arduino_SWSPI(
   8 /* SDA /10? */,             // Master Out Slave In pin
   GFX_NOT_DEFINED /* MISO */  // Master In Slave Out pin (not used)
 );
+
+#define LCD_WIDTH                  (800) // LCD width in pixels
+#define LCD_HEIGHT                 (480) // LCD height in pixels
+
+#define LCD_RGB_IO_DE              (5)   // Data enable pin number
+#define LCD_RGB_IO_VSYNC           (3)   // VSYNC pin number
+#define LCD_RGB_IO_HSYNC           (46)  // HSYNC pin number
+#define LCD_RGB_IO_PCLK            (7)   // Pixel clock pin number
+
+#define LCD_RGB_TIMING_HFP         (8)   // Horizontal front porch
+#define LCD_RGB_TIMING_HPW         (4)   // Horizontal pulse width
+#define LCD_RGB_TIMING_HBP         (8)   // Horizontal back porch
+#define LCD_RGB_TIMING_VFP         (8)   // Vertical front porch
+#define LCD_RGB_TIMING_VPW         (4)   // Vertical pulse width
+#define LCD_RGB_TIMING_VBP         (8)   // Vertical back porch
+
+#define LCD_RGB_IO_DATA0           (14)  // RGB data pin 0
+#define LCD_RGB_IO_DATA1           (38)  // RGB data pin 1
+#define LCD_RGB_IO_DATA2           (18)  // RGB data pin 2
+#define LCD_RGB_IO_DATA3           (17)  // RGB data pin 3
+#define LCD_RGB_IO_DATA4           (10)  // RGB data pin 4
+#define LCD_RGB_IO_DATA5           (39)  // RGB data pin 5
+#define LCD_RGB_IO_DATA6           (0)   // RGB data pin 6
+#define LCD_RGB_IO_DATA7           (45)  // RGB data pin 7
+#define LCD_RGB_IO_DATA8           (48)  // RGB data pin 8
+#define LCD_RGB_IO_DATA9           (47)  // RGB data pin 9
+#define LCD_RGB_IO_DATA10          (21)  // RGB data pin 10
+#define LCD_RGB_IO_DATA11          (1)   // RGB data pin 11
+#define LCD_RGB_IO_DATA12          (2)   // RGB data pin 12
+#define LCD_RGB_IO_DATA13          (42)  // RGB data pin 13
+#define LCD_RGB_IO_DATA14          (41)  // RGB data pin 14
+#define LCD_RGB_IO_DATA15          (40)  // RGB data pin 15
+
+#define LCD_RGB_BOUNCE_BUFFER_SIZE (LCD_WIDTH * 10)
+#define LCD_RGB_TIMING_FREQ_HZ     (16 * 1000 * 1000) // RGB timing frequency
+
+// Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
+//   LCD_RGB_IO_DE, LCD_RGB_IO_VSYNC, LCD_RGB_IO_HSYNC, LCD_RGB_IO_PCLK,
+//   LCD_RGB_IO_DATA11, LCD_RGB_IO_DATA12, LCD_RGB_IO_DATA13, LCD_RGB_IO_DATA14, LCD_RGB_IO_DATA15,
+//   LCD_RGB_IO_DATA5, LCD_RGB_IO_DATA6, LCD_RGB_IO_DATA7, LCD_RGB_IO_DATA8, LCD_RGB_IO_DATA9, LCD_RGB_IO_DATA10,
+//   LCD_RGB_IO_DATA0, LCD_RGB_IO_DATA1, LCD_RGB_IO_DATA2, LCD_RGB_IO_DATA3, LCD_RGB_IO_DATA4,
+//   0 /* hsync_polarity */, LCD_RGB_TIMING_HFP, LCD_RGB_TIMING_HPW, LCD_RGB_TIMING_HBP,
+//   0 /* vsync_polarity */, LCD_RGB_TIMING_VFP, LCD_RGB_TIMING_VPW, LCD_RGB_TIMING_VBP,
+//   1 /* pclk_active_neg */, 13000000 /* prefer_speed */, false /* useBigEndian */,
+//   0 /* de_idle_high */, 0 /* pclk_idle_high */, 0);
 // from C:\Users\dagna\OneDrive\DocOneDrive\Arduino\libraries\GFX_Library_for_Arduino\examples\PDQgraphicstest\Arduino_GFX_dev_device.h
+
+// And with my corrected pins for green! 
 Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(  // MY BOARD modified pin numbers 4.3  R's from 3,4,5,6,7  1,2,42,41,40  G2,G3,G4,G5,G6,G7   39,0,45,48,47,21, B3,4,5,6,B7   14,38,18,17,10
   5 /* DE */, 3 /* VSYNC */, 46 /* HSYNC */, 7 /* PCLK */,
   1,2,42,41,40, //R pins R3,4,5,6,R7  1,2,42,41,40

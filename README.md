@@ -7,6 +7,9 @@ The Wavshare modules were selected because they have in built CANBUS and 6-36V p
 With the Guitron module, it is necessary to provide an external 5v power supply (from the boat or N2000 bus) and optionally add a cheap CAN drives such as TJA1050, and wire it (with a 3.3V power supply) to the 8 pin connector. 
 
 Despite sounding more practical for boat use, the Wavshare modules have a very iritating 'feature' in that they do not switch on with power on, and require pressing their reset buttons before the screens turn on. 
+ALSO- As of 18/10/25 They seem to be unreliable for N2K so only use this code for NON n2K direct applications. 
+This seems to be a TWAIN / Wavshare/ ESP32S3  issue, but the Guitron is also affected
+
 
 <i><small>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
