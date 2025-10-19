@@ -26,14 +26,14 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 
 
 
-// also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note Should automatically detects use of ESP32 and  use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
-///----  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
+// also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note TL library automatically detects use of ESP32 and use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
+///-BUT NOT esp32s or esp32C ---  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.36";
+const char soft_version[] = " V0.40";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
-#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
 //#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
@@ -57,7 +57,7 @@ bool _WideDisplay;  // so that I can pass this to sub files
 #include "src/TAMC_GT911.h"  // use local copy as it is edited!! 
 
 
-
+#include "aux_functions.h"
 //********* stuff t add my library for paged displays *****************
 
 #include "src/MarinePageGFX.h"  // Double-buffered graphics
@@ -99,10 +99,14 @@ bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 
 int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
 
+
+#include "driver/twai.h"  // help with debugging: knows about  twai_status messages 
+
+
 #include "N2kMsg.h"            //part of https://github.com/ttlappalainen/NMEA2000[NMEA2000] library. I have it in C:\Users\dagna\OneDrive\DocOneDrive\Arduino\libraries       
                                //https://github.com/ttlappalainen/NMEA0183
 #include "NMEA2000.h"          //https://github.com/ttlappalainen/NMEA2000[NMEA2000] library. 
-#include <NMEA2000_esp32xx.h>  //https://github.com/jiauka/NMEA2000_esp32xx
+#include "src/NMEA2000_esp32xx.h"  // use local copy in case I need to adjust / modify https://github.com/jiauka/NMEA2000_esp32xx
 #include <N2kMessages.h>       // also part of https://github.com/ttlappalainen/NMEA2000[NMEA2000] library.    ?????? why does this need <> and the n2kMsg.h need (or use) "" ?????
 tNMEA2000& NMEA2000 = *(new tNMEA2000_esp32xx());
 
@@ -451,7 +455,60 @@ void loop() {
   static unsigned long DebugInterval;
   static unsigned long SSIDSearchTimer;
   static int WiFiChannel;
-  static bool ClearScreenNow;
+
+  static unit32_t lastRxerrorcount,lastTxerrorcount;
+
+  static bool ClearScreenNow,productInfoSent,errorStatusUpdated;
+
+  if (millis() > 60000 && !productInfoSent) { //send N2K product info without being asked! 
+  NMEA2000.SendProductInformation();
+  productInfoSent = true;
+  }
+
+
+
+
+  static unsigned long lastTWAIStatus = 0;
+  unsigned long now = millis();
+  twai_status_info_t status;  // ← Move this outside the if block
+  if (now - lastTWAIStatus >= 1000) {
+    lastTWAIStatus = now;
+    twai_get_status_info(&status);
+    if ((status.state == 1) && errorStatusUpdated) {  // Error-passive or bus-off
+       errorStatusUpdated=false;
+       DEBUG_PORT.printf("[TWAI Fault cleared] State: %d (before clear TX errors: %d RX errors: %d) \n", status.state, lastTxerrorcount,lastRxerrorcount);
+       }
+    if (status.state == 1){lastRxerrorcount=status.rx_error_counter;lastTxerrorcount=status.tx_error_counter;}
+    // DEBUG_PORT.printf("[MAIN LOOP TWAI Status] RX missed: %d, TX errors: %d, RX errors: %d, Bus errors: %d, State: %d\n",
+    //                   status.rx_missed_count,
+    //                   status.tx_error_counter,
+    //                   status.rx_error_counter,
+    //                   status.bus_error_count,
+    //                   status.state);
+  
+  
+
+  if (status.state != 1) {  // Error-passive or bus-off
+    errorStatusUpdated=true;
+  // DEBUG_PORT.printf("[TWAI Fault] State: %d | TX errors: %d\n", status.state, status.tx_error_counter);
+   esp_err_t res = twai_initiate_recovery();
+  //  DEBUG_PORT.printf("[TWAI Recovery] Result: %d\n", res);
+    delay(10);  // Let recovery settle
+    if (res == ESP_OK) {
+     esp_err_t startRes = twai_start();
+   //   DEBUG_PORT.printf("[TWAI Restart] Result: %d\n", startRes);
+      twai_get_status_info(&status);
+   //   DEBUG_PORT.printf("[TWAI Post-Restart] State: %d | TX errors: %d\n", status.state, status.tx_error_counter);
+    }//else{DEBUG_PORT.printf("[TWAI Post-Restart fail] State: %d | TX errors: %d RX errors: %d\n", status.state, status.tx_error_counter,status.rx_error_counter);}
+  }
+
+  }
+
+
+
+
+
+
   delay(1);
  // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
@@ -478,7 +535,10 @@ void loop() {
   page->swap();
   page->fillScreen(NEAR_BLACK);
   Display(ClearScreenNow,Display_Page);
-  page->GFXBorderBoxPrintf(StatusBox, "%s Page%i  loop: <%.1ffps>",Display_Config.PanelName,Display_Page, 1000.0/(millis()-DebugInterval));  // common to all pages  
+  
+  page->GFXBorderBoxPrintf(StatusBox, "UDP%i Esp%i N2K%i %s Page%i loop:<%.1ffps>",
+                            Current_Settings.UDP_ON, Current_Settings.ESP_NOW_ON,Current_Settings.N2K_ON, 
+                            Display_Config.PanelName,Display_Page, 1000.0/(millis()-DebugInterval) );  // common to all pages  
   DebugInterval=millis();
   if(ClearScreenNow){ClearScreenNow= false;}
   if(WIFIGFXBoxdisplaystarted && (millis() <= WIFIGFXBoxstartedTime + 10000) ) {
@@ -559,55 +619,62 @@ void InitNMEA2000() {  // make it display device Info on start up..
   NMEA2000.SetN2kCANReceiveFrameBufSize(100);
   // Set device information
   char SnoStr[33];
-  uint32_t SerialNumber;
-  SerialNumber = 9999;
+  //uint32_t SerialNumber;
+  //SerialNumber = 9999;
+  //SerialNumber = (uint32_t)ESP.getEfuseMac(); // wraps and gives negative number!
+  uint32_t SerialNumber = (uint32_t)(ESP.getEfuseMac() ^ (ESP.getEfuseMac() >> 32));  // Simple XOR fold
   snprintf(SnoStr, 32, "%lu", SerialNumber);
   DEBUG_PORT.println("   Initializing ...");
-  DEBUG_PORT.printf("   Unique ID: <%i> \r\n", SerialNumber);
+  DEBUG_PORT.printf("   Unique ID: <0x%08lX>\r\n", SerialNumber);
   NMEA2000.SetDeviceInformation(SerialNumber,  // Unique number. Use e.g. Serial number.
                                 130,           // Device function=Display. See codes on https://web.archive.org/web/20190531120557/https://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
                                 120,           // Device class=Display Device.
                                 2046,          // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
                                 4              //marine
   );
+  uint8_t node;
 #ifdef WAVSHARE
 #ifdef WIDEBOX
   NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
-                                 001,                      // Manufacturer's product code
-                                 "MarineMultiDisplay",    // Manufacturer's Model ID
+                                 003,                      // Manufacturer's product code
+                                 "WideMarineMultiDisplay",    // Manufacturer's Model ID
                                  soft_version,                   //N2kSwCode
                                  "Wavshare 4.3 800x480 Wide Display",  // N2kModelVersion
                                  3                         //,                            // LoadEquivalency (of 50mA loads)
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
+  node=120;
 #else
   NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
-                                 001,                      // Manufacturer's product code
-                                 "MarineMultiDisplay",    // Manufacturer's Model ID
+                                 002,                      // Manufacturer's product code
+                                 "WAVMarineMultiDisplay",    // Manufacturer's Model ID
                                  soft_version,                   //N2kSwCode
                                  "Wavshare 4 inch 480x480",  // N2kModelVersion
                                  3                         //,                            // LoadEquivalency (of 50mA loads)
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
+  node=121;
 #endif
 #else
   NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
                                  001,                      // Manufacturer's product code
-                                 "MarineMultiDisplay",    // Manufacturer's Model ID
+                                 "GuitMarineMultiDisplay",    // Manufacturer's Model ID
                                  soft_version,                   //N2kSwCode
                                  "Guitron ESP32s3 4 inch480x480",  // N2kModelVersion
                                  3                         //,                            // LoadEquivalency (of 50mA loads)
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
-#endif
-
+  node=122;
+ #endif
   NMEA2000.EnableForward(false);                        // we are not  forwarding / streaming anything
-  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 15);  // needs this to enable device information send at start up?
+  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, node);  // needs this to enable device information send at start up? and select preferred start port 
   NMEA2000.SetMsgHandler(HandleNMEA2000Msg);            // see main ino)
   NMEA2000.Open();
+  delay(10);
+  DEBUG_PORT.printf("→ Claimed CAN address: %d\n", NMEA2000.GetN2kSource());
 }
 
 //******* Define a handler for the interrupt to work *******
@@ -646,13 +713,24 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
   if ((Display_Page == -21) || (Display_Page == -22)) {  // only do this terminal debug display if on the N2K viewing debug page!
     char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
-    if (known) {
-      page->UpdateLinef(NEAR_BLACK, 7, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+    // old display but with seconds from millis
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "%5.3fs N2K:[%.2X][%.5X](PGN%i %s)",
+         millis() / 1000.0,
+         N2kMsg.Source,
+         N2kMsg.PGN,
+         N2kMsg.PGN,
+         decode);
+
+    if (known) {// NOTE Only N2K shows time as part of some debug I am activeley looking at directly writes to Terminal because we are known to be on page -21 or -22
+      page->UpdateLinef(NEAR_BLACK, 7, Terminal, "%s\n",buffer);
     } else {
-      page->UpdateLinef(52685, 7, Terminal, "N2K:(%i)[%.2X%.5X] %s\n", N2kMsg.PGN, N2kMsg.Source, N2kMsg.PGN, decode);
+      page->UpdateLinef(52685, 7, Terminal, "%s\n",buffer);
     }
+    if (ColorSettings.SerialOUT) {DEBUG_PORT.println(buffer);}
     //52685 is light gray in RBG565 light gray for pgns we do not decode. (based on handler setup)
-  }
+
+ }
   // DEBUG_PORT.print(" N2K :Pgn");
   // DEBUG_PORT.printlnN2kMsg.PGN);
 }
@@ -1790,7 +1868,7 @@ void UseNMEA(char* buf, int type) {
       if (type == 3) {page->UpdateLinef(RED, 7, Terminal, "ESP:%s\n", buf);} // add lf as esp does not have it 
       if (type == 1) { page->UpdateLinef(GREEN, 7, Terminal, "Ser:%s", buf);}
     }
-    // now decode it for the displays to use
+    // now decode it for the displays to use and possibly send it to serial ColorSettings is not an obvious "config, but is where my "extra settings are"
     if (ColorSettings.SerialOUT) {DEBUG_PORT.println(buf);}
 
     if (type != 4) { // Now process the NMEA0183 messages into BoatData so we can use the data. (N2K is dealt with elsewhere!)
@@ -1978,4 +2056,3 @@ void EventTiming(String input, int number){//.. prints when string !=start or St
   //  if (OutOfSetup) { SetSerialFor_DefaultBaud(); }
   }
 }
-

@@ -452,6 +452,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->Addtitletobutton(Switch9, 1, 0, "ESP-N");
         page->GFXBorderBoxPrintf(Switch10, Current_Settings.N2K_ON On_Off);
         page->Addtitletobutton(Switch10, 1, 0, "N2K");
+         page->GFXBorderBoxPrintf(Switch6, ColorSettings.SerialOUT On_Off);
+          page->Addtitletobutton(Switch6, 1, 0, "Send>USB");
         if (!Terminal.debugpause) {
           page->Addtitletobutton(Terminal, 1, 0, "TERMINAL");
         } else {
@@ -474,6 +476,10 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
           page->Addtitletobutton(Terminal, 1, 0, "-paused-");
         }
       }
+      if (CheckButton(Switch6)) {
+        ColorSettings.SerialOUT = !ColorSettings.SerialOUT;
+        DataChanged = true;
+      };
       // if (CheckButton(Switch6) && hasSD) {
       //   Current_Settings.Log_ON = !Current_Settings.Log_ON;
       //  // NO LOGGING YET if (Current_Settings.Log_ON) { StartInstlogfile(SD); }
@@ -485,6 +491,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       //  //  NO LOGGING YET if (Current_Settings.Data_Log_ON) { DATA_Log_File_Create(SD); }
       //   DataChanged = true;
       // };
+
 
       if (CheckButton(Switch8)) {
         Current_Settings.UDP_ON = !Current_Settings.UDP_ON;
