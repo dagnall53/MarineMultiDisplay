@@ -24,6 +24,21 @@ extern String Fontname;  // trying to sort auto sizing and need the fontname
 
 static Arduino_GFX* _jpegTargetCanvas = nullptr;  //This will hold the canvas you want to draw to—whe
 
+uint16_t dimRGB565(uint16_t color) { //simple dim by half function 
+    // Extract RGB components
+    uint8_t r = (color >> 11) & 0x1F; // 5 bits
+    uint8_t g = (color >> 5) & 0x3F;  // 6 bits
+    uint8_t b = color & 0x1F;         // 5 bits
+
+    // Halve each component (brightness reduction)
+    r >>= 1;
+    g >>= 1;
+    b >>= 1;
+
+    // Repack into RGB565
+    return (r << 11) | (g << 5) | b;
+}
+
 static void setJPEGTargetCanvas(Arduino_Canvas* canvas) {
   _jpegTargetCanvas = canvas;
 }
@@ -354,9 +369,10 @@ void MarinePageGFX::drawBoatOutline(int x, int y, int size) {  // add uint16_t c
 
 
 
-void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, float angleDeg, uint16_t color, bool shadow) {
+void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, _sInstData &data, uint16_t color, bool shadow) {
   if (!isReady() || !_textCanvas) return;
-
+  float angleDeg = data.data;
+  if (millis()>= data.updated +10000){data.greyed = true;}
   // Compute center and radius from button
   int16_t centerX = button.h + button.width / 2;
   int16_t centerY = button.v + button.height / 2;
@@ -404,9 +420,14 @@ void MarinePageGFX::drawCompassPointer(_sButton& button, int16_t baseWidth, int1
   }
 
   // Main pointer
+  if (!data.greyed){
   _textCanvas->fillTriangle(tailX, tailY, baseX1, baseY1, tipX, tipY, SILVER_GRAY);
   _textCanvas->fillTriangle(tailX, tailY, baseX2, baseY2, tipX, tipY, color);
-  _textCanvas->drawLine(tipX, tipY, tailX, tailY, NEAR_BLACK);
+  _textCanvas->drawLine(tipX, tipY, tailX, tailY, NEAR_BLACK);}
+  else {_textCanvas->fillTriangle(tailX, tailY, baseX1, baseY1, tipX, tipY, dimRGB565(SILVER_GRAY));
+  _textCanvas->fillTriangle(tailX, tailY, baseX2, baseY2, tipX, tipY, dimRGB565(color));
+  //_textCanvas->drawLine(tipX, tipY, tailX, tailY, NEAR_BLACK);
+  }
 }
 
 void MarinePageGFX::clearOutsideRadius(_sButton& button, uint16_t color) {
@@ -510,8 +531,12 @@ void MarinePageGFX::DrawScrollingGraph(_sButton& button, const GraphBuffer& buff
   //pushCanvas();
 }
 
-void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, const char* fmt, ...) {
+
+
+// added extra &data to enable access to .updated so we can turn this grey if old .. I have not worked out how to modify format it yet to avoid the double use and .data in the call 
+void MarinePageGFX::AutoPrint2Size(_sButton& button,_sInstData &data , const char* reference, const char* fmt, ...) {
   if (!_textCanvas || !fmt) return;
+  if(millis()>=data.updated +10000){data.greyed= true;}
   char valueBuffer[64];
   int magnify = 1;
   va_list args;
@@ -547,7 +572,7 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
       _textCanvas->setTextSize(textmag);
       _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
       printable = ((w1 <= printableWidth) && (h1 <= printableHeight));
-//      DEBUG_PORT.printf("**  printable?(%i)page (%ix%i) Font %i %s,mag %i Gives(%i x %i) \n", printable, , printableWidth, printableHeight, fontIndex, fontNameTable[fontIndex], textmag, w1, h1);
+      //      DEBUG_PORT.printf("**  printable?(%i)page (%ix%i) Font %i %s,mag %i Gives(%i x %i) \n", printable, , printableWidth, printableHeight, fontIndex, fontNameTable[fontIndex], textmag, w1, h1);
       if (printable) {  //save largest font at each magnification
         chosenFont = fontIndex;
         chosenMag = textmag;
@@ -557,43 +582,15 @@ void MarinePageGFX::AutoPrint2Size(_sButton& button, const char* reference, cons
       lastprintable = printable;  // chosenFont/mag should hold the last printable font/magnification
     }
   }
-
- // DEBUG_PORT.printf("**page (%ix%i) CHOSENFont %i, mag %i (%s)\n", printableWidth, printableHeight, chosenFont, chosenMag, fontNameTable[chosenFont]);
-  // OLD
-  // int lastw = 0;
-  // int lasth = 0;
-  // for (int fontIndex = 7; fontIndex <= 13; fontIndex++) {
-  //   setFontByIndex(fontIndex);
-  //   _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
-  //   if ((w1 >= printableWidth) || (h1 >= printableHeight)) { break; }  // make sure that if we have an error in the font table and loop, we still catch the lagest font
-  //   lastw = w1;
-  //   lasth = h1;
-  //   chosenFont = fontIndex;
-  // }
-  // // DEBUG_PORT.printf("**page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
-  // // allow possibilty that if biggest font is less than half the printableWidth and then magnify by 2
-  // if ((lastw <= printableWidth / 2) && (lasth <= printableHeight / 2)) {
-  //   magnify = 4;
-  //   _textCanvas->setTextSize(magnify);
-  //   lastw = 0;
-  //   lasth = 0;
-  //   // get the largest font size again
-  //   for (int fontIndex = 7; fontIndex <= 13; fontIndex++) {
-  //     setFontByIndex(fontIndex);
-  //     _textCanvas->getTextBounds(reference, 0, 0, &x1, &y1, &w1, &h1);
-  //     if ((w1 >= printableWidth) || (h1 >= printableHeight)) { break; }  // make sure that if we have an error in the fint table and loop, we still catch the lagest font
-  //     lastw = w1;
-  //     lasth = h1;
-  //     chosenFont = fontIndex;
-  //   }
-  //   //    DEBUG_PORT.printf("*****page %iX%i Font selected is font %i,  magnification %i lastw:%i lasth:%i\n",printableWidth,printableHeight,chosenFont, magnify, lastw,lasth);
-  // }
-  // SET chosen magnify and font for printing in UpdateTwoSize_MultiLine(
+  // SET chosen magnify and font and dimmed colour/ for printing in UpdateTwoSize_MultiLine(
+  uint16_t originalTextColor = button.TextColor;
+  if (data.greyed){button.TextColor=dimRGB565(button.TextColor);} 
   button.lastY = button.v + button.bordersize;
   UpdateTwoSize_MultiLine(chosenMag, true, true, chosenFont, chosenFont - 1, button, "%s", valueBuffer);
   _textCanvas->setTextSize(1);  // reset magnify for other functions
   button.PrintLine = 0;
   button.lastY = button.v + button.bordersize;
+   if (data.greyed){button.TextColor=originalTextColor; }  // put back the playtings in the box!! 
 }
 
 
@@ -768,7 +765,7 @@ void MarinePageGFX::AddTitleInsideBox(_sButton& button, int position, int font, 
   _textCanvas->setCursor(tx, ty);
   _textCanvas->print(buffer);
 }
-
+// [Positions ]1:top left 2:Top Right 3:Bottom Right 4:Bottom Left  5:Bottom Center 6:Top Center
 void MarinePageGFX::Addtitletobutton(_sButton& button, int position, int font, const char* fmt, ...) {
   if (!_textCanvas || !fmt) return;
 

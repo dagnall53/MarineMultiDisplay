@@ -29,7 +29,7 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note TL library automatically detects use of ESP32 and use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///-BUT NOT esp32s or esp32C ---  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V0.40";
+const char soft_version[] = " V1.00";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
@@ -37,7 +37,8 @@ const char soft_version[] = " V0.40";
 //#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
-bool _WideDisplay;  // so that I can pass this to sub files
+bool _WideDisplay;    // so that I can pass this to sub files SEt in Setup once it knows everything
+int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
 #include <Arduino.h>       
 //Include libraries..
 #include <WiFi.h>
@@ -97,12 +98,12 @@ bool hasSD, hasFATS, hasSPIFFS,Touch_available;
 #include "debug_port.h"
 #include "SDControl.h" // seeing if I can wrap SD_CS() into the filemanager
 
-int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
+
 
 
 #include "driver/twai.h"  // help with debugging: knows about  twai_status messages 
 
-
+#include <driver/twai.h>
 #include "N2kMsg.h"            //part of https://github.com/ttlappalainen/NMEA2000[NMEA2000] library. I have it in C:\Users\dagna\OneDrive\DocOneDrive\Arduino\libraries       
                                //https://github.com/ttlappalainen/NMEA0183
 #include "NMEA2000.h"          //https://github.com/ttlappalainen/NMEA2000[NMEA2000] library. 
@@ -449,26 +450,48 @@ void setup() {
    delay(100); 
  }
 
-void loop() {
-  static unsigned long PageInterval;
-  static unsigned long LogInterval;
-  static unsigned long DebugInterval;
-  static unsigned long SSIDSearchTimer;
-  static int WiFiChannel;
-
-  static unit32_t lastRxerrorcount,lastTxerrorcount;
-
-  static bool ClearScreenNow,productInfoSent,errorStatusUpdated;
-
-  if (millis() > 60000 && !productInfoSent) { //send N2K product info without being asked! 
-  NMEA2000.SendProductInformation();
-  productInfoSent = true;
-  }
 
 
-
-
+void CheckTWAIAndRecover() {
+  if (!Current_Settings.N2K_ON){return;}
+  static bool errorStatusUpdated;
   static unsigned long lastTWAIStatus = 0;
+  static unsigned long Errortime;
+  unsigned long now = millis();
+  twai_status_info_t status;  // ← Move this outside the if block
+  if (now - lastTWAIStatus >= 1000) {
+    lastTWAIStatus = now;
+    twai_get_status_info(&status);
+    if ((status.state == 1) && errorStatusUpdated) {  // Error-passive or bus-off
+       errorStatusUpdated=false;
+       DEBUG_PORT.printf("[TWAI Fault cleared] State: %d (RX errors: %d TX errors: %d) \n", status.state, status.rx_error_counter,status.tx_error_counter);
+       }
+    // DEBUG_PORT.printf("[MAIN LOOP TWAI Status] RX missed: %d, TX errors: %d, RX errors: %d, Bus errors: %d, State: %d\n",
+    //                   status.rx_missed_count,
+    //                   status.tx_error_counter,
+    //                   status.rx_error_counter,
+    //                   status.bus_error_count,
+    //                   status.state);
+  
+  
+
+  if (status.state != 1) {  // Error-passive or bus-off
+    errorStatusUpdated=true;
+  // DEBUG_PORT.printf("[TWAI Fault] State: %d | TX errors: %d\n", status.state, status.tx_error_counter);
+   esp_err_t res = twai_initiate_recovery();
+  //  DEBUG_PORT.printf("[TWAI Recovery] Result: %d\n", res);
+    delay(10);  // Let recovery settle
+    if (res == ESP_OK) {
+     esp_err_t startRes = twai_start();
+      DEBUG_PORT.printf("[TWAI Restart] Result: %d, \n", startRes);
+      twai_get_status_info(&status);
+   //   DEBUG_PORT.printf("[TWAI Post-Restart] State: %d | TX errors: %d\n", status.state, status.tx_error_counter);
+    }
+  }
+}
+}
+ /* 
+ static unsigned long lastTWAIStatus = 0;
   unsigned long now = millis();
   twai_status_info_t status;  // ← Move this outside the if block
   if (now - lastTWAIStatus >= 1000) {
@@ -500,15 +523,16 @@ void loop() {
       twai_get_status_info(&status);
    //   DEBUG_PORT.printf("[TWAI Post-Restart] State: %d | TX errors: %d\n", status.state, status.tx_error_counter);
     }//else{DEBUG_PORT.printf("[TWAI Post-Restart fail] State: %d | TX errors: %d RX errors: %d\n", status.state, status.tx_error_counter,status.rx_error_counter);}
-  }
+  }*/
 
-  }
-
-
-
-
-
-
+void loop() {
+  static unsigned long PageInterval;
+  static unsigned long LogInterval;
+  static unsigned long DebugInterval;
+  static unsigned long SSIDSearchTimer;
+  static int WiFiChannel;
+  static bool ClearScreenNow;
+  CheckTWAIAndRecover();
   delay(1);
  // EventTiming("START");
   server.handleClient();  // for OTA webserver etc. will set HaltOtherOperations for OTA upload to try and overcome Wavshare boards low WDT settings or slow performance(?)
@@ -644,7 +668,7 @@ void InitNMEA2000() {  // make it display device Info on start up..
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
-  node=120;
+  node=121;
 #else
   NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
                                  002,                      // Manufacturer's product code
@@ -655,7 +679,7 @@ void InitNMEA2000() {  // make it display device Info on start up..
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
-  node=121;
+  node=122;
 #endif
 #else
   NMEA2000.SetProductInformation(SnoStr,                   // N2kVersion
@@ -667,7 +691,7 @@ void InitNMEA2000() {  // make it display device Info on start up..
                                                            //2102,                           // N2kversion default 2102
                                                            //0                           // CertificationLevel
   );
-  node=122;
+  node=123;
  #endif
   NMEA2000.EnableForward(false);                        // we are not  forwarding / streaming anything
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, node);  // needs this to enable device information send at start up? and select preferred start port 
@@ -713,14 +737,22 @@ void HandleNMEA2000Msg(const tN2kMsg& N2kMsg) {  // simplified version from data
   if ((Display_Page == -21) || (Display_Page == -22)) {  // only do this terminal debug display if on the N2K viewing debug page!
     char decode[40];
     PGNDecode(N2kMsg.PGN).toCharArray(decode, 35);  // get the discription of the PGN from my string function, trucated to 35 char
-    // old display but with seconds from millis
+    // old display but with seconds from millis for display -22 which is for detailed N2K decoding 
     char buffer[100];
+    if ((Display_Page == -22)){
     snprintf(buffer, sizeof(buffer), "%5.3fs N2K:[%.2X][%.5X](PGN%i %s)",
          millis() / 1000.0,
          N2kMsg.Source,
          N2kMsg.PGN,
          N2kMsg.PGN,
-         decode);
+         decode);}
+         else{ 
+            snprintf(buffer, sizeof(buffer), "N2K:[%.2X][%.5X](PGN%i %s)",
+              N2kMsg.Source,
+              N2kMsg.PGN,
+              N2kMsg.PGN,
+              decode);
+          }
 
     if (known) {// NOTE Only N2K shows time as part of some debug I am activeley looking at directly writes to Terminal because we are known to be on page -21 or -22
       page->UpdateLinef(NEAR_BLACK, 7, Terminal, "%s\n",buffer);
@@ -1862,7 +1894,7 @@ void UseNMEA(char* buf, int type) {
       if (type == 4) {page->UpdateLinef(NEAR_BLACK, 7, Terminal, "%s", buf);}  //8 readable ! 7 small enough to avoid line wrap issue?
     }
 
-    if ((Display_Page == -21)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
+    if ((Display_Page == -21)||(Display_Page == -22)) {  //Terminal.debugpause built into in page->UpdateLinef as part of button characteristics
       if (type == 4) {page->UpdateLinef(NEAR_BLACK, 7, Terminal, "Victron:%s", buf);} // 7 small enough to avoid line wrap issue?
       if (type == 2) {page->UpdateLinef(BLUE, 7, Terminal, "UDP:%s", buf);}// 7 small enough to avoid line wrap issue?
       if (type == 3) {page->UpdateLinef(RED, 7, Terminal, "ESP:%s\n", buf);} // add lf as esp does not have it 

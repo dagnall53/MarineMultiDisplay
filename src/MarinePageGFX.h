@@ -44,7 +44,7 @@ public:
   void GFXBorderBoxPrintf(_sButton& button, const char* fmt, ...);
 
   
-  void AutoPrint2Size(_sButton& button, const char* reference, const char* fmt, ...);
+  void AutoPrint2Size(_sButton& button,_sInstData &data , const char* reference, const char* fmt, ...) ;
   int getFontLineHeight(FontID id);
   
   void CommonSub_UpdateLine(uint16_t color, int font, _sButton &button, const char *msg);
@@ -85,7 +85,7 @@ public:
   void clearOutsideRadius(_sButton& button, uint16_t color);
 
   // compass
-  void drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, float angleDeg, uint16_t color, bool shadow);
+  void drawCompassPointer(_sButton& button, int16_t baseWidth, int16_t tailLength, _sInstData &data, uint16_t color, bool shadow);
 
   // Rounded rectangle primitives
   void drawRoundRect(int16_t x0, int16_t y0, int16_t w, int16_t h, int16_t radius, uint16_t color);

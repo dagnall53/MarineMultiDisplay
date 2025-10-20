@@ -11,7 +11,7 @@
 
 extern MarinePageGFX* page;
 #include "Globals.h"
-
+#include <driver/twai.h>
 
 #include "debug_port.h"
 
@@ -52,36 +52,34 @@ const char* label = labelBuffer;  // Now label points to the formatted string
 extern TAMC_GT911 ts;
 extern bool Touch_available;
 
-inline uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
-{
+inline uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
   return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
-void drawRGBGradientAndBitfieldBars(){
+void drawRGBGradientAndBitfieldBars() {
   const int w = 480;
   const int h = 10;
   const int barWidth = w / 6;  // 6 bars for 6 bits per channel
   // ─── RGB Gradient Bars ───
-  for (int x = 0; x < w; ++x)
-  {
+  for (int x = 0; x < w; ++x) {
     uint8_t intensity = (x * 255) / (w - 1);
 
-    page->fillRect(x, 0, 1, h, color565(0, 0, intensity));       // Blue
-    page->fillRect(x, h, 1, h, color565(0, intensity, 0));       // Green
-    page->fillRect(x, 2 * h, 1, h, color565(intensity, 0, 0));   // Red
+    page->fillRect(x, 0, 1, h, color565(0, 0, intensity));      // Blue
+    page->fillRect(x, h, 1, h, color565(0, intensity, 0));      // Green
+    page->fillRect(x, 2 * h, 1, h, color565(intensity, 0, 0));  // Red
   }
 
   // ─── RGB Bitfield Bars ───
   for (int i = 0; i < 6; ++i)  // 6 bits per channel
   {
-    uint8_t red   = 1 << i;  // R0–R5 (scaled to 6-bit)
+    uint8_t red = 1 << i;    // R0–R5 (scaled to 6-bit)
     uint8_t green = 1 << i;  // G0–G5
-    uint8_t blue  = 1 << i;  // B0–B5
+    uint8_t blue = 1 << i;   // B0–B5
 
     // Scale to 8-bit space for color565
-    uint8_t red8   = red << 2;
+    uint8_t red8 = red << 2;
     uint8_t green8 = green << 2;
-    uint8_t blue8  = blue << 2;
+    uint8_t blue8 = blue << 2;
 
     int x = i * barWidth;
 
@@ -113,23 +111,23 @@ void DoNewKeyboard() {
     wasTouched = false;  // Reset when touch is released
   }
 }
-void ShowGPSDATA(int font, _sButton &button, _sBoatData BoatData) {
-    button.lastY = 2;
-    page->UpdateLinef(font, button, " \n");
-    if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(font, button, " Satellites in view %.0f \n", BoatData.SatsInView); }
-    page->UpdateLinef(font, button, " Date: %06i \n", int(BoatData.GPSDate));
-    page->UpdateLinef(font, button, " TIME: %02i:%02i:%02i\n",
-                      int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
-    if (BoatData.Latitude.data != NMEA0183DoubleNA) {
-      page->UpdateLinef(font, button, " LAT: %s\n", LattoString(BoatData.Latitude.data));
-      page->UpdateLinef(font, button, " LON: %s\n", LongtoString(BoatData.Longitude.data));
-    }
-    if (BoatData.MagHeading.data != NMEA0183DoubleNA) { 
-      page->UpdateLinef(font, button, "Mag Heading: %.4f\n", BoatData.MagHeading); }
-    if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) { 
-      page->UpdateLinef(font, button, "Variation: %.4f\n", BoatData.Variation); }
-
- 
+void ShowGPSDATA(int font, _sButton& button, _sBoatData BoatData) {
+  button.lastY = 2;
+  page->UpdateLinef(font, button, " \n");
+  if (BoatData.SatsInView != NMEA0183DoubleNA) { page->UpdateLinef(font, button, " Satellites in view %.0f \n", BoatData.SatsInView); }
+  page->UpdateLinef(font, button, " Date: %06i \n", int(BoatData.GPSDate));
+  page->UpdateLinef(font, button, " TIME: %02i:%02i:%02i\n",
+                    int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60, (int(BoatData.GPSTime) % 3600) % 60);
+  if (BoatData.Latitude.data != NMEA0183DoubleNA) {
+    page->UpdateLinef(font, button, " LAT: %s\n", LattoString(BoatData.Latitude.data));
+    page->UpdateLinef(font, button, " LON: %s\n", LongtoString(BoatData.Longitude.data));
+  }
+  if (BoatData.MagHeading.data != NMEA0183DoubleNA) {
+    page->UpdateLinef(font, button, "Mag Heading: %.4f\n", BoatData.MagHeading);
+  }
+  if ((BoatData.Variation != NMEA0183DoubleNA) && (BoatData.Variation != 0) && !N2kIsNA(BoatData.Variation)) {
+    page->UpdateLinef(font, button, "Variation: %.4f\n", BoatData.Variation);
+  }
 }
 
 void Display(bool reset, int pageIndex) {  // setups for alternate pages to be selected by pageIndex.
@@ -173,7 +171,7 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
   //page->GFXBorderBoxPrintf(StatusBox, "%s Page%i Display monitor %i",Display_Config.PanelName,pageIndex, millis()/100);  // common to all pages
   if (RunSetup) {
     LoadConfiguration();  //Reload configuration in case new data stored
-   // DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
+                          // DEBUG_PORT.println("IN Display_Page.. Runsetup (page sets..)");
     page->clearCanvas(BLUE);
     page->setTextColor(WHITE);
   }
@@ -205,9 +203,9 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
     case -200:
       if (RunSetup || DataChanged) {  //logo examples
-     
+
         page->showPicture("/logo.jpg");
-        
+
         page->GFXBorderBoxPrintf(Full0Center, "Jpg tests -Return to Menu-");
         page->GFXBorderBoxPrintf(Full1Center, "logo.jpg");
         page->GFXBorderBoxPrintf(Full2Center, "ColourTestBars");
@@ -219,21 +217,25 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
 
       if (CheckButton(Full0Center)) { Display_Page = 0; }
       if (CheckButton(Full1Center)) {
-        page->showPicture("/logo.jpg");DataChanged=true;
+        page->showPicture("/logo.jpg");
+        DataChanged = true;
       }
       if (CheckButton(Full2Center)) {
         drawRGBGradientAndBitfieldBars();
-        DataChanged=true;
-       // page->showPicture("/logo1.jpg");
+        DataChanged = true;
+        // page->showPicture("/logo1.jpg");
       }
       if (CheckButton(Full3Center)) {
-        page->showPicture("/vicback.jpg");DataChanged=true;
+        page->showPicture("/vicback.jpg");
+        DataChanged = true;
       }
       if (CheckButton(Full4Center)) {
-        page->showPicture("/Bars.jpg");DataChanged=true;  // drawJPEGToTextCanvas and showPicture were written / corrected at separate points: showPicture was updated to be the same and needs to be asimilated
+        page->showPicture("/Bars.jpg");
+        DataChanged = true;  // drawJPEGToTextCanvas and showPicture were written / corrected at separate points: showPicture was updated to be the same and needs to be asimilated
       }
       if (CheckButton(Full5Center)) {
-        page->showPicture("/Colortest.jpg");DataChanged=true;
+        page->showPicture("/Colortest.jpg");
+        DataChanged = true;
       }
 
       break;
@@ -384,9 +386,30 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         }
         DataChanged = false;
       }
-      // if (millis() > slowdown + 500) {
-      //   slowdown = millis();
-      // }
+      twai_status_info_t status;
+      if (millis() > slowdown + 500) {  // update data
+        slowdown = millis();
+        twai_get_status_info(&status);
+        if (ColorSettings.SerialOUT){
+        DEBUG_PORT.printf("[TWAI Status] RX missed: %d, TX errors: %d, RX errors: %d, Bus errors: %d, State: %d\n",
+                          status.rx_missed_count,
+                          status.tx_error_counter,
+                          status.rx_error_counter,
+                          status.bus_error_count,
+                          status.state);}
+        page->GFXBorderBoxPrintf(Switch7, "%i", status.rx_missed_count);
+        page->Addtitletobutton(Switch7, 2, 0, "RxMissed");
+        page->GFXBorderBoxPrintf(Switch6, "%i", status.tx_error_counter);
+        page->Addtitletobutton(Switch6, 1, 0, "TX errs");
+      }
+      page->GFXBorderBoxPrintf(Switch9, Current_Settings.ESP_NOW_ON On_Off);
+      page->Addtitletobutton(Switch9, 1, 0, "ESP-N");
+      page->GFXBorderBoxPrintf(Switch10, Current_Settings.N2K_ON On_Off);
+      page->Addtitletobutton(Switch10, 1, 0, "N2K");
+      page->GFXBorderBoxPrintf(Switch11, ColorSettings.SerialOUT On_Off);
+      page->Addtitletobutton(Switch11, 1, 0, "Send>USB");
+
+
       if (CheckButton(FullTopCenter)) { Display_Page = 0; }
       if (CheckButton(Terminal)) {
         Terminal.debugpause = !Terminal.debugpause;
@@ -397,16 +420,19 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
           page->Addtitletobutton(Terminal, 1, 0, "-paused-");
         }
       }
-      // if (CheckButton(Switch9)) {
-      //   Current_Settings.ESP_NOW_ON = !Current_Settings.ESP_NOW_ON;
-      //   DataChanged = true;
-      // };
-      // if (CheckButton(Switch11)) {
-      //    SaveConfiguration();//(Display_Config, Current_Settings);
-      //   delay(50);
-      //   // Display_Page = 0;
-      //   DataChanged = true;
-      // };
+      if (CheckButton(Switch11)) {
+        ColorSettings.SerialOUT = !ColorSettings.SerialOUT;
+        DataChanged = true;
+      };
+      if (CheckButton(Switch9)) {
+        Current_Settings.ESP_NOW_ON = !Current_Settings.ESP_NOW_ON;
+        DataChanged = true;
+      };
+      if (CheckButton(Switch10)) {
+        Current_Settings.N2K_ON = !Current_Settings.N2K_ON;
+        DataChanged = true;
+      };
+
       break;
 
     case -20:  // Experimental / extra stuff
@@ -452,8 +478,8 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
         page->Addtitletobutton(Switch9, 1, 0, "ESP-N");
         page->GFXBorderBoxPrintf(Switch10, Current_Settings.N2K_ON On_Off);
         page->Addtitletobutton(Switch10, 1, 0, "N2K");
-         page->GFXBorderBoxPrintf(Switch6, ColorSettings.SerialOUT On_Off);
-          page->Addtitletobutton(Switch6, 1, 0, "Send>USB");
+        page->GFXBorderBoxPrintf(Switch6, ColorSettings.SerialOUT On_Off);
+        page->Addtitletobutton(Switch6, 1, 0, "Send>USB");
         if (!Terminal.debugpause) {
           page->Addtitletobutton(Terminal, 1, 0, "TERMINAL");
         } else {
@@ -864,16 +890,16 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (RunSetup) {
       }
       page->GFXBorderBoxPrintf(BigSingleTopLeft, "Click for graphic");
-      page->AutoPrint2Size(TopHalfBigSingleTopRight, "19.9", "%.1f\n", BoatData.SOG.data);
+      page->AutoPrint2Size(TopHalfBigSingleTopRight, BoatData.SOG,"19.9", "%.1f\n", BoatData.SOG.data);
       page->AddTitleInsideBox(TopHalfBigSingleTopRight, 1, 8, " SOG ");
-      page->AutoPrint2Size(BottomHalfBigSingleTopRight, "19.9", "%.1f\n", BoatData.COG.data);
+      page->AutoPrint2Size(BottomHalfBigSingleTopRight, BoatData.COG, "19.9", "%.1f\n", BoatData.COG.data);
       page->AddTitleInsideBox(BottomHalfBigSingleTopRight, 1, 8, " COG ");
 
       if (millis() > slowdown + 1000) {
         slowdown = millis();
         page->GFXBorderBoxPrintf(BigSingleDisplay, "");
-       if (BoatData.GPSTime != NMEA0183DoubleNA) {  ShowGPSDATA(9, BigSingleDisplay,BoatData);}
-       }
+        if (BoatData.GPSTime != NMEA0183DoubleNA) { ShowGPSDATA(9, BigSingleDisplay, BoatData); }
+      }
       if (CheckButton(BigSingleTopLeft)) { Display_Page = 10; }
       //if (CheckButton(bottomLeftquarter)) { Display_Page = 4; }  //Loop to the main settings pageIndex
       break;
@@ -885,27 +911,27 @@ void Display(bool reset, int pageIndex) {  // setups for alternate pages to be s
       if (RunSetup) { magnification = 1111111; }
       if (RunSetup || DataChanged) {
         page->fillScreen(BLUE);
-        page->clearCanvas(BLUE);  // fill screen not work, clear canvas does?        
-        
-        DrawGPSPlot(true,  BoatData, 1);  //draws circle
-      //  page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
+        page->clearCanvas(BLUE);  // fill screen not work, clear canvas does?
+
+        DrawGPSPlot(true, BoatData, 1);  //draws circle
+                                         //  page->fillCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, BigSingleDisplay.BorderColor);
         DataChanged = false;
       }
       if (millis() > slowdown + 1000) {
         slowdown = millis();
 
-      //  page->drawRoundRect(200, 200, 170, 130, 10, GREEN); easy place to put graphics tests! 
-      //page->drawBoatOutline(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2),150);
-      //page->fillCircle(100, 200, 5, RED);
+        //  page->drawRoundRect(200, 200, 170, 130, 10, GREEN); easy place to put graphics tests!
+        //page->drawBoatOutline(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2),150);
+        //page->fillCircle(100, 200, 5, RED);
         page->drawCircle(BigSingleDisplay.h + (BigSingleDisplay.width / 2), BigSingleDisplay.v + (BigSingleDisplay.height / 2), (BigSingleDisplay.height) / 2, WHITE);
         page->GFXBorderBoxPrintf(BigSingleTopLeft, "");
-        if (BoatData.GPSTime != NMEA0183DoubleNA) {  ShowGPSDATA(8, BigSingleTopLeft,BoatData);}  
+        if (BoatData.GPSTime != NMEA0183DoubleNA) { ShowGPSDATA(8, BigSingleTopLeft, BoatData); }
         page->AddTitleInsideBox(BigSingleDisplay, 2, 9, "Magnification= %4.1f pixels/m", pixel);
         page->AddTitleInsideBox(BigSingleDisplay, 1, 9, "Circle= %4.1f m", float((BigSingleDisplay.height) / (2 * pixel)));
         page->GFXBorderBoxPrintf(BigSingleTopRight, "Show Quad Display");
         page->GFXBorderBoxPrintf(BottomRightbutton, "Zoom in");
         page->GFXBorderBoxPrintf(BottomLeftbutton, "Zoom out");
-        DrawGPSPlot(false,  BoatData, magnification);
+        DrawGPSPlot(false, BoatData, magnification);
       }
       if (CheckButton(topLeftquarter)) { Display_Page = 9; }
       if (CheckButton(BigSingleTopRight)) { Display_Page = 4; }
@@ -1025,48 +1051,44 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
     timefont = 13;
   }
   if (RunSetup) slowdown = 0;
-  if ((Choice == "WIND") && (BoatData.WindSpeedK.data != NMEA0183DoubleNA) && (!BoatData.WindAngleApp.displayed)) {
+  if ((Choice == "WIND") && (BoatData.WindSpeedK.data != NMEA0183DoubleNA) ) {
     page->DrawCompass(Position);
-    page->drawCompassPointer(Position, 20, 50, BoatData.WindAngleApp.data, WHITE, true);
+    page->drawCompassPointer(Position, 20, 50, BoatData.WindAngleApp, WHITE, true);
     page->AddTitleInsideBox(Position, 6, 9, "Apparent:%.1fkts", BoatData.WindSpeedK.data);
-    BoatData.WindAngleApp.displayed = true;
   }
-  /*if (selected dta .data != NMEA0183DoubleNA) */
+  /*if (selected data .data != NMEA0183DoubleNA) */
   page->setShadowX(4);
   page->setShadowY(4);
-  if ((Choice == "SOG") && (BoatData.SOG.data != NMEA0183DoubleNA) && (!BoatData.SOG.displayed)) {
-    page->AutoPrint2Size(Position, "19.9", "%.1f", BoatData.SOG.data);
+  if ((Choice == "SOG") && (BoatData.SOG.data != NMEA0183DoubleNA) ) {
+    page->AutoPrint2Size(Position, BoatData.SOG,"19.9", "%.1f", BoatData.SOG.data);
     page->AddTitleInsideBox(Position, 6, 9, " SOG ");
     page->AddTitleInsideBox(Position, 3, 9, " Kts ");
-    BoatData.SOG.displayed = true;
   }
-  if ((Choice == "STW") && (BoatData.STW.data != NMEA0183DoubleNA) && (!BoatData.STW.displayed)) {
-    page->AutoPrint2Size(Position, "19.9", "%.1f", BoatData.STW.data);
+  if ((Choice == "STW") && (BoatData.STW.data != NMEA0183DoubleNA) ) {
+    page->AutoPrint2Size(Position, BoatData.STW,"19.9", "%.1f", BoatData.STW.data);
     page->AddTitleInsideBox(Position, 6, 9, " STW ");
     page->AddTitleInsideBox(Position, 3, 9, " Kts ");
-    BoatData.STW.displayed = true;
   }
-  if ((Choice == "DEPTH") && (BoatData.WaterDepth.data != NMEA0183DoubleNA) && (!BoatData.WaterDepth.displayed)) {
-    page->AutoPrint2Size(Position, "199.9", "%.1f", BoatData.WaterDepth.data);
+  if ((Choice == "DEPTH") && (BoatData.WaterDepth.data != NMEA0183DoubleNA) ) {
+    page->AutoPrint2Size(Position,BoatData.WaterDepth, "199.9", "%.1f", BoatData.WaterDepth.data);
     page->AddTitleInsideBox(Position, 6, 9, " DEPTH ");
     page->AddTitleInsideBox(Position, 3, 9, " m ");
-    BoatData.WaterDepth.displayed = true;
   }
 
   if (Choice == "TIME") {
-    if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
+    if (millis() > slowdown + 10000) {  //USE SOG for grey trigger as it will dissapear if GPS is lostFOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
       slowdown = millis();
-      page->AutoPrint2Size(Position, "19.99", "%02i:%02i",
-                               int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
+      page->AutoPrint2Size(Position,BoatData.SOG, "19.99", "%02i:%02i",
+                           int(BoatData.GPSTime) / 3600, (int(BoatData.GPSTime) % 3600) / 60);
       page->AddTitleInsideBox(Position, 6, 9, "UTC ");
       //setFont(10);
     }
   }
   if (Choice == "TIMEL") {
-    if (millis() > slowdown + 10000) {  //FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
+    if (millis() > slowdown + 10000) {  //USE SOG for grey trigger as it will dissapear if GPS is lost FOR the TIME display only make/update copies every 10 second!  else undisplayed copies will be redrawn!
       slowdown = millis();
-      page->AutoPrint2Size(Position, "19.99", "%02i:%02i",
-                               int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
+      page->AutoPrint2Size(Position, BoatData.SOG,"19.99", "%02i:%02i",
+                           int(BoatData.LOCTime) / 3600, (int(BoatData.LOCTime) % 3600) / 60);
       page->AddTitleInsideBox(Position, 6, 9, "LOCAL ");
       //setFont(10);
     }
@@ -1095,18 +1117,17 @@ void ButtonDataSelect(_sButton Position, int Instance, String Choice, bool RunSe
 
 
   // if (Choice == "DGRAPH2") { SCROLLGraph(RunSetup, Instance, 1, true, Position, BoatData.WaterDepth, 50, 0, 8, "Fathmometer 50m ", "m"); }
-  if (Choice == "STWGRAPH") { 
-     page->DrawScrollingGraph(Position, STWBuffer, 0, 10);  //
+  if (Choice == "STWGRAPH") {
+    page->DrawScrollingGraph(Position, STWBuffer, 0, 10);  //
     page->AddTitleInsideBox(Position, 1, 0, "STW ");
     page->AddTitleInsideBox(Position, 2, 0, "10Kt");
     page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ", 0);
-     }
-  if (Choice == "SOGGRAPH") {     
+  }
+  if (Choice == "SOGGRAPH") {
     page->DrawScrollingGraph(Position, SOGBuffer, 0, 10);  //
     page->AddTitleInsideBox(Position, 1, 0, "SOG");
     page->AddTitleInsideBox(Position, 2, 0, "10 Kt");
     page->AddTitleInsideBox(Position, 3, 0, "MIN:%i ", 0);
-     }
+  }
   if (Choice == "GPS") { ShowGPSinBox(9, Position); }
-
 }

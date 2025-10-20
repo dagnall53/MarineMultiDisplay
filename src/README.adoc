@@ -1,0 +1,63 @@
+[cols="1,1,1,1,1,1"]
+|===
+|Supported Targets |ESP32 |ESP32-C2 |ESP32-C3 |ESP32-S2 |ESP32-S3
+
+|ESP-IDF 5.x | Yes |?|YES|?|?
+|===
+
+
+= NMEA2000_esp32 library for ESP32xx boards using twai driver =
+
+Inherited object for use NMEA2000 library for ESP32 Boards.
+See also https://github.com/ttlappalainen/NMEA2000[NMEA2000] library.
+
+To use this library, you will also need NMEA2000 library.
+
+The library defines as default Tx pin to GPIO 16 and Rx pint to GPIO 4. You can 
+change these with defines:
+
+  #define ESP32_CAN_TX_PIN GPIO_NUM_5
+  #define ESP32_CAN_RX_PIN GPIO_NUM_4
+
+before including NMEA2000_CAN.h or NMEA2000_esp32xx.h
+
+A working example can be found at https://github.com/jiauka/NMEA2000-windesp32xx-idf[NMEA2000-windesp32xx-idf] library
+
+== Thanks ==
+
+Thanks to Thomas Barth, barth-dev.de and Timo Lappalainen the implementation
+of ESP32 CAN driver. This is based on their work
+
+== Changes ==
+2023-06-08
+- First release, WIP, only tested in RX
+2023-06-09
+- V0.1 working on both ESP32 and ESP32c3
+2023-06-10
+- V0.2 code cleanup
+
+== License ==
+
+
+2015-2022 Copyright (c) jiauka, Kave Oy, www.kave.fi  All right reserved.
+
+Author: Jaume Clarens
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the
+Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

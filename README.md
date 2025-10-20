@@ -6,10 +6,8 @@ It has three versions, one for the GUITRON 480x480 module, one for the 480x480 4
 The Wavshare modules were selected because they have in built CANBUS and 6-36V power supplies, making them slightly better suited for N2000 bus integration.
 With the Guitron module, it is necessary to provide an external 5v power supply (from the boat or N2000 bus) and optionally add a cheap CAN drives such as TJA1050, and wire it (with a 3.3V power supply) to the 8 pin connector. 
 
-Despite sounding more practical for boat use, the Wavshare modules have a very iritating 'feature' in that they do not switch on with power on, and require pressing their reset buttons before the screens turn on. 
-ALSO- As of 18/10/25 They seem to be unreliable for N2K so only use this code for NON n2K direct applications. 
-This seems to be a TWAIN / Wavshare/ ESP32S3  issue, but the Guitron is also affected
-
+Warning: The 4" wavshare display has a power on button that needs to be pressed. It will also require a box.
+The Wide Wavshare (Wavshare ESP32-S3-Touch-LCD-4.3B 800x480 module) is better as it has a box, but may still need "reset" (on the side of module and likely to be hidden when panel mounted!) pressing if the power supply only turns on slowly.
 
 <i><small>STANDARD DISCLAIMER: This instrument is intended as an aid to navigation and should not be relied upon as the sole source of information. 
 While every effort has been made to ensure the accuracy of message translations and their display, they are not guaranteed. 
@@ -38,14 +36,18 @@ If your module becomes corrupted and you cannot connect to USB port, you can usu
 
 ## CONFIG FILEs STRUCTURE and Editor 
 
-When connected via a PC, upload of new files (or images) is easy. However when connect by phone, you are effectively limited to just editing existing text files.
-ALL configuration files (".txt") for this version of the code ars now contained in three files that are stored in the (SPIFFS) flash and are automatically generated on first start. 
+WiFi details and data source (UDP,ESPnow,Serial,N2K) settings can be set via the touch interface.
+But more options are available by editing the configuration files via the filemanager, and this is the recommended method for setting the module.
+This allows the user to change what is shown on the "Quad Display" {the default 'page 4' start page}. 
+This configuration is saved in config.txt along with the wifi etc details.
+Data to set up the victron displays is set in vconfig.txt and colortest.text.
+If connected to a PC, you can also easily upload saved configurations (or images to be used as background to the victron page).
+However when connect by phone, you are effectively limited to just editing existing text files.
+ALL configuration files (".txt") for this version of the code are now contained in three files that are stored in the (SPIFFS) flash and are automatically generated on first start. 
 There is no need to add a specially configured SD card.
 
 <img width="928" height="562" alt="Screenshot 2025-09-11 175536" src="https://github.com/user-attachments/assets/c5023189-ab79-46fd-81c7-7a0e337b039e" />
-WiFi details and source (UDP,ESPnow,Serial,N2K) switching can be set via the touch interface, but more options are available by editing the configuration files via the filemanager, and this is the recommended method for setting the module.
-Most importantly, this allows the user to change what is shown on the "Quad Display" {the default 'page 4' start page}. This configuration is saved in config.txt along with the wifi etc details.
-Data to set up the victron displays is set in vconfig.txt and colortest.text.
+
 
 # MODULE HARDWARE 
 
@@ -62,7 +64,7 @@ Availble from multiple sources (Possibly has part number JC4848W540C_I )
 
 
 
-## FLASH file Storage 
+## FLASH file Storage Notes
 The root of the FLASH (SPIFFS) should have (at least) these files:
 config.txt, ( a json file with user settings) and 
 vconfig.txt ( a json with settings for the ble victron mode )
@@ -72,22 +74,20 @@ These txt files may (should!) self initiate if not present, but its better to ha
 Examples are available in the EXAMPLES folder on github. In particular, the example Victron configurations (colortest.txt and vconfig.txt and vicback.jpg set up a simulation to show the Victron display capability.
 
 Other files may be added :
-(note- I do not recommed using graphics on the Wavshare boards as the colour quality is poor - this may be an issue in the driver ? and the display does not really need Jpegs! )
-logo4.jpg (the new generic start screen image), 
-v3small.jpg (used in the webbrowser start screen).
-and loading.jpg, (a picture that appears during OTA updates). 
+vicback.jpg (background for the victron data display) 
+logo4.jpg (A generic start screen image), 
+v3small.jpg (may be used in the webbrowser start screen).
+and loading.jpg, (a completely unecessary picture that appears during OTA updates). 
 
 ## Connecting to NMEA 2000
 Is done automatically and does not require the module to be wirelessly connected to a multiplexer.
-
 BUT - Wireless communication is necessary to change settings. I would recommend normally connecting the display to a WiFi multiplexer just to allow it to stop searching for the network.
-
-For the Guiton device, add a CAN Driver module such as the TJA1050 and a 3.3V voltage regulator.
-Connect the bottom left connection of the 8 way socket to TJA "TX" and the connection above to TJA "RX".
-Connect the 5v power supply (Bottom Right) to the 3.3v regulator input, and the output of the 3.3V regulator to the VCC connection of the TJA.
-Connect the NMEA2000 (or boat 12V) to a 5V regulator input and connect the 5V output to the 5V power supply on the module.
-Connect Ground (top pins of the 8 way socket) to the TJA ground and Regulator grounds. 
-Lastly, connect the CANH and CANl from the TJA to the NMEA2000 canbus. 
+For the Guiton device, to add a CAN Driver module such as the TJA1050 and a 3.3V voltage regulator.
+  Connect the bottom left connection of the 8 way socket to TJA "TX" and the connection above to TJA "RX".
+  Connect the 5v power supply (Bottom Right) to the 3.3v regulator input, and the output of the 3.3V regulator to the VCC connection of the TJA.
+  Connect the NMEA2000 (or boat 12V) to a 5V regulator input and connect the 5V output to the 5V power supply on the module.
+  Connect Ground (top pins of the 8 way socket) to the TJA ground and Regulator grounds. 
+  Lastly, connect the CANH and CANl from the TJA to the NMEA2000 canbus. 
 
 ## CAUTIONS
 
@@ -101,25 +101,26 @@ With touchscreen, Go to Settings WiFi,  Click on "set SSID", and you will be pre
 
 You can select a network by touching it and it will update in the second box and show (eg) Select<GUESTBOAT>?
 if you touch this, it will select that SSID and return you to the main WiFi Settings page. 
-Press EEPROM "UPDATE" and then "Save/Reset " to save this new SSID in the eeprom.
+Press  "UPDATE" and then "Save/Reset " to save this new SSID in the eeprom.
 Settings made via the screen will be copied into the config.txt file on flash and may also be modified wirelessly. (see next).
 Settings on the config.txt (from flash) take priority when starting.
+Victron settings are only settable via the webserver. I would advise keeping a separate copy of working versins as they can be quite complex. Save/reset via touchsecreen should not modify these, but mayy 
 
-The Display does a scan on startin he wifi SSID page and this may take a while (2-4seconds).
+The Display does a scan on starting the wifi SSID page and this may take a while (2-4seconds).
 it will retry the scan once every 30 seconds if it does not find the SSID. 
 This may interrupt the display. 
 
 ### Webbrowser:
 
 There is a web interface that can be connected to by pointing a browser at http://nmeadisplay.local/ (default)
-If you change the panel name, you will need to point to the new name: eg http://panel2.local (etc).
+If you change the panel name (it is set in config.txt), you will need to point to the new name: eg http://panel2.local (etc).
 You can also point directly to the IP address as shown on the WiFi settings page. 
 
 ## USING FILE Manager to select settings.
 
 On web browser go to (IP:8080)
 EG 192.168.4.1:8080 
-This will bring up the new Trek style file browser.
+This will bring up the new file browser/ editor.
 There are three JSON files that control operations:
 The "config.txt". controls WiFi settings and major display modes, and is backed up by EEPROM, so that the SD card is not essential for basic operations.
 Vconfig.txt and colortest.txt are only stored on the SD and are related mainly to Victron BLE functions.
@@ -172,23 +173,21 @@ I have seen some issues with Simulate crashing the display very badly:(needed re
 For reference see also  https://github.com/Fabian-Schmidt/esphome-victron_ble
 
 
-GUIT version 1978885 bytes 29/09
-
-=======
-
 # COMPILE NOTES
 
-File viewer see https://github.com/holgerlembke/
+File viewer see https://github.com/holgerlembke/  buy him a coffee! 
 
-Add NMEA0183 and NMEA2000 libraries from https://github.com/ttlappalainen
+NMEA0183 and NMEA2000 libraries from https://github.com/ttlappalainen
 I have used some of the Timo Lappinen NMEA01983 conversion functions. so null data returns as NMEA0183DoubleNA (==1e-9)
+ESp32_XX ibrary is now included in /src as I was 'playing' with elements. https://github.com/jiauka/NMEA2000_esp32xx
 
-Based on concepts from AndreasSzep WiFi, https://github.com/AndrasSzep/NMEA0183-WiFi
+
+Some code is based on concepts from AndreasSzep WiFi, https://github.com/AndrasSzep/NMEA0183-WiFi
 Note: I have tried to avoid use of "Strings" as used in the original Keyboard and Andreas Szep concepts, and modified the codes to use only strings as char arrays. 
 
-The GFX is based on GFX Library for Arduino and I am using Version 1.5.5 :
+The GFX is based on GFX Library for Arduino and I am using Version 1.6.0  :https://github.com/moononournation/Arduino_GFX
 Getting the ST7701 display to work correctly was part of the initial reason for my "cheap display" Github.
-the author of the GFX code sometimes updates the drivers, so if you use a different driver you may need to make small modifications:
+The author of the GFX code sometimes updates the drivers, so if you use a different driver you may need to make small modifications:
 for the Guitron version I used :  st7701_type9_init_operations,  sizeof(st7701_type9_init_operations));
 But for this wavshare I have used type_1
 
@@ -199,11 +198,11 @@ Other useful sources are noted in the victron cpp and .h.
 
 # OTHER NOTES 
 
-The main 'User' Settings for the display are now kept in JSON fioles stored on the FATFS 
+The main 'User' Settings for the display are now kept in JSON files stored on the SPIFFs drive 
 
 Use of SD card: (for logs (later) )
 Apparently, File Names longer than 8 characters may be truncated by the SD library, so keep filenames shorter.
-I have noted particular issues when uploading  jquery.min.js  as this truncated to jquery.m.js  - but editing the name in the Filename box was succesul and it was stored on the SD with the full name.
+I have noted particular issues when uploading  jquery.min.js  as this truncated to jquery.m.js  - but editing the name in the Filename box was successful and it was stored on the SD with the full name.
 
 
 
