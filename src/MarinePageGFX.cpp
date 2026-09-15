@@ -11,7 +11,9 @@ static File _f;
 
 
 
+#ifndef DEG_TO_RAD
 #define DEG_TO_RAD 0.0174532925f
+#endif
 
 const GFXfont* _currentFont = nullptr;
 

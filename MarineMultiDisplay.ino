@@ -2,7 +2,8 @@
 
 /*
 *************** settings **************************
-USB CDC on boot enabled for Wavsahre: Disabled for Guitron 
+USB CDC on boot enabled for Wavshare: (4 inch and 4.3 inch)
+                Disabled for Guitron  . 
 Erase All flash before sketch disable -- but also test Enable to check that the code rebuilds the configuration files
 Partition scheme  Default 16M(6.25Mb APP /3.4MB SPIFFS) (copied as ora_16MB_clean.csv for CLI compile to try to overcome CLI vs IDE issues)
 PSRAM OPI PSRAM
@@ -16,9 +17,9 @@ esp32s3.menu.PartitionScheme.default_16MB.build.partitions=default_16MB
 esp32s3.menu.PartitionScheme.default_16MB.upload.maximum_size=6553600
 But NOTE: This will not be seen by Arduino until you delete its rapid access copy of its settings.
 
-This is all held in C:\Users\<yourname>dagna\AppData\Roaming\arduino-ide
+This is all held in C:\Users\<yourname>\AppData\Roaming\arduino-ide
 Close Arduino ide and then the whole directory needs to be deleted.
-I will be rebuilt next time you open Arduino, but now the 16M partition will be available as an option.
+It will be rebuilt next time you open Arduino, but now the 16M partition will be available as an option.
 See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/1170025
 
 */
@@ -29,15 +30,15 @@ See https://forum.arduino.cc/t/adding-a-partition-table-to-arduino-2-0-ide/11700
 // also see notes about <NMEA2000_CAN.h>  and #include <NMEA2000_esp32xx.h> // note TL library automatically detects use of ESP32 and use the (https://github.com/ttlappalainen/NMEA2000_esp32) library
 ///-BUT NOT esp32s or esp32C ---  // see https://github.com/ttlappalainen/NMEA2000/issues/416#issuecomment-2251908112
 
-const char soft_version[] = " V1.00";
+const char soft_version[] = " V1.01";
 
 //**********  SET DEFINES ************************************************
 //Uncomment as needed FOR THE BOARD WE WISH TO Compile for:  GUITRON 480x480 (default or..)
-//#define WAVSHARE   // 4 inch  480 by 480                Wavshare use expander chip for chip selects! 
+#define WAVSHARE   // 4 inch  480 by 480   and WIDEBOX options.              Wavshare use expander chip for chip selects! 
 //#define WIDEBOX    // 4.3inch 800 by 480 display Setup
 //**********  END SET DEFINES ********************************************
 
-bool _WideDisplay;    // so that I can pass this to sub files SEt in Setup once it knows everything
+bool _WideDisplay;    // so that I can pass this to sub files SET in Setup once it knows everything
 int Screen_Width;     // Solution to pass TOUCH_WIDTH to stuff that does not see module data until later!
 #include <Arduino.h>       
 //Include libraries..
@@ -532,6 +533,7 @@ void loop() {
   static unsigned long SSIDSearchTimer;
   static int WiFiChannel;
   static bool ClearScreenNow;
+  timeupdate();
   CheckTWAIAndRecover();
   delay(1);
  // EventTiming("START");
@@ -1833,6 +1835,8 @@ void timeupdate() {
   while ((millis() >= tick)) {
     tick = tick + 1000;  // not millis or you can get 'slip'
     BoatData.LOCTime = BoatData.LOCTime + 1;
+    if (BoatData.LOCTime >= 86400) {   // 24 * 60 * 60
+            BoatData.LOCTime = 0;  }
   }
 }
 
